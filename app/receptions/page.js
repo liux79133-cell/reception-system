@@ -119,7 +119,7 @@ export default function ReceptionsPage() {
       )
     },
     {
-      title: '会议 / 活动名称', dataIndex: 'title', ellipsis: true,
+      title: '会议 / 活动名称', dataIndex: 'title', ellipsis: true, width: 280,
       render: v => (
         <div style={{ fontWeight: 600, fontSize: 13, color: '#1a1f3e', lineHeight: 1.5 }}>{v}</div>
       )
@@ -244,7 +244,7 @@ export default function ReceptionsPage() {
           columns={columns}
           dataSource={data}
           loading={loading}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 960 }}
           onRow={record => ({
             onClick: () => setDetailRecord(record),
             style: { cursor: 'pointer' }
