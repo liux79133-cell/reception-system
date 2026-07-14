@@ -36,14 +36,16 @@ export default function AppLayout({ children }) {
   ]
 
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider locale={zhCN} theme={{ components: { Menu: { itemSelectedBg: '#d6e8ff', itemSelectedColor: '#1677ff', itemHoverBg: '#e8f1ff', itemColor: '#3a4a6e' } } }}>
       <Layout style={{ minHeight: '100vh', background: '#f0f2f7' }}>
-        <Sider theme="dark" width={200} style={{ background: '#1a1f3e', boxShadow: '2px 0 8px rgba(0,0,0,0.15)' }}>
-          <div style={{ padding: '18px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 1.5, marginBottom: 4 }}>RECEPTION</div>
-            <Typography.Text style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>接待事务管理平台</Typography.Text>
+        <Sider theme="light" width={200} style={{ background: 'linear-gradient(180deg, #e8f1ff 0%, #f0f6ff 100%)', boxShadow: '2px 0 10px rgba(22,119,255,0.08)', borderRight: '1px solid #dce8ff' }}>
+          <div style={{ padding: '18px 16px 16px', borderBottom: '1px solid rgba(22,119,255,0.12)' }}>
+            <div style={{ color: '#1677ff', fontSize: 10, letterSpacing: 1.5, marginBottom: 4, fontWeight: 600, opacity: 0.6 }}>RECEPTION</div>
+            <Typography.Text style={{ color: '#1a2d5a', fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>接待事务管理平台</Typography.Text>
           </div>
-          <Menu theme="dark" style={{ background: '#1a1f3e', marginTop: 8, border: 'none' }}
+          <Menu
+            theme="light"
+            style={{ background: 'transparent', marginTop: 8, border: 'none' }}
             selectedKeys={[pathname]}
             items={menuItems}
             onClick={({ key }) => router.push(key)}
