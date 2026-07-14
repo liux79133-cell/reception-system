@@ -52,13 +52,13 @@ export default function AppLayout({ children }) {
           />
         </Sider>
         <Layout style={{ background: '#f0f2f7' }}>
-          <Header style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', boxShadow: '0 1px 0 rgba(0,0,0,0.06)', height: 52 }}>
+          <Header style={{ background: 'linear-gradient(90deg, #e8f1ff 0%, #f0f6ff 100%)', borderBottom: '1px solid #dce8ff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', boxShadow: '0 1px 4px rgba(22,119,255,0.06)', height: 52 }}>
             {user && (
               <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: logout }] }}>
                 <Space style={{ cursor: 'pointer' }}>
-                  <Avatar size={30} style={{ background: 'linear-gradient(135deg,#1a1f3e,#3a4580)', fontSize: 12 }}>{user.name?.[0]}</Avatar>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>{user.name}</span>
-                  <span style={{ fontSize: 11, color: '#aaa', background: '#f0f0f0', padding: '1px 8px', borderRadius: 20 }}>
+                  <Avatar size={30} style={{ background: 'linear-gradient(135deg,#1677ff,#4096ff)', fontSize: 12 }}>{user.name?.[0]}</Avatar>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1a2d5a' }}>{user.name}</span>
+                  <span style={{ fontSize: 11, color: '#1677ff', background: '#d6e8ff', padding: '1px 8px', borderRadius: 20 }}>
                     {user.role === 'admin' ? '管理员' : user.role === 'editor' ? '编辑员' : '查看者'}
                   </span>
                 </Space>
