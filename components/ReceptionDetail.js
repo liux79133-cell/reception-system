@@ -1,19 +1,19 @@
 'use client'
 import { useState, useEffect } from 'react'
 import {
-  Drawer, Form, Input, Select, DatePicker, Tag, Button, Space, Divider,
-  Typography, message, Popconfirm, Row, Col, Badge, Avatar, Upload,
-  Checkbox, Progress, Modal, Radio, TimePicker, AutoComplete
+  Drawer, Input, Select, DatePicker, Tag, Button, Space,
+  message, Popconfirm, Row, Col, Avatar, Upload,
+  Checkbox, Progress, Modal, AutoComplete
 } from 'antd'
 import {
   EditOutlined, DeleteOutlined, SaveOutlined, CloseOutlined,
   CalendarOutlined, UserOutlined, BellOutlined, PaperClipOutlined,
   PictureOutlined, CheckSquareOutlined, EnvironmentOutlined,
   PlusOutlined, DeleteFilled, UploadOutlined, FileOutlined, EyeOutlined,
-  ClockCircleOutlined, SendOutlined, CheckOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { api } from '@/lib/api'
+import NotifyModal from './NotifyModal'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -25,17 +25,6 @@ const STATUS_CONFIG = {
   '取消': { color: '#ff4d4f', bg: '#fff2f0', border: '#ffa39e' },
   '待确认': { color: '#faad14', bg: '#fffbe6', border: '#ffe58f' }
 }
-
-const NOTIFY_PRESETS = [
-  { label: '会前一天', value: 'day1', minutes: 1440 },
-  { label: '会前12小时', value: 'h12', minutes: 720 },
-  { label: '会前6小时', value: 'h6', minutes: 360 },
-  { label: '会前2小时', value: 'h2', minutes: 120 },
-  { label: '会前1小时', value: 'h1', minutes: 60 },
-  { label: '会前30分钟', value: 'm30', minutes: 30 },
-  { label: '会前10分钟', value: 'm10', minutes: 10 },
-  { label: '准时发送', value: 'now0', minutes: 0 },
-]
 
 function Section({ title, icon, children, extra, bg = '#fff' }) {
   return (
@@ -60,122 +49,6 @@ function FieldRow({ label, children, span = 12 }) {
   )
 }
 
-// 定时通知弹窗
-function NotifyModal({ open, onClose, record, startTime }) {
-  const [mode, setMode] = useState('preset')
-  const [selectedPresets, setSelectedPresets] = useState([])
-  const [customTime, setCustomTime] = useState(null)
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (open && record?.id) {
-      api.get('/api/notifications', { receptionId: record.id }).then(setNotifications).catch(() => {})
-    }
-  }, [open, record?.id])
-
-  const handleSend = async () => {
-    setLoading(true)
-    try {
-      const times = []
-      if (mode === 'preset') {
-        selectedPresets.forEach(v => {
-          const preset = NOTIFY_PRESETS.find(p => p.value === v)
-          if (preset) {
-            const t = dayjs(startTime).subtract(preset.minutes, 'minute')
-            times.push({ scheduledAt: t.toISOString(), label: preset.label })
-          }
-        })
-      } else if (mode === 'immediate') {
-        times.push({ scheduledAt: new Date().toISOString(), label: '立即发送' })
-      } else if (mode === 'custom' && customTime) {
-        times.push({ scheduledAt: customTime.toISOString(), label: '自定义时间' })
-      }
-
-      for (const t of times) {
-        await api.post('/api/notifications', { receptionId: record.id, ...t })
-      }
-      const updated = await api.get('/api/notifications', { receptionId: record.id })
-      setNotifications(updated)
-      message.success(`已设置 ${times.length} 条通知`)
-      setSelectedPresets([])
-    } catch (e) { message.error(e || '设置失败') }
-    finally { setLoading(false) }
-  }
-
-  const handleDelete = async (id) => {
-    await api.delete('/api/notifications', { id })
-    setNotifications(prev => prev.filter(n => n.id !== id))
-  }
-
-  return (
-    <Modal title={<span><BellOutlined style={{ color: '#1677ff', marginRight: 6 }} />发送飞书通知</span>}
-      open={open} onCancel={onClose} footer={null} width={460}>
-      {/* 已设置的通知 */}
-      {notifications.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>已设置的通知</div>
-          {notifications.map(n => (
-            <div key={n.id} style={{ display: 'flex', alignItems: 'center', padding: '6px 10px', background: n.sent ? '#f6ffed' : '#f0f7ff', borderRadius: 8, marginBottom: 6, gap: 8 }}>
-              {n.sent ? <CheckOutlined style={{ color: '#52c41a' }} /> : <ClockCircleOutlined style={{ color: '#1677ff' }} />}
-              <span style={{ flex: 1, fontSize: 13 }}>{n.label}</span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{dayjs(n.scheduledAt).format('MM/DD HH:mm')}</span>
-              {!n.sent && <Button type="text" size="small" danger icon={<DeleteFilled />} onClick={() => handleDelete(n.id)} />}
-            </div>
-          ))}
-          <Divider style={{ margin: '12px 0' }} />
-        </div>
-      )}
-
-      <Radio.Group value={mode} onChange={e => setMode(e.target.value)} style={{ width: '100%', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[{ v: 'immediate', l: '立即发送' }, { v: 'preset', l: '按会议时间' }, { v: 'custom', l: '自定义时间' }].map(o => (
-            <Radio.Button key={o.v} value={o.v} style={{ flex: 1, textAlign: 'center', borderRadius: 8 }}>{o.l}</Radio.Button>
-          ))}
-        </div>
-      </Radio.Group>
-
-      {mode === 'immediate' && (
-        <div style={{ padding: '12px 16px', background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f', color: '#ad6800', fontSize: 13 }}>
-          将立即向飞书群发送接待通知
-        </div>
-      )}
-
-      {mode === 'preset' && (
-        <div>
-          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>会议开始时间：{startTime ? dayjs(startTime).format('MM/DD HH:mm') : '未设置'}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {NOTIFY_PRESETS.map(p => {
-              const t = startTime ? dayjs(startTime).subtract(p.minutes, 'minute') : null
-              const isPast = t && t.isBefore(dayjs())
-              const isSelected = selectedPresets.includes(p.value)
-              return (
-                <div key={p.value} onClick={() => !isPast && setSelectedPresets(prev => isSelected ? prev.filter(x => x !== p.value) : [...prev, p.value])}
-                  style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${isSelected ? '#1677ff' : '#e8e8e8'}`, background: isSelected ? '#e6f4ff' : isPast ? '#fafafa' : '#fff', color: isPast ? '#bfbfbf' : isSelected ? '#1677ff' : '#333', cursor: isPast ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: isSelected ? 600 : 400, transition: 'all 0.15s' }}>
-                  {p.label}
-                  {t && <div style={{ fontSize: 11, color: isPast ? '#d9d9d9' : '#8c8c8c' }}>{t.format('MM/DD HH:mm')}</div>}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {mode === 'custom' && (
-        <DatePicker showTime value={customTime} onChange={setCustomTime} format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} placeholder="选择自定义发送时间" />
-      )}
-
-      <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <Button onClick={onClose}>取消</Button>
-        <Button type="primary" loading={loading} icon={<SendOutlined />} onClick={handleSend}
-          disabled={mode === 'preset' && selectedPresets.length === 0 || mode === 'custom' && !customTime}>
-          {mode === 'immediate' ? '立即发送' : `设置 ${mode === 'preset' ? selectedPresets.length : customTime ? 1 : 0} 条通知`}
-        </Button>
-      </div>
-    </Modal>
-  )
-}
-
 // 待办预设选择弹窗
 function TodoPresetModal({ open, onClose, onImport, currentTodos }) {
   const [categories, setCategories] = useState([])
@@ -190,7 +63,7 @@ function TodoPresetModal({ open, onClose, onImport, currentTodos }) {
 
   const toggle = (id) => setSelected(prev => ({ ...prev, [id]: !prev[id] }))
   const toggleAll = () => {
-    const allIds = categories.reduce((acc, c) => [...acc, c.id], [])
+    const allIds = categories.map(c => c.id)
     const allSelected = allIds.every(id => selected[id])
     const next = {}
     allIds.forEach(id => { next[id] = !allSelected })
@@ -207,11 +80,13 @@ function TodoPresetModal({ open, onClose, onImport, currentTodos }) {
       }
     })
     onImport(items)
+    setSelected({})
     onClose()
   }
 
   return (
-    <Modal title={<span style={{ fontSize: 15 }}>📋 从预设导入待办</span>}
+    <Modal
+      title={<span style={{ fontSize: 15 }}>📋 从预设导入待办</span>}
       open={open} onCancel={onClose} width={500}
       footer={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -231,14 +106,14 @@ function TodoPresetModal({ open, onClose, onImport, currentTodos }) {
       </div>
       <div style={{ maxHeight: 460, overflowY: 'auto' }}>
         {categories.map(c => {
-          const alreadyIn = c.items.every(item => currentTexts.has(item.text))
+          const alreadyIn = c.items.length > 0 && c.items.every(item => currentTexts.has(item.text))
           return (
-            <div key={c.id} style={{ marginBottom: 12, borderRadius: 10, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
+            <div key={c.id} style={{ marginBottom: 10, borderRadius: 10, border: `1.5px solid ${selected[c.id] ? '#1677ff' : '#f0f0f0'}`, overflow: 'hidden', transition: 'border-color 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', background: selected[c.id] ? '#e6f4ff' : '#fafafa', cursor: 'pointer' }}
                 onClick={() => toggle(c.id)}>
                 <Checkbox checked={!!selected[c.id]} onChange={() => toggle(c.id)} onClick={e => e.stopPropagation()} />
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 14, marginLeft: 10, color: '#1f1f1f' }}>{c.name}</span>
-                {alreadyIn && <span style={{ fontSize: 12, color: '#8c8c8c', background: '#f0f0f0', padding: '1px 8px', borderRadius: 20 }}>已导入</span>}
+                {alreadyIn && <span style={{ fontSize: 11, color: '#8c8c8c', background: '#f0f0f0', padding: '1px 8px', borderRadius: 20 }}>已导入</span>}
               </div>
               {c.items.length > 0 && (
                 <div style={{ padding: '4px 14px 10px 38px', background: '#fff' }}>
@@ -347,7 +222,6 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
 
   if (!record) return null
   const statusCfg = STATUS_CONFIG[status] || { color: '#8c8c8c', bg: '#fafafa', border: '#d9d9d9' }
-  const todosDone = todos.filter(t => t.done).length
 
   return (
     <>
@@ -450,16 +324,16 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
           {/* 地址 */}
           <Section title="接待地址" icon={<EnvironmentOutlined />} bg="#fffdf0">
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 3 }}>详细地址</div>
+              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 3 }}>详细地址（含楼层、大厅等，展示给用户看）</div>
               {editing
-                ? <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="含楼层、大厅等" size="small" />
+                ? <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="如：苏州国际博览中心 2号馆 B区" size="small" />
                 : <span style={{ fontSize: 13, color: location ? '#333' : '#bfbfbf' }}>{location || '未填写'}</span>}
             </div>
             <div>
               <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 3 }}>地图搜索词（可选）</div>
               {editing
-                ? <Input value={locationKey} onChange={e => setLocationKey(e.target.value)} placeholder="用于导航的简略地名" size="small" />
-                : <span style={{ fontSize: 13, color: locationKey ? '#1677ff' : '#bfbfbf' }}>{locationKey || '-'}</span>}
+                ? <Input value={locationKey} onChange={e => setLocationKey(e.target.value)} placeholder="如：苏州国际博览中心" size="small" />
+                : locationKey ? <a href={`https://map.baidu.com/search/${encodeURIComponent(locationKey)}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>📍 {location || locationKey}</a> : <span style={{ fontSize: 13, color: '#bfbfbf' }}>-</span>}
             </div>
           </Section>
 
@@ -486,7 +360,12 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
 
           {/* 待办事项 */}
           <Section title="待办事项" icon={<CheckSquareOutlined />} bg="#f6fff0"
-            extra={<Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setTodoPresetOpen(true)}>从预设导入</Button>}>
+            extra={
+              <Space size={4}>
+                <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setTodoPresetOpen(true)}>从预设导入</Button>
+                {editing && <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setTodos(p => [...p, { id: Date.now(), text: '', done: false }])}>新增</Button>}
+              </Space>
+            }>
             {todos.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
@@ -505,7 +384,7 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
                 {editing && <Button type="text" size="small" danger icon={<DeleteFilled />} onClick={() => setTodos(p => p.filter((_, j) => j !== i))} />}
               </div>
             ))}
-            {editing && <Button type="dashed" size="small" icon={<PlusOutlined />} style={{ marginTop: 8, width: '100%', borderRadius: 8 }} onClick={() => setTodos(p => [...p, { id: Date.now(), text: '', done: false }])}>新增待办</Button>}
+            {todos.length === 0 && !editing && <span style={{ color: '#bfbfbf', fontSize: 13 }}>暂无待办，点击"从预设导入"快速添加</span>}
           </Section>
 
           {/* 会议纪要 */}
@@ -585,10 +464,9 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
         </div>
       </Drawer>
 
-      <NotifyModal open={notifyOpen} onClose={() => setNotifyOpen(false)} record={record} startTime={startTime} />
+      <NotifyModal open={notifyOpen} onClose={() => setNotifyOpen(false)} record={record} />
       <TodoPresetModal open={todoPresetOpen} onClose={() => setTodoPresetOpen(false)}
-        currentTodos={todos}
-        onImport={items => setTodos(p => [...p, ...items])} />
+        currentTodos={todos} onImport={items => setTodos(p => [...p, ...items])} />
     </>
   )
 }

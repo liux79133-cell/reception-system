@@ -121,6 +121,61 @@ function TodoCategories() {
   )
 }
 
+function NotifyTargets() {
+  const [data, setData] = useState([])
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form] = Form.useForm()
+
+  const fetch = async () => { try { setData(await api.get('/api/notify-targets')) } catch {} }
+  useEffect(() => { fetch() }, [])
+
+  const onFinish = async values => {
+    try {
+      if (editing) await api.put(`/api/notify-targets/${editing.id}`, values)
+      else await api.post('/api/notify-targets', values)
+      message.success('保存成功'); setOpen(false); fetch()
+    } catch (e) { message.error(e || '操作失败') }
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>配置飞书群机器人 Webhook，发送通知时可选择目标</Typography.Text>
+        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>添加</Button>
+      </div>
+      {data.map(t => (
+        <div key={t.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', background: '#fafafa', borderRadius: 10, marginBottom: 8, border: '1px solid #f0f0f0' }}>
+          <span style={{ fontSize: 18, marginRight: 10 }}>{t.type === 'group_webhook' ? '👥' : '👤'}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</div>
+            <div style={{ fontSize: 12, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{t.webhook}</div>
+          </div>
+          <Space size={4}>
+            <Button type="link" size="small" onClick={() => { setEditing(t); form.setFieldsValue(t); setOpen(true) }}>编辑</Button>
+            <Popconfirm title="确认删除？" onConfirm={async () => { await api.delete(`/api/notify-targets/${t.id}`); fetch() }}>
+              <Button type="link" size="small" danger>删除</Button>
+            </Popconfirm>
+          </Space>
+        </div>
+      ))}
+      <Modal title={editing ? '编辑通知目标' : '添加通知目标'} open={open} onCancel={() => setOpen(false)} onOk={() => form.submit()} destroyOnClose>
+        <Form form={form} layout="vertical" onFinish={onFinish} style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input placeholder="如：接待工作群" /></Form.Item>
+          <Form.Item name="type" label="类型" rules={[{ required: true }]} initialValue="group_webhook">
+            <select style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 6 }}>
+              <option value="group_webhook">飞书群机器人</option>
+              <option value="person_webhook">个人 Webhook</option>
+            </select>
+          </Form.Item>
+          <Form.Item name="webhook" label="Webhook 地址" rules={[{ required: true }]}><Input placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." /></Form.Item>
+          <Form.Item name="sortOrder" label="排序" initialValue={0}><InputNumber min={0} /></Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
 export default function SettingsPage() {
   return (
     <AppLayout>
@@ -128,6 +183,7 @@ export default function SettingsPage() {
         <Tabs items={[
           { key: 'hosts', label: '接待人预设', children: <HostPresets /> },
           { key: 'todos', label: '待办模板', children: <TodoCategories /> },
+          { key: 'notify', label: '通知目标', children: <NotifyTargets /> },
         ]} />
       </Card>
     </AppLayout>
