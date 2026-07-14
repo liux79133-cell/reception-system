@@ -18,7 +18,7 @@ model User {
 }
 
 model Reception {
-  id            Int               @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   startTime     DateTime
   endTime       DateTime
   title         String
@@ -27,20 +27,33 @@ model Reception {
   host          String
   dressCode     String
   purpose       String
-  status        String            @default("正常")
-  location      String?           // 详细地址
-  locationKey   String?           // 地图搜索词
-  leaders       String?           // 领导介绍 JSON
-  minutes       String?           // 会议纪要文字
-  minuteFiles   String?           // 会议纪要附件 JSON [{name, url, size}]
-  photos        String?           // 会议照片 JSON [{name, url}]
-  todos         String?           // 待办事项 JSON [{id, text, done, presetKey}]
+  status        String   @default("正常")
+  location      String?
+  locationKey   String?
+  leaders       String?
+  minutes       String?
+  minuteFiles   String?
+  photos        String?
+  todos         String?
   remark        String?
   customFields  String?
   createdById   Int
-  createdBy     User              @relation(fields: [createdById], references: [id])
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  notifications Notification[]
+}
+
+// 定时通知
+model Notification {
+  id           Int       @id @default(autoincrement())
+  receptionId  Int
+  reception    Reception @relation(fields: [receptionId], references: [id], onDelete: Cascade)
+  scheduledAt  DateTime
+  sent         Boolean   @default(false)
+  sentAt       DateTime?
+  label        String?
+  createdAt    DateTime  @default(now())
 }
 
 model CustomFieldDef {
@@ -54,20 +67,28 @@ model CustomFieldDef {
   enabled    Boolean @default(true)
 }
 
-// 接待人员预设
 model HostPreset {
   id        Int      @id @default(autoincrement())
   name      String
-  title     String?  // 职位
-  feishuId  String?  // 飞书用户ID
+  title     String?
+  feishuId  String?
   avatar    String?
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 }
 
-// 待办事项预设模板
-model TodoPreset {
-  id        Int      @id @default(autoincrement())
-  text      String
-  sortOrder Int      @default(0)
+// 待办大类（含子项）
+model TodoCategory {
+  id        Int        @id @default(autoincrement())
+  name      String
+  sortOrder Int        @default(0)
+  items     TodoItem[]
+}
+
+model TodoItem {
+  id         Int          @id @default(autoincrement())
+  categoryId Int
+  category   TodoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  text       String
+  sortOrder  Int          @default(0)
 }
