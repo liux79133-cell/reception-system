@@ -1,8 +1,10 @@
 'use client'
 import { useState } from 'react'
-import { Modal, Input, Button, Table, message, Alert, Typography, Steps, Space, Spin } from 'antd'
-import { CloudDownloadOutlined, CheckCircleOutlined, LinkOutlined } from '@ant-design/icons'
+import { Modal, Button, Table, message, Alert, Typography, Steps, Space, Upload } from 'antd'
+import { CloudDownloadOutlined, CheckCircleOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons'
 import { api } from '@/lib/api'
+
+const { Dragger } = Upload
 
 const FIELD_MAP = {
   '日期': 'startTime', '结束日期': 'endTime', '会议名称': 'title',
@@ -10,24 +12,29 @@ const FIELD_MAP = {
   '着装要求': 'dressCode', '来访目的': 'purpose', '状态': 'status', '备注': 'remark',
 }
 
-function parseFeishuDate(val) {
-  if (!val) return null
-  if (typeof val === 'number') return new Date(val).toISOString()
-  const d = new Date(val); return isNaN(d) ? null : d.toISOString()
-}
-
-function parseFeishuData(raw) {
-  let items = Array.isArray(raw) ? raw : raw.data?.items || raw.records?.map(r => r.fields || r) || []
-  return items.map((item, i) => {
-    const fields = item.fields || item
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+  return lines.slice(1).map((line, i) => {
+    const cols = line.match(/(".*?"|[^,]+|(?<=,)(?=,))/g) || line.split(',')
+    const fields = {}
+    headers.forEach((h, idx) => {
+      fields[h] = (cols[idx] || '').trim().replace(/^"|"$/g, '')
+    })
     const record = { _index: i + 1 }
     Object.entries(FIELD_MAP).forEach(([fk, ok]) => {
-      const val = fields[fk]; if (val == null) return
-      if (ok === 'startTime' || ok === 'endTime') record[ok] = parseFeishuDate(Array.isArray(val) ? val[0] : val)
-      else record[ok] = Array.isArray(val) ? val.map(v => v.text || v).join('') : String(val)
+      const val = fields[fk]
+      if (!val) return
+      if (ok === 'startTime' || ok === 'endTime') {
+        const d = new Date(val)
+        record[ok] = isNaN(d) ? null : d.toISOString()
+      } else {
+        record[ok] = val
+      }
     })
     const extra = {}
-    Object.entries(fields).forEach(([k, v]) => { if (!FIELD_MAP[k]) extra[k] = Array.isArray(v) ? v.map(x => x.text || x).join('') : String(v ?? '') })
+    Object.entries(fields).forEach(([k, v]) => { if (!FIELD_MAP[k] && v) extra[k] = v })
     if (Object.keys(extra).length) record._extra = extra
     return record
   }).filter(r => r.title)
@@ -44,35 +51,30 @@ const COLS = [
 
 export default function FeishuImport({ open, onClose, onSuccess }) {
   const [step, setStep] = useState(0)
-  const [input, setInput] = useState('')
   const [preview, setPreview] = useState([])
   const [loading, setLoading] = useState(false)
-  const [fetching, setFetching] = useState(false)
   const [count, setCount] = useState(0)
+  const [fileName, setFileName] = useState('')
 
-  const isUrl = (s) => s.trim().startsWith('http')
-
-  const handleParse = async () => {
-    if (isUrl(input)) {
-      // 飞书链接：通过后端代理获取
-      setFetching(true)
+  const handleFile = (file) => {
+    setFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (e) => {
       try {
-        const res = await api.post('/api/feishu/fetch', { url: input.trim() })
-        const parsed = parseFeishuData(res)
-        if (!parsed.length) return message.error('未识别到有效记录，请确认表格字段名称')
-        setPreview(parsed); setStep(1)
-      } catch (e) {
-        message.error(e || '获取飞书数据失败，请改用 JSON 粘贴方式')
-      } finally { setFetching(false) }
-    } else {
-      // JSON 粘贴
-      try {
-        const raw = JSON.parse(input)
-        const parsed = parseFeishuData(raw)
-        if (!parsed.length) return message.error('未识别到有效记录')
-        setPreview(parsed); setStep(1)
-      } catch { message.error('格式不正确，请粘贴有效的飞书链接或 JSON 数据') }
+        const text = e.target.result
+        const parsed = parseCSV(text)
+        if (!parsed.length) {
+          message.error('未识别到有效记录，请确认表格包含"会议名称"等列')
+          return
+        }
+        setPreview(parsed)
+        setStep(1)
+      } catch {
+        message.error('文件解析失败，请使用飞书导出的 CSV 文件')
+      }
     }
+    reader.readAsText(file, 'UTF-8')
+    return false // 阻止自动上传
   }
 
   const handleImport = async () => {
@@ -84,48 +86,39 @@ export default function FeishuImport({ open, onClose, onSuccess }) {
     finally { setLoading(false) }
   }
 
-  const handleClose = () => { setStep(0); setInput(''); setPreview([]); onClose() }
+  const handleClose = () => { setStep(0); setPreview([]); setFileName(''); onClose() }
 
   return (
     <Modal title="飞书多维表格批量导入" open={open} onCancel={handleClose} width={760} footer={null} destroyOnClose>
       <Steps current={step} size="small" style={{ marginBottom: 24 }}
-        items={[{ title: '粘贴链接或数据' }, { title: '确认预览' }, { title: '导入完成' }]} />
+        items={[{ title: '上传文件' }, { title: '确认预览' }, { title: '导入完成' }]} />
 
       {step === 0 && (
         <div>
-          <Alert type="info" showIcon style={{ marginBottom: 16 }} message="两种方式均支持"
+          <Alert type="info" showIcon style={{ marginBottom: 16 }} message="操作步骤"
             description={
-              <div>
-                <div>① <b>粘贴飞书表格链接</b>（需要在 Vercel 配置飞书 App ID/Secret，见设置页面）</div>
-                <div>② <b>粘贴 JSON 数据</b>：飞书表格 → 右上角 … → 导出 → 导出为 JSON</div>
-              </div>
+              <ol style={{ margin: 0, paddingLeft: 20 }}>
+                <li>打开飞书多维表格 → 右上角 <b>…</b> → <b>导出</b> → <b>Excel/CSV 文件</b></li>
+                <li>选择 <b>CSV 格式</b>下载到电脑</li>
+                <li>将 CSV 文件拖入下方或点击上传</li>
+              </ol>
             }
           />
-          <Input.TextArea
-            rows={6}
-            placeholder="粘贴飞书多维表格链接（如 https://momenta.feishu.cn/...）或导出的 JSON 数据..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-          />
-          <div style={{ marginTop: 16, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={handleClose}>取消</Button>
-              <Button type="primary" icon={isUrl(input) ? <LinkOutlined /> : <CloudDownloadOutlined />}
-                onClick={handleParse} disabled={!input.trim()} loading={fetching}>
-                {isUrl(input) ? '获取表格数据' : '解析数据'}
-              </Button>
-            </Space>
-          </div>
+          <Dragger beforeUpload={handleFile} accept=".csv" showUploadList={false} style={{ padding: '20px 0' }}>
+            <p style={{ fontSize: 32, color: '#1677ff', marginBottom: 8 }}><InboxOutlined /></p>
+            <p style={{ fontSize: 16, fontWeight: 500 }}>拖拽 CSV 文件到这里，或点击选择文件</p>
+            <p style={{ color: '#999', fontSize: 13 }}>仅支持飞书导出的 CSV 格式</p>
+          </Dragger>
         </div>
       )}
 
       {step === 1 && (
         <div>
-          <Alert type="success" showIcon message={`解析成功，共 ${preview.length} 条记录，确认后导入`} style={{ marginBottom: 16 }} />
+          <Alert type="success" showIcon message={`「${fileName}」解析成功，共 ${preview.length} 条记录`} style={{ marginBottom: 16 }} />
           <Table rowKey="_index" columns={COLS} dataSource={preview} size="small" pagination={{ pageSize: 10 }} scroll={{ x: 500 }} />
           <div style={{ marginTop: 16, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setStep(0)}>返回</Button>
+              <Button onClick={() => setStep(0)}>重新上传</Button>
               <Button type="primary" loading={loading} onClick={handleImport}>确认导入 {preview.length} 条</Button>
             </Space>
           </div>
