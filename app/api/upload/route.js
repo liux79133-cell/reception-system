@@ -1,7 +1,5 @@
 import { requireAuth, errorResponse } from '@/lib/auth'
 
-export const config = { api: { bodyParser: false } }
-
 export async function POST(request) {
   try {
     requireAuth(request)
