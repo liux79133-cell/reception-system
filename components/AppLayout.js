@@ -30,6 +30,7 @@ export default function AppLayout({ children }) {
     { key: '/receptions', icon: <CalendarOutlined />, label: '接待记录' },
     ...(user?.role === 'admin' ? [
       { key: '/custom-fields', icon: <SettingOutlined />, label: '自定义字段' },
+      { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
       { key: '/users', icon: <TeamOutlined />, label: '用户管理' },
     ] : [])
   ]

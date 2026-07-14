@@ -18,22 +18,29 @@ model User {
 }
 
 model Reception {
-  id           Int      @id @default(autoincrement())
-  startTime    DateTime
-  endTime      DateTime
-  title        String
-  level        String
-  form         String
-  host         String
-  dressCode    String
-  purpose      String
-  status       String   @default("正常")
-  remark       String?
-  customFields String?
-  createdById  Int
-  createdBy    User     @relation(fields: [createdById], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            Int               @id @default(autoincrement())
+  startTime     DateTime
+  endTime       DateTime
+  title         String
+  level         String
+  form          String
+  host          String
+  dressCode     String
+  purpose       String
+  status        String            @default("正常")
+  location      String?           // 详细地址
+  locationKey   String?           // 地图搜索词
+  leaders       String?           // 领导介绍 JSON
+  minutes       String?           // 会议纪要文字
+  minuteFiles   String?           // 会议纪要附件 JSON [{name, url, size}]
+  photos        String?           // 会议照片 JSON [{name, url}]
+  todos         String?           // 待办事项 JSON [{id, text, done, presetKey}]
+  remark        String?
+  customFields  String?
+  createdById   Int
+  createdBy     User              @relation(fields: [createdById], references: [id])
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 model CustomFieldDef {
@@ -45,4 +52,22 @@ model CustomFieldDef {
   required   Boolean @default(false)
   sortOrder  Int     @default(0)
   enabled    Boolean @default(true)
+}
+
+// 接待人员预设
+model HostPreset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  title     String?  // 职位
+  feishuId  String?  // 飞书用户ID
+  avatar    String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// 待办事项预设模板
+model TodoPreset {
+  id        Int      @id @default(autoincrement())
+  text      String
+  sortOrder Int      @default(0)
 }
