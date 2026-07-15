@@ -105,3 +105,10 @@ model TodoItem {
   text       String
   sortOrder  Int          @default(0)
 }
+
+// 系统配置（key-value）
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

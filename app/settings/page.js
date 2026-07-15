@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Card, Typography, Tabs, InputNumber } from 'antd'
-import { PlusOutlined, HolderOutlined } from '@ant-design/icons'
+import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Card, Typography, Tabs, InputNumber, Alert, Steps, Tag } from 'antd'
+import { PlusOutlined, CheckCircleOutlined, ApiOutlined, LinkOutlined } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
 
@@ -176,11 +176,95 @@ function NotifyTargets() {
   )
 }
 
+function FeishuConfig() {
+  const [appId, setAppId] = useState('')
+  const [appSecret, setAppSecret] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [status, setStatus] = useState(null) // null | 'ok' | 'error'
+
+  useEffect(() => {
+    api.get('/api/config').then(d => {
+      if (d.feishu_app_id) setAppId(d.feishu_app_id)
+      if (d.feishu_app_secret) setAppSecret(d.feishu_app_secret === '******' ? '' : d.feishu_app_secret)
+      if (d.feishu_app_id) setStatus('ok')
+    }).catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    if (!appId.trim() || !appSecret.trim()) return message.error('App ID 和 App Secret 均不能为空')
+    setSaving(true)
+    try {
+      await api.post('/api/config', { feishu_app_id: appId.trim(), feishu_app_secret: appSecret.trim() })
+      message.success('保存成功')
+      setStatus('ok')
+    } catch (e) { message.error(e || '保存失败') }
+    finally { setSaving(false) }
+  }
+
+  const handleTest = async () => {
+    setTesting(true)
+    try {
+      await api.post('/api/feishu/fetch', { url: 'https://open.feishu.cn/test' })
+    } catch (e) {
+      if (typeof e === 'string' && e.includes('鉴权失败')) {
+        message.error('凭证验证失败：' + e); setStatus('error')
+      } else {
+        message.success('连接成功，凭证有效'); setStatus('ok')
+      }
+    } finally { setTesting(false) }
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Typography.Text strong>飞书应用凭证</Typography.Text>
+          {status === 'ok' && <Tag color="success" icon={<CheckCircleOutlined />}>已配置</Tag>}
+          {status === 'error' && <Tag color="error">凭证无效</Tag>}
+        </div>
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+          配置后可在"飞书导入"中直接粘贴多维表格链接，系统自动解析数据
+        </Typography.Text>
+      </div>
+
+      <div style={{ background: '#f8f9fc', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: '#667085', marginBottom: 6, fontWeight: 600 }}>App ID</div>
+          <Input value={appId} onChange={e => setAppId(e.target.value)} placeholder="cli_xxxxxxxxxxxxxxxx" style={{ borderRadius: 8, fontFamily: 'monospace' }} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#667085', marginBottom: 6, fontWeight: 600 }}>App Secret</div>
+          <Input.Password value={appSecret} onChange={e => setAppSecret(e.target.value)} placeholder="输入 App Secret" style={{ borderRadius: 8, fontFamily: 'monospace' }} />
+        </div>
+        <Space>
+          <Button type="primary" loading={saving} onClick={handleSave} style={{ borderRadius: 8 }}>保存凭证</Button>
+          <Button loading={testing} onClick={handleTest} style={{ borderRadius: 8 }}>测试连接</Button>
+        </Space>
+      </div>
+
+      <Alert type="info" showIcon icon={<ApiOutlined />} message="如何获取飞书应用凭证"
+        description={
+          <Steps direction="vertical" size="small" style={{ marginTop: 8 }}
+            items={[
+              { title: <span>打开 <a href="https://open.feishu.cn" target="_blank" rel="noreferrer">飞书开放平台</a> → 开发者后台 → 创建企业自建应用</span>, status: 'process' },
+              { title: '进入应用 → 凭证与基础信息 → 复制 App ID 和 App Secret', status: 'process' },
+              { title: <span>权限管理 → 搜索并开通 <code style={{ background: '#f0f0f0', padding: '0 4px', borderRadius: 3 }}>bitable:app:readonly</code></span>, status: 'process' },
+              { title: '版本管理与发布 → 创建版本 → 申请发布（审核通过后生效）', status: 'process' },
+            ]}
+          />
+        }
+      />
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   return (
     <AppLayout>
       <Card title={<Typography.Title level={4} style={{ margin: 0 }}>系统设置</Typography.Title>}>
         <Tabs items={[
+          { key: 'feishu', label: <span><ApiOutlined /> 飞书集成</span>, children: <FeishuConfig /> },
           { key: 'hosts', label: '接待人预设', children: <HostPresets /> },
           { key: 'todos', label: '待办模板', children: <TodoCategories /> },
           { key: 'notify', label: '通知目标', children: <NotifyTargets /> },

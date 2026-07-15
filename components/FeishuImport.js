@@ -126,15 +126,15 @@ export default function FeishuImport({ open, onClose, onSuccess }) {
       const items = res.records || res.items || res
       const parsed = parseFeishuApiData(Array.isArray(items) ? items : [])
       if (!parsed.length) {
-        setLinkError('未识别到有效记录，请确认表格字段名称（需包含"会议名称"列）')
+        setLinkError('未识别到有效记录，请确认表格包含"会议名称"列')
         return
       }
-      setFileName('飞书多维表格')
+      setFileName(`飞书多维表格（${parsed.length} 条）`)
       setPreview(parsed); setStep(1)
     } catch (e) {
-      const msg = typeof e === 'string' ? e : '解析失败'
-      if (msg.includes('App ID') || msg.includes('未配置')) {
-        setLinkError('需要先配置飞书应用凭证，请联系管理员在系统设置中添加 FEISHU_APP_ID 和 FEISHU_APP_SECRET')
+      const msg = typeof e === 'string' ? e : (e?.message || '解析失败')
+      if (msg.includes('NO_CREDENTIALS') || msg.includes('未配置')) {
+        setLinkError('NO_CREDENTIALS')
       } else {
         setLinkError(msg)
       }
@@ -186,21 +186,21 @@ export default function FeishuImport({ open, onClose, onSuccess }) {
                     onSearch={handleLink}
                     onPressEnter={handleLink}
                   />
-                  {linkError && (
+                  {linkError && linkError !== 'NO_CREDENTIALS' && (
                     <div style={{ marginTop: 10, padding: '10px 14px', background: '#fff2f0', borderRadius: 8, border: '1px solid #ffa39e', color: '#c0282a', fontSize: 13, display: 'flex', gap: 8 }}>
                       <WarningOutlined style={{ flexShrink: 0, marginTop: 2 }} />
                       <div>{linkError}</div>
                     </div>
                   )}
-                  <div style={{ marginTop: 16, padding: '14px 16px', background: '#f8f9fc', borderRadius: 10, fontSize: 13 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#1a1f3e' }}>如何配置飞书凭证（一次配置永久生效）</div>
-                    <ol style={{ margin: 0, paddingLeft: 18, color: '#555', lineHeight: 2 }}>
-                      <li>打开 <a href="https://open.feishu.cn" target="_blank" rel="noreferrer">飞书开放平台</a> → 开发者后台 → 创建企业自建应用</li>
-                      <li>进入应用 → 凭证与基础信息 → 复制 <b>App ID</b> 和 <b>App Secret</b></li>
-                      <li>权限管理 → 搜索并开通 <code style={{ background: '#f0f0f0', padding: '0 4px', borderRadius: 3 }}>bitable:app:readonly</code></li>
-                      <li>发布应用，然后在 Vercel 项目环境变量中添加 <code style={{ background: '#f0f0f0', padding: '0 4px', borderRadius: 3 }}>FEISHU_APP_ID</code> 和 <code style={{ background: '#f0f0f0', padding: '0 4px', borderRadius: 3 }}>FEISHU_APP_SECRET</code></li>
-                    </ol>
-                  </div>
+                  {linkError === 'NO_CREDENTIALS' && (
+                    <div style={{ marginTop: 10, padding: '14px 16px', background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f', fontSize: 13 }}>
+                      <div style={{ fontWeight: 600, color: '#ad6800', marginBottom: 6 }}>⚠️ 需要先配置飞书应用凭证</div>
+                      <div style={{ color: '#614700', marginBottom: 10 }}>管理员在系统设置中填写 App ID 和 App Secret 后即可使用链接导入。</div>
+                      <Button size="small" type="primary" onClick={() => { onClose(); window.location.href = '/settings' }} style={{ borderRadius: 6, background: '#d48806', borderColor: '#d48806' }}>
+                        前往系统设置配置
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )
             },
