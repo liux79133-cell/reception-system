@@ -212,20 +212,27 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
     setLoading(true)
     try {
       if (type === 'photo') {
-        // 照片：上传到 Supabase Storage，获取永久 URL
-        const fd = new FormData()
-        fd.append('file', file)
-        const token = localStorage.getItem('token')
-        const res = await fetch('/api/upload', {
+        // 前端直传 Supabase Storage，绕过服务器大小限制
+        const SUPABASE_URL = 'https://qxzpcawlnbrroywufps.supabase.co'
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4enBjYXdsbmJycmNveXd1ZnBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzk1NzMsImV4cCI6MjA5OTc1NTU3M30.hRx1znHLcxEOqEHlTRCLtPlSy2PXUA00D63xAXLt0kY'
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const res = await fetch(`${SUPABASE_URL}/storage/v1/object/photos/${fileName}`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
+          headers: {
+            Authorization: `Bearer ${ANON_KEY}`,
+            'Content-Type': file.type || 'image/jpeg',
+            'x-upsert': 'true',
+          },
+          body: file,
         })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || '上传失败')
-        setPhotos(prev => [...prev, { name: data.name, url: data.url }])
+        if (!res.ok) {
+          const err = await res.text()
+          throw new Error(err)
+        }
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/photos/${fileName}`
+        setPhotos(prev => [...prev, { name: file.name, url: publicUrl }])
       } else {
-        // 文件：本地 base64（文档文件较小，可以接受）
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = e => resolve(e.target.result)
