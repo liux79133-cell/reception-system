@@ -189,7 +189,7 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.put(`/api/receptions/${record.id}`, {
+      const payload = {
         title, level, form, host, dressCode, purpose, status,
         location, locationKey, minutes, remark,
         startTime: startTime?.toISOString(),
@@ -198,7 +198,8 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
         minuteFiles: JSON.stringify(minuteFiles),
         photos: JSON.stringify(photos),
         todos: JSON.stringify(todos),
-      })
+      }
+      await api.put(`/api/receptions/${record.id}`, payload)
       message.success('保存成功')
       setEditing(false)
       onUpdated?.()
@@ -210,20 +211,31 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
     const setLoading = type === 'minute' ? setUploadingMinute : setUploadingPhoto
     setLoading(true)
     try {
-      // 直接用 FileReader 转 dataURL，存在内存里，不走服务器上传
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = e => resolve(e.target.result)
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-      if (type === 'minute') {
-        setMinuteFiles(prev => [...prev, { name: file.name, url: dataUrl, size: (file.size / 1024).toFixed(1) + 'KB' }])
+      if (type === 'photo') {
+        // 照片：上传到 Supabase Storage，获取永久 URL
+        const fd = new FormData()
+        fd.append('file', file)
+        const token = localStorage.getItem('token')
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || '上传失败')
+        setPhotos(prev => [...prev, { name: data.name, url: data.url }])
       } else {
-        setPhotos(prev => [...prev, { name: file.name, url: dataUrl }])
+        // 文件：本地 base64（文档文件较小，可以接受）
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => resolve(e.target.result)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        setMinuteFiles(prev => [...prev, { name: file.name, url: dataUrl, size: (file.size / 1024).toFixed(1) + 'KB' }])
       }
       message.success('上传成功')
-    } catch { message.error('上传失败') }
+    } catch (e) { message.error(e?.message || '上传失败') }
     finally { setLoading(false) }
     return false
   }
