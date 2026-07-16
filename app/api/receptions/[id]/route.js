@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireEditor, errorResponse } from '@/lib/auth'
 
-export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
 export async function GET(request, { params }) {
   try {
