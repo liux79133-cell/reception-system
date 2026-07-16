@@ -42,91 +42,89 @@ function ReceptionCard({ record, onClick }) {
   const photos = record.photos ? (() => { try { return JSON.parse(record.photos) } catch { return [] } })() : []
   const firstPhoto = photos[0]?.url || null
   const hasPhoto = !!firstPhoto
+  const level = LEVEL_MAP_LIGHT[record.level] || LEVEL_MAP_LIGHT['其他']
+  const status = STATUS_MAP_LIGHT[record.status] || STATUS_MAP_LIGHT['正常']
 
-  const level = hasPhoto ? (LEVEL_MAP[record.level] || LEVEL_MAP['其他']) : (LEVEL_MAP_LIGHT[record.level] || LEVEL_MAP_LIGHT['其他'])
-  const status = hasPhoto ? (STATUS_MAP[record.status] || STATUS_MAP['正常']) : (STATUS_MAP_LIGHT[record.status] || STATUS_MAP_LIGHT['正常'])
+  if (hasPhoto) {
+    // 有照片：照片铺满，内容叠在底部
+    return (
+      <div onClick={onClick}
+        style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 16px rgba(0,0,0,0.18)', position: 'relative', height: 240 }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.28)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)' }}>
 
-  return (
-    <div onClick={onClick}
-      style={{
-        borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
-        transition: 'all 0.2s',
-        boxShadow: hasPhoto ? '0 4px 20px rgba(0,0,0,0.15)' : '0 1px 3px rgba(16,24,40,0.08)',
-        border: hasPhoto ? 'none' : '1px solid #f2f4f7',
-        position: 'relative', minHeight: 180,
-        background: hasPhoto ? 'transparent' : '#fff',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = hasPhoto ? '0 12px 36px rgba(0,0,0,0.25)' : '0 8px 24px rgba(16,24,40,0.12)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = hasPhoto ? '0 4px 20px rgba(0,0,0,0.15)' : '0 1px 3px rgba(16,24,40,0.08)' }}>
+        {/* 背景图 */}
+        <img src={firstPhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
 
-      {/* 背景图 */}
-      {hasPhoto && (
-        <>
-          <img src={firstPhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
-          {/* 渐变蒙层：上方轻透明、下方较深，让文字清晰 */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.78) 100%)', zIndex: 1 }} />
-        </>
-      )}
+        {/* 顶部标签区蒙层（轻） */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 100%)', zIndex: 1 }} />
 
-      {/* 无图片：顶部色条 */}
-      {!hasPhoto && (
-        <div style={{ height: 5, background: `linear-gradient(90deg, ${LEVEL_MAP_LIGHT[record.level]?.color || '#667085'}60, ${LEVEL_MAP_LIGHT[record.level]?.color || '#667085'}20)` }} />
-      )}
-
-      {/* 内容 */}
-      <div style={{ position: 'relative', zIndex: 2, padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: hasPhoto ? 180 : 'auto' }}>
+        {/* 底部内容区蒙层（深） */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 60%, transparent 100%)', zIndex: 1 }} />
 
         {/* 顶部标签行 */}
+        <div style={{ position: 'absolute', top: 10, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            <Pill label={record.level} color={LEVEL_MAP[record.level]?.color || '#9ca3af'} bg={LEVEL_MAP[record.level]?.bg || 'rgba(156,163,175,0.15)'} border={LEVEL_MAP[record.level]?.border || 'rgba(156,163,175,0.3)'} />
+            <Pill label={record.status} color={STATUS_MAP[record.status]?.color || '#9ca3af'} bg={STATUS_MAP[record.status]?.bg || 'rgba(156,163,175,0.15)'} border={STATUS_MAP[record.status]?.border || 'rgba(156,163,175,0.3)'} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{dayjs(record.startTime).format('MM/DD')}</span>
+        </div>
+
+        {/* 底部内容 */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 14px 14px', zIndex: 2 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            {record.title}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', marginBottom: 6 }}>
+            {dayjs(record.startTime).format('HH:mm')}
+            <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 4px' }}>→</span>
+            {dayjs(record.endTime).format('HH:mm')}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {record.host && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 4 }}><UserOutlined style={{ fontSize: 10 }} />{record.host}</span>}
+              {record.purpose && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{record.purpose}</span>}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)' }}>{record.form}</span>
+          </div>
+          {record.location && (
+            <div style={{ marginTop: 4, fontSize: 11, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <EnvironmentOutlined style={{ fontSize: 10 }} />{record.location}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // 无照片：普通白色卡片
+  return (
+    <div onClick={onClick}
+      style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(16,24,40,0.08)', border: '1px solid #f2f4f7', background: '#fff', display: 'flex', flexDirection: 'column' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,24,40,0.12)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(16,24,40,0.08)' }}>
+      <div style={{ height: 5, background: `linear-gradient(90deg, ${level.color}70, ${level.color}20)` }} />
+      <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ display: 'flex', gap: 5 }}>
             <Pill label={record.level} {...level} />
             <Pill label={record.status} {...status} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: hasPhoto ? 'rgba(255,255,255,0.75)' : '#98a2b3' }}>
-            {dayjs(record.startTime).format('MM/DD')}
-          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#98a2b3' }}>{dayjs(record.startTime).format('MM/DD')}</span>
         </div>
-
-        {/* 标题 */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: hasPhoto ? '#fff' : '#101828', lineHeight: 1.45, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', flex: hasPhoto ? 1 : 'none', textShadow: hasPhoto ? '0 1px 3px rgba(0,0,0,0.4)' : 'none' }}>
-          {record.title}
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#101828', lineHeight: 1.45, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{record.title}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1677ff', marginBottom: 8 }}>
+          {dayjs(record.startTime).format('HH:mm')}<span style={{ color: '#d0d5dd', margin: '0 4px' }}>→</span>{dayjs(record.endTime).format('HH:mm')}
         </div>
-
-        {/* 时间 */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: hasPhoto ? '#93c5fd' : '#1677ff', marginBottom: 8 }}>
-          {dayjs(record.startTime).format('HH:mm')}
-          <span style={{ color: hasPhoto ? 'rgba(255,255,255,0.3)' : '#d0d5dd', margin: '0 4px' }}>→</span>
-          {dayjs(record.endTime).format('HH:mm')}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+          {record.host && <div style={{ fontSize: 12, color: '#667085', display: 'flex', alignItems: 'center', gap: 5 }}><UserOutlined style={{ fontSize: 11 }} />{record.host}</div>}
+          {record.purpose && <div style={{ fontSize: 12, color: '#667085' }}>◎ {record.purpose}</div>}
+          {record.location && <div style={{ fontSize: 12, color: '#1677ff', display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><EnvironmentOutlined style={{ fontSize: 11 }} />{record.location}</div>}
         </div>
-
-        {/* 接待人 / 目的 / 地址 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {record.host && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: hasPhoto ? 'rgba(255,255,255,0.8)' : '#667085' }}>
-              <UserOutlined style={{ fontSize: 11 }} />
-              <span>{record.host}</span>
-            </div>
-          )}
-          {record.purpose && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: hasPhoto ? 'rgba(255,255,255,0.7)' : '#667085' }}>
-              <span style={{ fontSize: 10 }}>◎</span>
-              <span>{record.purpose}</span>
-            </div>
-          )}
-          {record.location && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: hasPhoto ? '#93c5fd' : '#1677ff' }}>
-              <EnvironmentOutlined style={{ fontSize: 11 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.location}</span>
-            </div>
-          )}
-        </div>
-
-        {/* 底部形式标签 */}
-        <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${hasPhoto ? 'rgba(255,255,255,0.15)' : '#f5f5f5'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: hasPhoto ? 'rgba(255,255,255,0.12)' : '#f0f9ff', color: hasPhoto ? 'rgba(255,255,255,0.85)' : '#175cd3' }}>{record.form}</span>
-          {photos.length > 1 && (
-            <span style={{ fontSize: 11, color: hasPhoto ? 'rgba(255,255,255,0.5)' : '#98a2b3' }}>📷 {photos.length}</span>
-          )}
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#f0f9ff', color: '#175cd3' }}>{record.form}</span>
+          <ArrowRightOutlined style={{ fontSize: 11, color: '#d0d5dd' }} />
         </div>
       </div>
     </div>
