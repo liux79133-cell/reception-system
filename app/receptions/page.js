@@ -112,7 +112,7 @@ export default function ReceptionsPage() {
       setData(res.records); setTotal(res.total)
 
       // 同时拉取全量数据供看板/卡片使用（去掉分页限制）
-      const allParams = { page: 1, pageSize: 9999, ...params }
+      const allParams = { ...params, page: 1, pageSize: 9999 }
       const allRes = await api.get('/api/receptions', allParams)
       setAllData(allRes.records)
     } catch (e) { message.error(e) }
