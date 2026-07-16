@@ -73,6 +73,7 @@ export default function ReceptionsPage() {
   const [detailRecord, setDetailRecord] = useState(null)
   const [importOpen, setImportOpen] = useState(false)
   const [viewMode, setViewMode] = useState('table')
+  const [allData, setAllData] = useState([]) // 看板/卡片用全量数据
   const [docLinks, setDocLinks] = useState([])
   const [configOpen, setConfigOpen] = useState(false)
   const [editLinks, setEditLinks] = useState([])
@@ -109,6 +110,11 @@ export default function ReceptionsPage() {
       }
       const res = await api.get('/api/receptions', params)
       setData(res.records); setTotal(res.total)
+
+      // 同时拉取全量数据供看板/卡片使用（去掉分页限制）
+      const allParams = { page: 1, pageSize: 9999, ...params }
+      const allRes = await api.get('/api/receptions', allParams)
+      setAllData(allRes.records)
     } catch (e) { message.error(e) }
     finally { setLoading(false) }
   }, [page, pageSize, filters])
@@ -170,7 +176,7 @@ export default function ReceptionsPage() {
     }
   ]
 
-  const recentCount = data.filter(r => dayjs(r.startTime).isAfter(dayjs().subtract(7, 'day'))).length
+  const recentCount = allData.filter(r => dayjs(r.startTime).isAfter(dayjs().subtract(7, 'day'))).length
 
   return (
     <AppLayout>
@@ -271,12 +277,12 @@ export default function ReceptionsPage() {
       )}
 
       {/* ── 卡片视图 ── */}
-      {viewMode === 'card' && <ReceptionCards data={data} onCardClick={r => setDetailRecord(r)} groupBy={cardGroupBy} />}
+      {viewMode === 'card' && <ReceptionCards data={allData} onCardClick={r => setDetailRecord(r)} groupBy={cardGroupBy} />}
 
       {/* ── 看板视图 ── */}
       {viewMode === 'kanban' && (
         <ReceptionKanban
-          data={data}
+          data={allData}
           onCardClick={r => setDetailRecord(r)}
           onFilterJump={f => {
             // 跳转到表格视图并应用筛选
