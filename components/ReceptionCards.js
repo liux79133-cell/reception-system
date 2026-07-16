@@ -1,7 +1,7 @@
 'use client'
 import dayjs from 'dayjs'
 import { Empty } from 'antd'
-import { UserOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { UserOutlined, EnvironmentOutlined, ArrowRightOutlined } from '@ant-design/icons'
 
 const LEVEL_MAP = {
   '板块':     { color: '#6941c6', bg: 'rgba(105,65,198,0.15)', border: 'rgba(105,65,198,0.3)' },
