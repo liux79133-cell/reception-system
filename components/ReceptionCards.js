@@ -56,14 +56,11 @@ function ReceptionCard({ record, onClick }) {
         {/* 背景图铺满 */}
         <img src={firstPhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
 
-        {/* 全局半透明蒙层 */}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.28)' }} />
+        {/* 顶部极淡蒙层（放标签） */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 100%)' }} />
 
-        {/* 顶部渐变蒙层（放标签） */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 70, background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 100%)' }} />
-
-        {/* 底部渐变蒙层（放内容） */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.35) 60%, transparent 100%)' }} />
+        {/* 底部渐变蒙层（放内容文字） */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(0deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.2) 65%, transparent 100%)' }} />
 
         {/* 顶部标签 */}
         <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
