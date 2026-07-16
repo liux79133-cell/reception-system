@@ -274,7 +274,19 @@ export default function ReceptionsPage() {
       {viewMode === 'card' && <ReceptionCards data={data} onCardClick={r => setDetailRecord(r)} groupBy={cardGroupBy} />}
 
       {/* ── 看板视图 ── */}
-      {viewMode === 'kanban' && <ReceptionKanban data={data} onCardClick={r => setDetailRecord(r)} />}
+      {viewMode === 'kanban' && (
+        <ReceptionKanban
+          data={data}
+          onCardClick={r => setDetailRecord(r)}
+          onFilterJump={f => {
+            // 跳转到表格视图并应用筛选
+            setViewMode('table')
+            setFilters(prev => ({ ...prev, ...f }))
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+        />
+      )}
 
       <style>{`
         .ant-table-thead > tr > th { background: #f9fafb !important; color: #667085 !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.5px !important; border-bottom: 1px solid #f2f4f7 !important; padding: 10px 14px !important; }
