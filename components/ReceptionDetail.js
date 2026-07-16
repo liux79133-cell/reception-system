@@ -212,13 +212,15 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
     setLoading(true)
     try {
       if (type === 'photo') {
-        // 先压缩图片（最大 1200px，质量 0.75），确保不超过 Vercel 4MB 限制
-        const compressedFile = await new Promise((resolve) => {
+        // 纯浏览器端压缩：最大 900px，质量 0.6，约 50~120KB，无需服务器
+        const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader()
+          reader.onerror = reject
           reader.onload = e => {
             const img = new Image()
+            img.onerror = reject
             img.onload = () => {
-              const MAX = 1200
+              const MAX = 900
               let w = img.width, h = img.height
               if (w > MAX || h > MAX) {
                 if (w > h) { h = Math.round(h * MAX / w); w = MAX }
@@ -227,24 +229,13 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
               const canvas = document.createElement('canvas')
               canvas.width = w; canvas.height = h
               canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-              canvas.toBlob(blob => resolve(new File([blob], file.name, { type: 'image/jpeg' })), 'image/jpeg', 0.75)
+              resolve(canvas.toDataURL('image/jpeg', 0.6))
             }
             img.src = e.target.result
           }
           reader.readAsDataURL(file)
         })
-        // 通过服务器上传到 Supabase Storage
-        const fd = new FormData()
-        fd.append('file', compressedFile)
-        const token = localStorage.getItem('token')
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || '上传失败')
-        setPhotos(prev => [...prev, { name: file.name, url: data.url }])
+        setPhotos(prev => [...prev, { name: file.name, url: dataUrl }])
       } else {
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader()
