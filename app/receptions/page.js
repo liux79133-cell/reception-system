@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, message, Modal, Tooltip } from 'antd'
-import { PlusOutlined, SearchOutlined, ImportOutlined, FilterOutlined, TableOutlined, AppstoreOutlined, LinkOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Select, DatePicker, message, Modal } from 'antd'
+import { PlusOutlined, SearchOutlined, ImportOutlined, FilterOutlined, TableOutlined, AppstoreOutlined, LinkOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import AppLayout from '@/components/AppLayout'
@@ -82,18 +82,56 @@ export default function ReceptionsPage() {
   const [detailRecord, setDetailRecord] = useState(null)
   const [importOpen, setImportOpen] = useState(false)
   const [viewMode, setViewMode] = useState('table')
-  const [docLinks, setDocLinks] = useState([{ label: '接待流程指引', url: '' }, { label: '模块使用手册', url: '' }])
+  const [docLinks, setDocLinks] = useState([])
+  const [configOpen, setConfigOpen] = useState(false)
+  const [editLinks, setEditLinks] = useState([])
+  const [savingLinks, setSavingLinks] = useState(false)
+
+  const loadDocLinks = () => {
+    api.get('/api/config').then(cfg => {
+      const links = []
+      let i = 1
+      while (cfg[`doc_link_${i}_label`]) {
+        links.push({ label: cfg[`doc_link_${i}_label`], url: cfg[`doc_link_${i}_url`] || '' })
+        i++
+      }
+      if (!links.length) links.push({ label: '接待流程指引', url: '' }, { label: '模块使用手册', url: '' })
+      setDocLinks(links)
+    }).catch(() => {})
+  }
 
   useEffect(() => {
     const u = localStorage.getItem('user')
     if (u) setUser(JSON.parse(u))
-    api.get('/api/config').then(cfg => {
-      setDocLinks([
-        { label: cfg.doc_link_1_label || '接待流程指引', url: cfg.doc_link_1_url || '' },
-        { label: cfg.doc_link_2_label || '模块使用手册', url: cfg.doc_link_2_url || '' },
-      ])
-    }).catch(() => {})
+    loadDocLinks()
   }, [])
+
+  const openConfig = () => {
+    setEditLinks(docLinks.length ? docLinks.map(l => ({ ...l })) : [{ label: '', url: '' }])
+    setConfigOpen(true)
+  }
+
+  const saveLinks = async () => {
+    setSavingLinks(true)
+    try {
+      const valid = editLinks.filter(l => l.label.trim())
+      const payload = {}
+      valid.forEach((l, i) => {
+        payload[`doc_link_${i + 1}_label`] = l.label
+        payload[`doc_link_${i + 1}_url`] = l.url
+      })
+      // 清除多余的旧 key（最多支持 10 个）
+      for (let i = valid.length + 1; i <= 10; i++) {
+        payload[`doc_link_${i}_label`] = ''
+        payload[`doc_link_${i}_url`] = ''
+      }
+      await api.post('/api/config', payload)
+      setDocLinks(valid)
+      setConfigOpen(false)
+      message.success('保存成功')
+    } catch (e) { message.error(e || '保存失败') }
+    finally { setSavingLinks(false) }
+  }
 
   const canEdit = user?.role === 'admin' || user?.role === 'editor'
 
@@ -162,17 +200,25 @@ export default function ReceptionsPage() {
           <div>
             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, letterSpacing: 2, fontWeight: 600, marginBottom: 5, textTransform: 'uppercase' }}>政府关系 · Reception</div>
             <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginBottom: 10 }}>接待事务管理</div>
-            {/* 飞书文档快捷跳转 */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {docLinks.map((link, i) => (
+            {/* 快捷文档链接 */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {docLinks.filter(l => l.label).map((link, i) => (
                 <a key={i} href={link.url || '#'} target={link.url ? '_blank' : undefined} rel="noreferrer"
-                  onClick={e => { if (!link.url) { e.preventDefault(); message.info('请在系统设置中配置文档链接') } }}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 13px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 500, textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer' }}
+                  onClick={e => { if (!link.url) { e.preventDefault(); openConfig() } }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 500, textDecoration: 'none', transition: 'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.22)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}>
-                  <LinkOutlined style={{ fontSize: 11 }} />{link.label}
+                  <LinkOutlined style={{ fontSize: 10 }} />{link.label}
                 </a>
               ))}
+              {canEdit && (
+                <button onClick={openConfig}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, background: 'transparent', border: '1px dashed rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
+                  <SettingOutlined style={{ fontSize: 10 }} />配置链接
+                </button>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -231,6 +277,26 @@ export default function ReceptionsPage() {
         .ant-table-tbody > tr:hover > td { background: #f8f9ff !important; }
         .ant-table-tbody > tr:last-child > td { border-bottom: none !important; }
       `}</style>
+
+      {/* 链接配置弹窗 */}
+      <Modal title={<span><SettingOutlined style={{ marginRight: 8 }} />配置快捷链接</span>}
+        open={configOpen} onCancel={() => setConfigOpen(false)} onOk={saveLinks} okText="保存" confirmLoading={savingLinks} width={500}>
+        <div style={{ padding: '8px 0' }}>
+          <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 14 }}>链接 URL 留空则该按钮自动隐藏；标题可自定义。可自由新增或删除。</div>
+          {editLinks.map((link, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+              <Input value={link.label} onChange={e => setEditLinks(prev => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
+                placeholder="标题" style={{ width: 130, borderRadius: 8 }} />
+              <Input value={link.url} onChange={e => setEditLinks(prev => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+                placeholder="https://momenta.feishu.cn/wiki/..." style={{ flex: 1, borderRadius: 8 }} />
+              <Button type="text" danger icon={<DeleteOutlined />} size="small"
+                onClick={() => setEditLinks(prev => prev.filter((_, j) => j !== i))} />
+            </div>
+          ))}
+          <Button type="dashed" icon={<PlusOutlined />} onClick={() => setEditLinks(prev => [...prev, { label: '', url: '' }])}
+            style={{ width: '100%', borderRadius: 8, marginTop: 4 }}>新增快捷链接</Button>
+        </div>
+      </Modal>
 
       <ReceptionForm open={modalOpen} editing={editing} customFields={customFields} onClose={() => setModalOpen(false)} onSuccess={() => { setModalOpen(false); fetchData() }} />
       <ReceptionDetail record={detailRecord} customFields={customFields} canEdit={canEdit} onClose={() => setDetailRecord(null)} onEdit={r => { setEditing(r); setModalOpen(true); setDetailRecord(null) }} onDelete={handleDelete} onUpdated={fetchData} />
