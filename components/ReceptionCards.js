@@ -127,12 +127,18 @@ function ReceptionCard({ record, onClick }) {
   )
 }
 
-export default function ReceptionCards({ data, onCardClick }) {
+export default function ReceptionCards({ data, onCardClick, groupBy = 'month' }) {
   if (!data.length) return <Empty description="暂无接待记录" style={{ padding: 60 }} />
+
+  const getKey = (r) => {
+    if (groupBy === 'level') return r.level || '其他'
+    if (groupBy === 'purpose') return r.purpose || '其他'
+    return dayjs(r.startTime).format('YYYY年M月')
+  }
 
   const groups = {}
   data.forEach(r => {
-    const key = dayjs(r.startTime).format('YYYY年M月')
+    const key = getKey(r)
     if (!groups[key]) groups[key] = []
     groups[key].push(r)
   })
@@ -145,6 +151,7 @@ export default function ReceptionCards({ data, onCardClick }) {
             {month}
             <span style={{ fontSize: 12, color: '#98a2b3', fontWeight: 400, background: '#f2f4f7', padding: '1px 8px', borderRadius: 20 }}>{records.length} 条</span>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
             {records.map(r => (
               <ReceptionCard key={r.id} record={r} onClick={() => onCardClick(r)} />
