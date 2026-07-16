@@ -259,11 +259,63 @@ function FeishuConfig() {
   )
 }
 
+function DocLinks() {
+  const [links, setLinks] = useState([
+    { label: '接待流程指引', url: '' },
+    { label: '模块使用手册', url: '' },
+  ])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.get('/api/config').then(cfg => {
+      setLinks([
+        { label: cfg.doc_link_1_label || '接待流程指引', url: cfg.doc_link_1_url || '' },
+        { label: cfg.doc_link_2_label || '模块使用手册', url: cfg.doc_link_2_url || '' },
+      ])
+    }).catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await api.post('/api/config', {
+        doc_link_1_label: links[0].label,
+        doc_link_1_url: links[0].url,
+        doc_link_2_label: links[1].label,
+        doc_link_2_url: links[1].url,
+      })
+      message.success('保存成功')
+    } catch (e) { message.error(e || '保存失败') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <Typography.Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>
+        配置首页 Banner 上的两个快捷跳转按钮，粘贴飞书文档链接即可
+      </Typography.Text>
+      {links.map((link, i) => (
+        <div key={i} style={{ background: '#f8f9fc', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#667085', marginBottom: 6, fontWeight: 600 }}>按钮 {i + 1}</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Input value={link.label} onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
+              placeholder="按钮名称" style={{ width: 140, borderRadius: 8 }} />
+            <Input value={link.url} onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+              placeholder="粘贴飞书文档链接..." style={{ flex: 1, borderRadius: 8 }} />
+          </div>
+        </div>
+      ))}
+      <Button type="primary" loading={saving} onClick={handleSave} style={{ borderRadius: 8 }}>保存</Button>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   return (
     <AppLayout>
       <Card title={<Typography.Title level={4} style={{ margin: 0 }}>系统设置</Typography.Title>}>
         <Tabs items={[
+          { key: 'docs', label: '快捷文档', children: <DocLinks /> },
           { key: 'feishu', label: <span><ApiOutlined /> 飞书集成</span>, children: <FeishuConfig /> },
           { key: 'hosts', label: '接待人预设', children: <HostPresets /> },
           { key: 'todos', label: '待办模板', children: <TodoCategories /> },

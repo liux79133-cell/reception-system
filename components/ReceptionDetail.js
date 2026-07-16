@@ -156,7 +156,8 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
   const [photos, setPhotos] = useState([])
   const [todos, setTodos] = useState([])
   const [remark, setRemark] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [uploadingMinute, setUploadingMinute] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   useEffect(() => {
     api.get('/api/host-presets').then(setHostPresets).catch(() => {})
@@ -206,17 +207,24 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
   }
 
   const uploadFile = async (file, type) => {
-    setUploading(true)
+    const setLoading = type === 'minute' ? setUploadingMinute : setUploadingPhoto
+    setLoading(true)
     try {
-      const fd = new FormData(); fd.append('file', file)
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      const data = await res.json()
-      if (type === 'minute') setMinuteFiles(prev => [...prev, { name: data.name, url: data.url, size: (data.size / 1024).toFixed(1) + 'KB' }])
-      else setPhotos(prev => [...prev, { name: data.name, url: data.url }])
+      // 直接用 FileReader 转 dataURL，存在内存里，不走服务器上传
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve(e.target.result)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      if (type === 'minute') {
+        setMinuteFiles(prev => [...prev, { name: file.name, url: dataUrl, size: (file.size / 1024).toFixed(1) + 'KB' }])
+      } else {
+        setPhotos(prev => [...prev, { name: file.name, url: dataUrl }])
+      }
       message.success('上传成功')
     } catch { message.error('上传失败') }
-    finally { setUploading(false) }
+    finally { setLoading(false) }
     return false
   }
 
@@ -393,7 +401,7 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
               ? <TextArea value={minutes} onChange={e => setMinutes(e.target.value)} rows={3} placeholder="输入会议纪要..." style={{ marginBottom: 10, borderRadius: 8 }} />
               : minutes && <div style={{ fontSize: 13, color: '#333', marginBottom: 10, whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{minutes}</div>}
             <Upload beforeUpload={f => uploadFile(f, 'minute')} showUploadList={false} accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-              <Button size="small" icon={<UploadOutlined />} loading={uploading} style={{ borderRadius: 20 }}>上传文件</Button>
+              <Button size="small" icon={<UploadOutlined />} loading={uploadingMinute} style={{ borderRadius: 20 }}>上传文件</Button>
             </Upload>
             {minuteFiles.map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f0f7ff', borderRadius: 8, marginTop: 8 }}>
@@ -408,10 +416,10 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
 
           {/* 会议照片 */}
           <Section title="会议照片" icon={<PictureOutlined />} bg="#fff">
-            <Upload beforeUpload={f => uploadFile(f, 'photo')} showUploadList={false} accept="image/*" multiple>
-              <div style={{ border: '1.5px dashed #e0e0e0', borderRadius: 10, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'linear-gradient(135deg,#fafafa,#f5f5f5)', marginBottom: photos.length ? 10 : 0 }}>
-                <div style={{ fontSize: 22, marginBottom: 4 }}>☁️</div>
-                <div style={{ fontSize: 13, color: '#595959' }}>点击上传 · 拖拽 · 粘贴图片</div>
+            <Upload beforeUpload={f => uploadFile(f, 'photo')} showUploadList={false} accept="image/*" multiple disabled={uploadingPhoto}>
+              <div style={{ border: '1.5px dashed #e0e0e0', borderRadius: 10, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'linear-gradient(135deg,#fafafa,#f5f5f5)', marginBottom: photos.length ? 10 : 0, opacity: uploadingPhoto ? 0.6 : 1 }}>
+                <div style={{ fontSize: 22, marginBottom: 4 }}>{uploadingPhoto ? '⏳' : '☁️'}</div>
+                <div style={{ fontSize: 13, color: '#595959' }}>{uploadingPhoto ? '上传中...' : '点击上传 · 拖拽 · 粘贴图片'}</div>
                 <div style={{ fontSize: 11, color: '#aaa' }}>JPG / PNG / GIF，最大 10MB</div>
               </div>
             </Upload>
