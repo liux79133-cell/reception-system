@@ -2,22 +2,17 @@
 import { useState, useMemo } from 'react'
 import dayjs from 'dayjs'
 import { Empty } from 'antd'
-import { CalendarOutlined, RiseOutlined, FallOutlined, MinusOutlined } from '@ant-design/icons'
+import { RiseOutlined, FallOutlined } from '@ant-design/icons'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell,
+  BarChart, Bar, LabelList
 } from 'recharts'
 
 const LEVEL_COLORS_PIE = { '板块': '#6941c6', '省级': '#1677ff', '市级': '#13c2c2', '区级': '#52c41a', '企业/院所': '#fa8c16', '其他': '#8c8c8c', '国家级': '#cf1322', '媒体': '#d48806' }
 const STATUS_COLORS_PIE = { '正常': '#17b26a', '取消': '#f63d68', '待确认': '#f79009', '推迟': '#9ca3af' }
 const HOST_PALETTE = ['#1677ff','#6941c6','#17b26a','#fa8c16','#f63d68','#13c2c2','#d48806','#8c8c8c']
 
-const LEVEL_MAP = { '板块': { color: '#6941c6', bg: '#f4f3ff', border: '#e9d7fe' }, '省级': { color: '#175cd3', bg: '#eff8ff', border: '#b2ddff' }, '市级': { color: '#0e7090', bg: '#f0f9ff', border: '#b9e6fe' }, '区级': { color: '#067647', bg: '#ecfdf3', border: '#abefc6' }, '企业/院所': { color: '#b54708', bg: '#fffaeb', border: '#fedf89' }, '其他': { color: '#667085', bg: '#f9fafb', border: '#e4e7ec' } }
-const KANBAN_COLS = [
-  { key: '待确认', label: '待确认', color: '#b54708', bg: '#fffaeb', border: '#fedf89', dot: '#f79009' },
-  { key: '正常',   label: '正常进行', color: '#067647', bg: '#ecfdf3', border: '#abefc6', dot: '#17b26a' },
-  { key: '取消',   label: '已取消',  color: '#c01048', bg: '#fff1f3', border: '#fecdd6', dot: '#f63d68' },
-]
 
 // ── 自定义 Tooltip ──────────────────────────
 function CustomTooltip({ active, payload, label, allData }) {
@@ -115,33 +110,6 @@ function DonutChart({ title, subtitle, data, colorMap, palette, onSegmentClick }
   )
 }
 
-// ── 看板卡片 ────────────────────────────────
-function KanbanCard({ record, onClick }) {
-  const level = LEVEL_MAP[record.level] || LEVEL_MAP['其他']
-  const photos = record.photos ? (() => { try { return JSON.parse(record.photos) } catch { return [] } })() : []
-  const firstPhoto = photos[0]?.url
-  return (
-    <div onClick={onClick} style={{ background: '#fff', borderRadius: 10, border: '1px solid #f2f4f7', marginBottom: 8, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(16,24,40,0.1)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,0.05)'; e.currentTarget.style.transform = 'translateY(0)' }}>
-      {firstPhoto && <div style={{ height: 80, overflow: 'hidden' }}><img src={firstPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
-      <div style={{ padding: '10px 12px' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: level.bg, color: level.color, border: `1px solid ${level.border}`, marginBottom: 6 }}>{record.level}</span>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#101828', lineHeight: 1.4, marginBottom: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{record.title}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#1677ff', fontWeight: 600, marginBottom: 7 }}>
-          <CalendarOutlined style={{ fontSize: 11 }} />{dayjs(record.startTime).format('MM/DD HH:mm')}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 7, borderTop: '1px solid #f9fafb' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 20, height: 20, borderRadius: 5, background: 'linear-gradient(135deg,#1a1f3e,#3a4580)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700 }}>{record.host?.[0]?.toUpperCase() || '?'}</span>
-            <span style={{ fontSize: 12, color: '#667085' }}>{record.host}</span>
-          </div>
-          <span style={{ fontSize: 11, color: '#667085', background: '#f9fafb', padding: '1px 7px', borderRadius: 4 }}>{record.form}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── 主组件 ──────────────────────────────────
 export default function ReceptionKanban({ data, onCardClick, onFilterJump }) {
@@ -257,26 +225,90 @@ export default function ReceptionKanban({ data, onCardClick, onFilterJump }) {
           onSegmentClick={name => onFilterJump?.({ status: name })} />
       </div>
 
-      {/* ── 看板列 ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-        {KANBAN_COLS.map(col => {
-          const cards = data.filter(r => r.status === col.key)
-          return (
-            <div key={col.key}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', marginBottom: 10, background: col.bg, borderRadius: 10, border: `1px solid ${col.border}` }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.dot }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: col.color }}>{col.label}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: col.color, background: 'rgba(255,255,255,0.6)', padding: '0 8px', borderRadius: 20 }}>{cards.length}</span>
-              </div>
-              <div style={{ minHeight: 80 }}>
-                {cards.length === 0
-                  ? <div style={{ padding: '20px 0', textAlign: 'center', color: '#d0d5dd', fontSize: 13 }}>暂无记录</div>
-                  : cards.map(r => <KanbanCard key={r.id} record={r} onClick={() => onCardClick(r)} />)}
-              </div>
-            </div>
-          )
-        })}
+      {/* ── 接待形式排行 + 来访目的分布 ── */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {/* 接待形式排行：横向条形图 */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', flex: 1, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', border: '1px solid #f2f4f7' }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', marginBottom: 2 }}>接待形式排行</div>
+            <div style={{ fontSize: 11, color: '#98a2b3' }}>点击柱子→跳转表格筛选</div>
+          </div>
+          <FormRankChart data={data} onFilterJump={onFilterJump} />
+        </div>
+
+        {/* 来访目的分布：竖向柱状图 */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', flex: 1, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', border: '1px solid #f2f4f7' }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', marginBottom: 2 }}>来访目的分布</div>
+            <div style={{ fontSize: 11, color: '#98a2b3' }}>点击柱子→跳转表格筛选</div>
+          </div>
+          <PurposeBarChart data={data} onFilterJump={onFilterJump} />
+        </div>
       </div>
     </div>
+  )
+}
+
+// ── 接待形式横向条形图 ──────────────────────
+function FormRankChart({ data, onFilterJump }) {
+  const formData = useMemo(() => {
+    const m = {}
+    data.forEach(r => { if (r.form) m[r.form] = (m[r.form] || 0) + 1 })
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
+  }, [data])
+
+  const max = formData[0]?.value || 1
+
+  return (
+    <div>
+      {formData.map((d, i) => (
+        <div key={d.name} onClick={() => onFilterJump?.({ form: d.name })}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+          <div style={{ width: 64, fontSize: 12, color: '#344054', fontWeight: 500, textAlign: 'right', flexShrink: 0 }}>{d.name}</div>
+          <div style={{ flex: 1, background: '#f2f4f7', borderRadius: 4, overflow: 'hidden', height: 20 }}>
+            <div style={{ width: `${(d.value / max) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #6941c6, #9b72f7)', borderRadius: 4, transition: 'width 0.6s ease', minWidth: 4 }} />
+          </div>
+          <div style={{ width: 32, fontSize: 13, fontWeight: 700, color: '#6941c6', textAlign: 'right', flexShrink: 0 }}>{d.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── 来访目的柱状图 ──────────────────────────
+const PURPOSE_COLORS = ['#fa8c16','#f79009','#17b26a','#6941c6','#1677ff','#f63d68','#0e7090','#9ca3af']
+
+function PurposeBarTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: '#1a1f3e', borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>{payload[0]?.value} <span style={{ fontSize: 12, fontWeight: 400 }}>场</span></div>
+    </div>
+  )
+}
+
+function PurposeBarChart({ data, onFilterJump }) {
+  const purposeData = useMemo(() => {
+    const m = {}
+    data.forEach(r => { if (r.purpose) m[r.purpose] = (m[r.purpose] || 0) + 1 })
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value, fill: PURPOSE_COLORS[i % PURPOSE_COLORS.length] }))
+  }, [data])
+
+  return (
+    <ResponsiveContainer width="100%" height={purposeData.length * 42 + 20}>
+      <BarChart data={purposeData} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 0 }}
+        onClick={e => { if (e?.activePayload?.[0]) onFilterJump?.({ purpose: e.activePayload[0].payload.name }) }}>
+        <XAxis type="number" hide />
+        <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12, fill: '#344054', fontWeight: 500 }} axisLine={false} tickLine={false} />
+        <Tooltip content={<PurposeBarTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+        <Bar dataKey="value" radius={[0, 6, 6, 0]} cursor="pointer">
+          {purposeData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+          <LabelList dataKey="value" position="right" style={{ fontSize: 13, fontWeight: 700, fill: '#344054' }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   )
 }
