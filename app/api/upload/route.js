@@ -1,5 +1,9 @@
 import { requireAuth, errorResponse } from '@/lib/auth'
 
+export const maxDuration = 30
+export const dynamic = 'force-dynamic'
+
+// 允许最大 20MB 请求体
 export async function POST(request) {
   try {
     requireAuth(request)
