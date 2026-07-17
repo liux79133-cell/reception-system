@@ -99,6 +99,8 @@ function parseCSV(text) {
 function parsePaste(text) {
   const lines = text.trim().split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
+  // 飞书复制是 TSV（tab分隔），如果第一行没有 tab 说明是 CSV，走 CSV 解析
+  if (!lines[0].includes('\t')) return parseCSV(text)
   const headers = lines[0].replace(/\r/g, '').split('\t').map(h => h.trim())
 
   const colMap = {}

@@ -398,6 +398,7 @@ export default function MajorProjectsPage() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+  const [expandedRowKeys, setExpandedRowKeys] = useState([])
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
@@ -451,8 +452,8 @@ export default function MajorProjectsPage() {
   }
 
   const allFlat = projects.flatMap(p => [p, ...(p.children || [])])
-  const totalAmt = allFlat.reduce((s, r) => s + (r.totalAmount || 0), 0)
-  const receivedAmt = allFlat.reduce((s, r) => s + (r.receivedAmount || 0), 0)
+  const totalAmt = Math.round(allFlat.reduce((s, r) => s + (r.totalAmount || 0), 0) * 100) / 100
+  const receivedAmt = Math.round(allFlat.reduce((s, r) => s + (r.receivedAmount || 0), 0) * 100) / 100
 
   // ── 8列定义 ──────────────────────────────────────────
   const columns = [
@@ -570,10 +571,12 @@ export default function MajorProjectsPage() {
             expandable={{
               childrenColumnName: 'children',
               rowExpandable: r => r.children?.length > 0,
+              expandedRowKeys,
+              onExpand: (expanded, record) => setExpandedRowKeys(expanded ? [...expandedRowKeys, record.id] : expandedRowKeys.filter(k => k !== record.id)),
               expandIcon: ({ expanded, onExpand, record }) =>
                 record.children?.length > 0
-                  ? <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#1677ff', fontSize: 12, userSelect: 'none' }}>{expanded ? '▾' : '▸'}</span>
-                  : <span style={{ display: 'inline-block', width: 12 }} />
+                  ? <span onClick={e => { e.stopPropagation(); onExpand(record, e) }} style={{ cursor: 'pointer', color: '#1677ff', fontSize: 12, userSelect: 'none', padding: '0 4px' }}>{expanded ? '▾' : '▸'}</span>
+                  : <span style={{ display: 'inline-block', width: 20 }} />
             }}
             pagination={{ pageSize: 20, showTotal: t => `共 ${t} 个项目`, showSizeChanger: true, size: 'small' }}
           />
