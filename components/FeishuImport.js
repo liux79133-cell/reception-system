@@ -7,6 +7,29 @@ import { api } from '@/lib/api'
 const { Dragger } = Upload
 const { TextArea } = Input
 
+// 模糊匹配规则：只要列名包含关键词就映射
+const FUZZY_MAP = [
+  { keywords: ['会议名称','活动名称','名称','会议'], field: 'title' },
+  { keywords: ['开始时间','开始日期','日期','时间'], field: 'startTime' },
+  { keywords: ['结束时间','结束日期'], field: 'endTime' },
+  { keywords: ['接待级别','级别'], field: 'level' },
+  { keywords: ['接待形式','形式'], field: 'form' },
+  { keywords: ['主接待人','主接待','接待人'], field: 'host' },
+  { keywords: ['着装要求','着装'], field: 'dressCode' },
+  { keywords: ['来访目的','目的'], field: 'purpose' },
+  { keywords: ['状态'], field: 'status' },
+  { keywords: ['备注'], field: 'remark' },
+]
+
+function fuzzyMatch(header) {
+  // 清理列名：去除空格、全角字符等
+  const clean = header.replace(/\s/g, '').replace(/　/g, '').trim()
+  for (const rule of FUZZY_MAP) {
+    if (rule.keywords.some(kw => clean.includes(kw))) return rule.field
+  }
+  return null
+}
+
 const FIELD_MAP = {
   '日期': 'startTime', '开始时间': 'startTime', '开始日期': 'startTime',
   '结束时间': 'endTime', '结束日期': 'endTime',
@@ -33,22 +56,30 @@ function parseDate(val) {
 function parsePaste(text) {
   const lines = text.trim().split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
-  const headers = lines[0].split('\t').map(h => h.trim())
+  const headers = lines[0].replace(/\r/g, '').split('\t').map(h => h.trim())
+
+  const colMap = {}
+  headers.forEach(h => {
+    const exact = FIELD_MAP[h]
+    if (exact) { colMap[h] = exact; return }
+    const fuzzy = fuzzyMatch(h)
+    if (fuzzy) colMap[h] = fuzzy
+  })
 
   return lines.slice(1).map((line, i) => {
-    const cols = line.split('\t').map(c => c.trim())
+    const cols = line.replace(/\r/g, '').split('\t').map(c => c.trim())
     const fields = {}
     headers.forEach((h, idx) => { fields[h] = cols[idx] || '' })
 
     const record = { _index: i + 1 }
-    Object.entries(FIELD_MAP).forEach(([fk, ok]) => {
-      const val = fields[fk]
+    Object.entries(colMap).forEach(([h, field]) => {
+      const val = fields[h]
       if (!val) return
-      if (ok === 'startTime' || ok === 'endTime') record[ok] = parseDate(val)
-      else record[ok] = val
+      if (field === 'startTime' || field === 'endTime') record[field] = parseDate(val)
+      else if (!record[field]) record[field] = val
     })
     const extra = {}
-    Object.entries(fields).forEach(([k, v]) => { if (!FIELD_MAP[k] && v) extra[k] = v })
+    Object.entries(fields).forEach(([k, v]) => { if (!colMap[k] && v) extra[k] = v })
     if (Object.keys(extra).length) record._extra = extra
     return record
   }).filter(r => r.title)
@@ -58,12 +89,23 @@ function parsePaste(text) {
 function parseCSV(text) {
   const lines = text.trim().split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
-  const headers = lines[0].replace(/^﻿/, '').split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+  // 去 BOM，处理 \r
+  const rawHeaders = lines[0].replace(/^﻿/, '').replace(/\r/g, '').split(',')
+  const headers = rawHeaders.map(h => h.trim().replace(/^"|"$/g, ''))
+
+  // 建立列名 → 字段 的映射（优先精确，再模糊）
+  const colMap = {}
+  headers.forEach(h => {
+    const exact = FIELD_MAP[h]
+    if (exact) { colMap[h] = exact; return }
+    const fuzzy = fuzzyMatch(h)
+    if (fuzzy) colMap[h] = fuzzy
+  })
 
   return lines.slice(1).map((line, i) => {
     const cols = []
     let cur = '', inQuote = false
-    for (let c of line) {
+    for (const c of line.replace(/\r/g, '')) {
       if (c === '"') inQuote = !inQuote
       else if (c === ',' && !inQuote) { cols.push(cur.trim()); cur = '' }
       else cur += c
@@ -74,14 +116,14 @@ function parseCSV(text) {
     headers.forEach((h, idx) => { fields[h] = (cols[idx] || '').replace(/^"|"$/g, '') })
 
     const record = { _index: i + 1 }
-    Object.entries(FIELD_MAP).forEach(([fk, ok]) => {
-      const val = fields[fk]
+    Object.entries(colMap).forEach(([h, field]) => {
+      const val = fields[h]
       if (!val) return
-      if (ok === 'startTime' || ok === 'endTime') record[ok] = parseDate(val)
-      else record[ok] = val
+      if (field === 'startTime' || field === 'endTime') record[field] = parseDate(val)
+      else if (!record[field]) record[field] = val // 先到先得，不覆盖
     })
     const extra = {}
-    Object.entries(fields).forEach(([k, v]) => { if (!FIELD_MAP[k] && v) extra[k] = v })
+    Object.entries(fields).forEach(([k, v]) => { if (!colMap[k] && v) extra[k] = v })
     if (Object.keys(extra).length) record._extra = extra
     return record
   }).filter(r => r.title)
