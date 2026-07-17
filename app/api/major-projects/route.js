@@ -55,9 +55,23 @@ export async function DELETE(request) {
   try {
     requireEditor(request)
     const { searchParams } = new URL(request.url)
-    const id = parseInt(searchParams.get('id'))
-    if (!id) return Response.json({ error: '缺少 id' }, { status: 400 })
-    await prisma.majorProject.delete({ where: { id } })
-    return Response.json({ ok: true })
+    const all = searchParams.get('all')
+    const ids = searchParams.get('ids')
+    const id = searchParams.get('id')
+
+    if (all === 'true') {
+      await prisma.majorProject.deleteMany({})
+      return Response.json({ ok: true })
+    }
+    if (ids) {
+      const idList = ids.split(',').map(Number).filter(Boolean)
+      await prisma.majorProject.deleteMany({ where: { id: { in: idList } } })
+      return Response.json({ ok: true })
+    }
+    if (id) {
+      await prisma.majorProject.delete({ where: { id: parseInt(id) } })
+      return Response.json({ ok: true })
+    }
+    return Response.json({ error: '缺少参数' }, { status: 400 })
   } catch (e) { return errorResponse(e) }
 }
