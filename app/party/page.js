@@ -160,12 +160,12 @@ function ApplicantView() {
         <div style={{ padding: '0 24px 24px' }}>
           {/* 阶段标题 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 20, paddingBottom: 14, borderBottom: `1px solid #f2f4f7` }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: RED_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileTextOutlined style={{ color: RED, fontSize: 16 }} />
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: RED_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              {TRANSFER_IN_STEPS[currentStep]?.icon}
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#101828' }}>阶段1：档案上传</div>
-              <div style={{ fontSize: 12, color: '#98a2b3' }}>上传党员档案材料</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#101828' }}>阶段{currentStep + 1}：{TRANSFER_IN_STEPS[currentStep]?.title}</div>
+              <div style={{ fontSize: 12, color: '#98a2b3' }}>{['上传党员档案材料', '上传党费缴纳凭证', '获取转接引导材料', '填写个人基本信息', '加入党员工作群', '等待审核完成归档'][currentStep]}</div>
             </div>
             <Tag color="orange" style={{ marginLeft: 'auto' }}>进行中</Tag>
           </div>
@@ -208,8 +208,12 @@ function ApplicantView() {
 
           {/* 操作按钮 */}
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-            <Button icon={<ArrowLeftOutlined />} style={{ borderRadius: 8, flex: 1, height: 44 }}>← 上一步</Button>
-            <Button type="primary" icon={<ArrowRightOutlined />} style={{ borderRadius: 8, flex: 3, height: 44, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', fontWeight: 700, fontSize: 15 }}>
+            <Button icon={<ArrowLeftOutlined />} disabled={currentStep === 0}
+              onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+              style={{ borderRadius: 8, flex: 1, height: 44 }}>← 上一步</Button>
+            <Button type="primary"
+              onClick={() => setCurrentStep(s => Math.min(TRANSFER_IN_STEPS.length - 1, s + 1))}
+              style={{ borderRadius: 8, flex: 3, height: 44, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', fontWeight: 700, fontSize: 15 }}>
               保存并继续 →
             </Button>
           </div>
