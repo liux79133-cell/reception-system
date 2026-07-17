@@ -124,9 +124,13 @@ model MajorProject {
   totalAmount     Float?
   receivedAmount  Float          @default(0)
   owner           String?
+  responsible     String?
+  applyCode       String?
   star            Boolean        @default(false)
   remark          String?
   customFields    String?
+  payRecords      String?
+  lifeCycle       String?
   parentId        Int?
   parent          MajorProject?  @relation("ProjectChildren", fields: [parentId], references: [id])
   children        MajorProject[] @relation("ProjectChildren")

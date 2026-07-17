@@ -51,7 +51,37 @@ export async function POST(request) {
   } catch (e) { return errorResponse(e) }
 }
 
-export async function DELETE(request) {
+export async function PUT(request) {
+  try {
+    requireEditor(request)
+    const body = await request.json()
+    const { id, ...fields } = body
+    if (!id) return Response.json({ error: '缺少 id' }, { status: 400 })
+    const toNum = v => (v == null || v === '' || v === '—') ? null : (isNaN(Number(v)) ? null : Number(v))
+    const project = await prisma.majorProject.update({
+      where: { id: parseInt(id) },
+      data: {
+        name: fields.name,
+        type: fields.type,
+        company: fields.company || null,
+        level: fields.level,
+        status: fields.status,
+        totalAmount: toNum(fields.totalAmount),
+        receivedAmount: toNum(fields.receivedAmount) ?? 0,
+        owner: fields.owner || null,
+        responsible: fields.responsible || null,
+        applyCode: fields.applyCode || null,
+        star: !!fields.star,
+        remark: fields.remark || null,
+        payRecords: fields.payRecords != null ? JSON.stringify(fields.payRecords) : undefined,
+        lifeCycle: fields.lifeCycle != null ? JSON.stringify(fields.lifeCycle) : undefined,
+      }
+    })
+    return Response.json({ project })
+  } catch (e) { return errorResponse(e) }
+}
+
+
   try {
     requireEditor(request)
     const { searchParams } = new URL(request.url)
