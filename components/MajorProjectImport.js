@@ -7,36 +7,38 @@ import { api } from '@/lib/api'
 const { Dragger } = Upload
 const { TextArea } = Input
 
-// 字段映射：飞书列名 → 系统字段
+// 字段映射：飞书列名 → 系统字段（精确匹配，优先级高于模糊）
 const FIELD_MAP = {
   '项目名称': 'name', '名称': 'name',
   '项目类别': 'type', '类别': 'type', '类型': 'type',
-  '收款主体': 'company', '主体': 'company', '公司': 'company',
+  '收款主体': 'company', '主体': 'company', '公司': 'company', '归属公司': 'company',
   '级别': 'level', '项目级别': 'level',
-  '状态': 'status', '项目状态': 'status',
-  '总金额': 'totalAmount', '总金额(万)': 'totalAmount', '金额': 'totalAmount',
-  '已到账': 'receivedAmount', '已到账(万)': 'receivedAmount', '到账金额': 'receivedAmount',
-  '归属': 'owner', '负责': 'owner',
-  '父项目': 'parentName', '上级项目': 'parentName', '父级': 'parentName',
+  '状态': 'status', '项目状态': 'status', '项目进度': 'status',
+  '总金额': 'totalAmount', '总金额(万)': 'totalAmount',
+  '已到账金额': 'receivedAmount', '已到账(万)': 'receivedAmount', '到账金额': 'receivedAmount', '已到账': 'receivedAmount',
+  '归属': 'owner', '负责人': 'owner', '归属公司': 'owner',
+  '父项目': 'parentName', '上级项目': 'parentName', '父级': 'parentName', '父记录': 'parentName',
   '备注': 'remark',
 }
 
+// 模糊匹配（列名含关键词则映射），含"时间/日期"的列排除在外
 const FUZZY_MAP = [
-  { keywords: ['项目名称', '名称', '项目'], field: 'name' },
-  { keywords: ['类别', '类型', '项目类别'], field: 'type' },
-  { keywords: ['收款主体', '公司', '主体'], field: 'company' },
-  { keywords: ['级别'], field: 'level' },
-  { keywords: ['状态'], field: 'status' },
-  { keywords: ['总金额', '金额'], field: 'totalAmount' },
-  { keywords: ['已到账(万)', '已到账金额', '到账金额', '已到账'], field: 'receivedAmount' },
-  { keywords: ['归属', '负责'], field: 'owner' },
-  { keywords: ['父项目', '上级项目', '父级'], field: 'parentName' },
+  { keywords: ['项目名称'], field: 'name' },
+  { keywords: ['项目类别', '类别', '类型'], field: 'type' },
+  { keywords: ['收款主体', '收款公司'], field: 'company' },
+  { keywords: ['项目级别'], field: 'level' },
+  { keywords: ['项目状态', '项目进度'], field: 'status' },
+  // 金额类：必须明确含"金额"或"总金额"，不能只含"金额"避免误匹配
+  { keywords: ['已到账金额', '到账金额', '已到账(万)'], field: 'receivedAmount' },
+  { keywords: ['总金额'], field: 'totalAmount' },
+  { keywords: ['归属公司', '归属单位'], field: 'owner' },
+  { keywords: ['父记录', '父项目', '上级项目'], field: 'parentName' },
   { keywords: ['备注'], field: 'remark' },
 ]
 
 function fuzzyMatch(header) {
-  const clean = header.replace(/\s/g, '').replace(/　/g, '').trim()
-  // 含"时间/日期"的列不做模糊匹配，避免把"到账时间"误映射成金额
+  const clean = header.replace(/\s/g, '').replace(/　/g, '').replace(/（.*?）/g, '').replace(/\(.*?\)/g, '').trim()
+  // 含"时间/日期"的列跳过，避免"到账时间"误匹配金额
   if (clean.includes('时间') || clean.includes('日期')) return null
   for (const rule of FUZZY_MAP) {
     if (rule.keywords.some(kw => clean.includes(kw))) return rule.field
@@ -52,8 +54,12 @@ function parseCSV(text) {
 
   const colMap = {}
   headers.forEach(h => {
-    const exact = FIELD_MAP[h]
-    if (exact) { colMap[h] = exact; return }
+    // 先精确匹配原始列名
+    if (FIELD_MAP[h]) { colMap[h] = FIELD_MAP[h]; return }
+    // 再用去括号后的列名精确匹配
+    const stripped = h.replace(/（.*?）/g, '').replace(/\(.*?\)/g, '').trim()
+    if (FIELD_MAP[stripped]) { colMap[h] = FIELD_MAP[stripped]; return }
+    // 最后模糊匹配
     const fuzzy = fuzzyMatch(h)
     if (fuzzy) colMap[h] = fuzzy
   })
@@ -98,8 +104,12 @@ function parsePaste(text) {
 
   const colMap = {}
   headers.forEach(h => {
-    const exact = FIELD_MAP[h]
-    if (exact) { colMap[h] = exact; return }
+    // 先精确匹配原始列名
+    if (FIELD_MAP[h]) { colMap[h] = FIELD_MAP[h]; return }
+    // 再用去括号后的列名精确匹配
+    const stripped = h.replace(/（.*?）/g, '').replace(/\(.*?\)/g, '').trim()
+    if (FIELD_MAP[stripped]) { colMap[h] = FIELD_MAP[stripped]; return }
+    // 最后模糊匹配
     const fuzzy = fuzzyMatch(h)
     if (fuzzy) colMap[h] = fuzzy
   })
