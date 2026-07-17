@@ -1,12 +1,13 @@
 'use client'
-import { useState } from 'react'
-import { Table, Button, Input, Select, Tag, Space, Tooltip, Badge, Progress, Empty, Modal, Form, InputNumber, message } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, ImportOutlined, FireOutlined, AppstoreOutlined, BarChartOutlined, UnorderedListOutlined, DeleteOutlined, EditOutlined, CheckSquareOutlined } from '@ant-design/icons'
+import { useState, useEffect, useCallback } from 'react'
+import { Table, Button, Input, Select, Tag, Space, Progress, Empty, Modal, message } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, ImportOutlined, FireOutlined, AppstoreOutlined, BarChartOutlined, UnorderedListOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
+import MajorProjectImport from '@/components/MajorProjectImport'
+import { api } from '@/lib/api'
 
 const { Option } = Select
 
-// ── 配色 ─────────────────────────────────────
 const LEVEL_MAP = {
   '国家级': { color: '#c01048', bg: '#fff1f3', border: '#fecdd6' },
   '省级':   { color: '#175cd3', bg: '#eff8ff', border: '#b2ddff' },
@@ -31,16 +32,6 @@ function StatusChip({ status }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />{status}</span>
 }
 
-// ── 示例数据（后续替换为真实API） ─────────────
-const MOCK_DATA = [
-  { id: 1, name: '江苏新兴领域"苏新领军"工程培育企业', type: '荣誉资质', company: '魔门塔（苏州）科技有限公司', level: '省级', status: '进行中', totalAmount: null, receivedAmount: 0, owner: '公司', todos: 2, star: true },
-  { id: 2, name: '2026年江苏省创新联合体项目', type: '荣誉资质', company: '魔门塔（苏州）科技有限公司', level: '省级', status: '进行中', totalAmount: 0, receivedAmount: 0, owner: '公司', todos: 0, star: true },
-  { id: 3, name: 'Xheart-2026年苏州市工信专项资金（芯片车规认证补贴）', type: '项目补贴', company: '新芯航途（苏州）科技股份有限公司', level: '市级', status: '进行中', totalAmount: null, receivedAmount: 0, owner: '公司', todos: 1, star: true },
-  { id: 4, name: '2026年江苏省科学技术奖', type: '荣誉资质', company: '魔门塔（苏州）科技有限公司', level: '省级', status: '进行中', totalAmount: null, receivedAmount: 0, owner: '公司', todos: 0, star: false },
-  { id: 5, name: '苏州市2026年工业数字化转型专项资金', type: '项目补贴', company: '魔门塔（苏州）科技有限公司', level: '市级', status: '待申报', totalAmount: 500, receivedAmount: 0, owner: '公司', todos: 3, star: false },
-]
-
-// ── 卡片视图 ─────────────────────────────────
 function ProjectCard({ record, onClick }) {
   const level = LEVEL_MAP[record.level] || LEVEL_MAP['其他']
   const pct = record.totalAmount ? Math.round((record.receivedAmount / record.totalAmount) * 100) : 0
@@ -57,7 +48,7 @@ function ProjectCard({ record, onClick }) {
       </div>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#101828', lineHeight: 1.5, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{record.name}</div>
       <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 3 }}>收款主体</div>
-      <div style={{ fontSize: 12, color: '#344054', marginBottom: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.company}</div>
+      <div style={{ fontSize: 12, color: '#344054', marginBottom: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.company || '—'}</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <span style={{ fontSize: 11, color: '#98a2b3' }}>到账进度</span>
         <span style={{ fontSize: 11, color: '#344054', fontWeight: 600 }}>{record.receivedAmount ?? '—'} / {record.totalAmount ?? '—'} 万</span>
@@ -65,31 +56,59 @@ function ProjectCard({ record, onClick }) {
       {record.totalAmount ? <Progress percent={pct} size="small" strokeColor="#1677ff" showInfo={false} /> : <div style={{ height: 4, background: '#f2f4f7', borderRadius: 4 }} />}
       <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 11, color: '#667085', background: '#f9fafb', padding: '2px 8px', borderRadius: 4 }}>{record.type}</span>
-        {record.todos > 0 && <span style={{ fontSize: 11, color: '#b54708', background: '#fffaeb', padding: '2px 8px', borderRadius: 4 }}>⏳ {record.todos} 项待办</span>}
       </div>
     </div>
   )
 }
 
-// ── 主页面 ──────────────────────────────────
 export default function MajorProjectsPage() {
   const [viewMode, setViewMode] = useState('table')
   const [keyword, setKeyword] = useState('')
   const [levelFilter, setLevelFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
-  const [importUrl, setImportUrl] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState(null)
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const filtered = MOCK_DATA.filter(r =>
-    (!keyword || r.name.includes(keyword) || r.company.includes(keyword)) &&
-    (!levelFilter || r.level === levelFilter) &&
-    (!typeFilter || r.type === typeFilter) &&
-    (!statusFilter || r.status === statusFilter)
-  )
+  const fetchProjects = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (keyword) params.set('keyword', keyword)
+      if (levelFilter) params.set('level', levelFilter)
+      if (typeFilter) params.set('type', typeFilter)
+      if (statusFilter) params.set('status', statusFilter)
+      const res = await api.get(`/api/major-projects?${params}`)
+      setProjects(res.projects || [])
+    } catch (e) {
+      message.error('加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [keyword, levelFilter, typeFilter, statusFilter])
 
-  const totalAmount = filtered.reduce((s, r) => s + (r.totalAmount || 0), 0)
-  const receivedAmount = filtered.reduce((s, r) => s + (r.receivedAmount || 0), 0)
+  useEffect(() => { fetchProjects() }, [fetchProjects])
+
+  const handleDelete = async (id) => {
+    Modal.confirm({
+      title: '确认删除该项目？',
+      okText: '删除', okType: 'danger', cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/api/major-projects?id=${id}`)
+          message.success('已删除')
+          fetchProjects()
+        } catch (e) {
+          message.error('删除失败')
+        }
+      }
+    })
+  }
+
+  const totalAmount = projects.reduce((s, r) => s + (r.totalAmount || 0), 0)
+  const receivedAmount = projects.reduce((s, r) => s + (r.receivedAmount || 0), 0)
 
   const columns = [
     {
@@ -109,9 +128,9 @@ export default function MajorProjectsPage() {
         return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 9px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: `${c}15`, color: c, border: `1px solid ${c}30` }}>{v}</span>
       }
     },
-    { title: '收款主体', dataIndex: 'company', ellipsis: true, width: 200, render: v => <span style={{ fontSize: 12, color: '#344054' }}>{v}</span> },
+    { title: '收款主体', dataIndex: 'company', ellipsis: true, width: 200, render: v => <span style={{ fontSize: 12, color: '#344054' }}>{v || '—'}</span> },
     {
-      title: '项目段', dataIndex: 'status', width: 90,
+      title: '状态', dataIndex: 'status', width: 90,
       render: v => <StatusChip status={v} />
     },
     {
@@ -127,24 +146,17 @@ export default function MajorProjectsPage() {
         </div>
       )
     },
-    { title: '归属', dataIndex: 'owner', width: 70, render: v => <span style={{ fontSize: 12, color: '#667085' }}>{v}</span> },
+    { title: '归属', dataIndex: 'owner', width: 70, render: v => <span style={{ fontSize: 12, color: '#667085' }}>{v || '—'}</span> },
     {
       title: '级别', dataIndex: 'level', width: 80,
       render: v => <Chip label={v} map={LEVEL_MAP} />
     },
     {
-      title: '待办事项', dataIndex: 'todos', width: 85, align: 'center',
-      render: v => v > 0
-        ? <span style={{ fontSize: 12, color: '#b54708', background: '#fffaeb', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{v} 项</span>
-        : <span style={{ color: '#d0d5dd', fontSize: 12 }}>—</span>
-    },
-    {
-      title: '操作', width: 90, fixed: 'right',
+      title: '操作', width: 70, fixed: 'right',
       render: (_, r) => (
         <Space size={2}>
-          <Button type="text" size="small" icon={<PlusOutlined />} style={{ color: '#667085', fontSize: 12 }} onClick={() => setDetailRecord(r)} />
-          <Button type="text" size="small" icon={<EditOutlined />} style={{ color: '#667085', fontSize: 12 }} />
-          <Button type="text" size="small" icon={<DeleteOutlined />} style={{ color: '#f04438', fontSize: 12 }} />
+          <Button type="text" size="small" icon={<EditOutlined />} style={{ color: '#667085', fontSize: 12 }} onClick={() => setDetailRecord(r)} />
+          <Button type="text" size="small" icon={<DeleteOutlined />} style={{ color: '#f04438', fontSize: 12 }} onClick={() => handleDelete(r.id)} />
         </Space>
       )
     }
@@ -166,7 +178,6 @@ export default function MajorProjectsPage() {
             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, letterSpacing: 2, fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>LPA Platform · Projects</div>
             <div style={{ color: '#fff', fontSize: 20, fontWeight: 800, marginBottom: 4 }}>重大项目管理</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 14 }}>项目全生命周期管理与追踪</div>
-            {/* 视图切换 */}
             <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3 }}>
               {VIEWS.map(v => (
                 <button key={v.key} onClick={() => setViewMode(v.key)}
@@ -178,7 +189,7 @@ export default function MajorProjectsPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <div style={{ textAlign: 'center', padding: '10px 18px', background: 'rgba(255,255,255,0.1)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)' }}>
-              <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{MOCK_DATA.length}</div>
+              <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{projects.length}</div>
               <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 4 }}>项目总数</div>
             </div>
             <div style={{ textAlign: 'center', padding: '10px 18px', background: 'rgba(255,255,255,0.08)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -193,14 +204,16 @@ export default function MajorProjectsPage() {
         </div>
       </div>
 
-      {/* ── 导入栏 ── */}
+      {/* ── 工具栏 ── */}
       <div style={{ background: '#fff', borderRadius: 12, padding: '10px 14px', marginBottom: 10, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <ImportOutlined style={{ color: '#1677ff', fontSize: 13 }} />
         </div>
-        <Input value={importUrl} onChange={e => setImportUrl(e.target.value)} placeholder="粘贴飞书多维表格 URL..." style={{ flex: 1, borderRadius: 8, border: '1px solid #e8f1ff', background: '#f8fbff' }} />
-        <Button type="primary" style={{ borderRadius: 8, background: 'linear-gradient(135deg,#2e3fa0,#1677ff)', border: 'none' }}
-          onClick={() => message.info('请先配置飞书应用凭证')}>解析导入</Button>
+        <div style={{ fontSize: 13, color: '#344054', flex: 1 }}>从飞书多维表格导出 CSV，然后导入到系统中</div>
+        <Button type="primary" icon={<ImportOutlined />} style={{ borderRadius: 8, background: 'linear-gradient(135deg,#2e3fa0,#1677ff)', border: 'none' }}
+          onClick={() => setImportOpen(true)}>
+          导入飞书数据
+        </Button>
         <Button icon={<DownloadOutlined />} style={{ borderRadius: 8, borderColor: '#d0d5dd', color: '#344054' }}>导出 Excel</Button>
       </div>
 
@@ -225,17 +238,18 @@ export default function MajorProjectsPage() {
       {/* ── 表格视图 ── */}
       {viewMode === 'table' && (
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-          <Table rowKey="id" columns={columns} dataSource={filtered} scroll={{ x: 1100 }}
-            pagination={{ pageSize: 20, showTotal: t => `共 ${t} 个项目（${filtered.filter(r=>r.name.includes('子项目')).length} 个主项目 + ${filtered.filter(r=>r.name.includes('子项目')).length} 个子项目）`, showSizeChanger: true }}
+          <Table rowKey="id" columns={columns} dataSource={projects} loading={loading} scroll={{ x: 1100 }}
+            pagination={{ pageSize: 20, showTotal: t => `共 ${t} 个项目`, showSizeChanger: true }}
           />
         </div>
       )}
 
       {/* ── 卡片视图 ── */}
       {viewMode === 'card' && (
-        filtered.length === 0 ? <Empty description="暂无项目" style={{ padding: 60 }} /> :
+        loading ? <div style={{ textAlign: 'center', padding: 60, color: '#98a2b3' }}>加载中...</div> :
+        projects.length === 0 ? <Empty description="暂无项目" style={{ padding: 60 }} /> :
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-          {filtered.map(r => <ProjectCard key={r.id} record={r} onClick={() => setDetailRecord(r)} />)}
+          {projects.map(r => <ProjectCard key={r.id} record={r} onClick={() => setDetailRecord(r)} />)}
         </div>
       )}
 
@@ -248,7 +262,14 @@ export default function MajorProjectsPage() {
         </div>
       )}
 
-      {/* ── 项目详情弹窗（占位） ── */}
+      {/* ── 导入弹窗 ── */}
+      <MajorProjectImport
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSuccess={() => { fetchProjects(); setImportOpen(false) }}
+      />
+
+      {/* ── 项目详情弹窗 ── */}
       <Modal open={!!detailRecord} onCancel={() => setDetailRecord(null)} footer={null} width={600} title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {detailRecord?.star && <FireOutlined style={{ color: '#f79009' }} />}
@@ -264,20 +285,17 @@ export default function MajorProjectsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
               {[
                 ['项目类别', detailRecord.type],
-                ['收款主体', detailRecord.company],
+                ['收款主体', detailRecord.company || '—'],
                 ['总金额', detailRecord.totalAmount ? `${detailRecord.totalAmount} 万元` : '—'],
                 ['已到账', `${detailRecord.receivedAmount} 万元`],
-                ['归属', detailRecord.owner],
-                ['待办事项', `${detailRecord.todos} 项`],
+                ['归属', detailRecord.owner || '—'],
+                ['备注', detailRecord.remark || '—'],
               ].map(([k, v]) => (
                 <div key={k}>
                   <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 3 }}>{k}</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#101828' }}>{v}</div>
                 </div>
               ))}
-            </div>
-            <div style={{ marginTop: 20, padding: '16px', background: '#f9fafb', borderRadius: 10, textAlign: 'center', color: '#98a2b3', fontSize: 13 }}>
-              📋 详细内容模块即将开放，请联系管理员配置
             </div>
           </div>
         )}

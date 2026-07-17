@@ -1,0 +1,62 @@
+import { prisma } from '@/lib/prisma'
+import { requireAuth, requireEditor, errorResponse } from '@/lib/auth'
+
+export async function GET(request) {
+  try {
+    requireAuth(request)
+    const { searchParams } = new URL(request.url)
+    const keyword = searchParams.get('keyword') || ''
+    const level = searchParams.get('level') || ''
+    const type = searchParams.get('type') || ''
+    const status = searchParams.get('status') || ''
+
+    const where = {}
+    if (keyword) where.OR = [
+      { name: { contains: keyword } },
+      { company: { contains: keyword } },
+    ]
+    if (level) where.level = level
+    if (type) where.type = type
+    if (status) where.status = status
+
+    const projects = await prisma.majorProject.findMany({
+      where,
+      orderBy: [{ star: 'desc' }, { createdAt: 'desc' }],
+    })
+    return Response.json({ projects })
+  } catch (e) { return errorResponse(e) }
+}
+
+export async function POST(request) {
+  try {
+    const user = requireEditor(request)
+    const body = await request.json()
+    const project = await prisma.majorProject.create({
+      data: {
+        name: body.name,
+        type: body.type || '其他',
+        company: body.company || null,
+        level: body.level || '其他',
+        status: body.status || '进行中',
+        totalAmount: body.totalAmount != null ? Number(body.totalAmount) : null,
+        receivedAmount: Number(body.receivedAmount || 0),
+        owner: body.owner || null,
+        star: body.star || false,
+        remark: body.remark || null,
+        createdById: user.id,
+      }
+    })
+    return Response.json({ project })
+  } catch (e) { return errorResponse(e) }
+}
+
+export async function DELETE(request) {
+  try {
+    requireEditor(request)
+    const { searchParams } = new URL(request.url)
+    const id = parseInt(searchParams.get('id'))
+    if (!id) return Response.json({ error: '缺少 id' }, { status: 400 })
+    await prisma.majorProject.delete({ where: { id } })
+    return Response.json({ ok: true })
+  } catch (e) { return errorResponse(e) }
+}

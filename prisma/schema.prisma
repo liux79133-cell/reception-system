@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id         Int         @id @default(autoincrement())
-  username   String      @unique
-  password   String
-  name       String
-  role       String      @default("viewer")
-  createdAt  DateTime    @default(now())
-  receptions Reception[]
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  password      String
+  name          String
+  role          String         @default("viewer")
+  createdAt     DateTime       @default(now())
+  receptions    Reception[]
+  majorProjects MajorProject[]
 }
 
 model Reception {
@@ -111,4 +112,23 @@ model AppConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model MajorProject {
+  id              Int      @id @default(autoincrement())
+  name            String
+  type            String   @default("其他")
+  company         String?
+  level           String   @default("其他")
+  status          String   @default("进行中")
+  totalAmount     Float?
+  receivedAmount  Float    @default(0)
+  owner           String?
+  star            Boolean  @default(false)
+  remark          String?
+  customFields    String?
+  createdById     Int
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
