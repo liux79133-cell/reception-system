@@ -28,7 +28,7 @@ const FUZZY_MAP = [
   { keywords: ['级别'], field: 'level' },
   { keywords: ['状态'], field: 'status' },
   { keywords: ['总金额', '金额'], field: 'totalAmount' },
-  { keywords: ['已到账', '到账'], field: 'receivedAmount' },
+  { keywords: ['已到账(万)', '已到账金额', '到账金额', '已到账'], field: 'receivedAmount' },
   { keywords: ['归属', '负责'], field: 'owner' },
   { keywords: ['父项目', '上级项目', '父级'], field: 'parentName' },
   { keywords: ['备注'], field: 'remark' },
@@ -36,6 +36,8 @@ const FUZZY_MAP = [
 
 function fuzzyMatch(header) {
   const clean = header.replace(/\s/g, '').replace(/　/g, '').trim()
+  // 含"时间/日期"的列不做模糊匹配，避免把"到账时间"误映射成金额
+  if (clean.includes('时间') || clean.includes('日期')) return null
   for (const rule of FUZZY_MAP) {
     if (rule.keywords.some(kw => clean.includes(kw))) return rule.field
   }

@@ -25,7 +25,7 @@ export async function POST(request) {
           level: r.level || '其他',
           status: r.status || '进行中',
           totalAmount: toNum(r.totalAmount),
-          receivedAmount: toNum(r.receivedAmount) ?? 0,
+          receivedAmount: toNum(r.receivedAmount) ?? 0,  // schema default 0，null时用0
           owner: r.owner || null,
           star: false,
           remark: r.remark || null,
