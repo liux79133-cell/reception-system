@@ -1,14 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Table, Button, Input, Select, Space, Progress, Empty, Modal, Drawer, Divider, message, Tooltip, Collapse, Form, InputNumber, DatePicker, Switch, Tag } from 'antd'
+import { Table, Button, Input, Select, Space, Progress, Empty, Modal, Drawer, Divider, message, Tooltip, Collapse, Form, InputNumber, DatePicker, Switch } from 'antd'
 import { PlusOutlined, SearchOutlined, DownloadOutlined, ImportOutlined, StarFilled, StarOutlined, AppstoreOutlined, BarChartOutlined, UnorderedListOutlined, DeleteOutlined, ExclamationCircleOutlined, CloseOutlined, EditOutlined, SaveOutlined, PlusCircleOutlined, BankOutlined, CalendarOutlined, FileTextOutlined, InfoCircleOutlined, CheckCircleFilled, ClockCircleOutlined } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import MajorProjectImport from '@/components/MajorProjectImport'
 import { api } from '@/lib/api'
-import dayjs from 'dayjs'
-
 const { Option } = Select
-const { Panel } = Collapse
 
 // ── 配色 ─────────────────────────────────────────────────
 const LEVEL_CFG = {
@@ -287,92 +284,103 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
       </div>
 
       {/* ── 折叠板块 ── */}
-      <div style={{ overflowY: 'auto', height: 'calc(100vh - 220px)' }}>
-        <Collapse defaultActiveKey={['basic', 'finance']} ghost style={{ background: 'transparent' }}
-          expandIconPosition="end">
-
-          {/* 基础信息 */}
-          <Panel key="basic" style={{ background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }}
-            header={<span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><InfoCircleOutlined style={{ color: '#1677ff' }} />基础信息</span>}>
-            <div style={{ padding: '0 4px 8px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <EditableField label="项目名称" value={record.name} onSave={v => save({ name: v })} />
-                </div>
-                <EditableField label="立项名称/编号" value={record.applyCode} onSave={v => save({ applyCode: v })} />
-                <EditableField label="项目级别" value={record.level} type="select" options={Object.keys(LEVEL_CFG)} onSave={v => save({ level: v })} />
-                <EditableField label="项目类别" value={record.type} type="select" options={TYPE_LIST} onSave={v => save({ type: v })} />
-                <EditableField label="收款公司主体" value={record.company} onSave={v => save({ company: v })} />
-                <EditableField label="归属" value={record.owner} onSave={v => save({ owner: v })} />
-                <EditableField label="项目负责人" value={record.responsible} onSave={v => save({ responsible: v })} />
-                <EditableField label="项目进度" value={record.status} type="select" options={Object.keys(STATUS_CFG)} onSave={v => save({ status: v })} />
-              </div>
-              <div style={{ marginTop: 14 }}>
-                <EditableField label="备注" value={record.remark} onSave={v => save({ remark: v })} />
-              </div>
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>周重点项目</div>
-                <Switch checked={record.star} onChange={v => save({ star: v })}
-                  checkedChildren="⭐ 周重点" unCheckedChildren="普通项目"
-                  style={{ background: record.star ? '#f59e0b' : undefined }} />
-              </div>
-            </div>
-          </Panel>
-
-          {/* 资金到账管理 */}
-          <Panel key="finance" style={{ background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }}
-            header={<span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><BankOutlined style={{ color: '#10b981' }} />资金与到账管理</span>}>
-            <div style={{ padding: '0 4px 8px' }}>
-              <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
-                <EditableField label="总金额(万)" value={record.totalAmount} type="number" onSave={v => save({ totalAmount: v })} />
-                <EditableField label="已到账(万)" value={record.receivedAmount} type="number" onSave={v => save({ receivedAmount: v })} />
-              </div>
-              <Divider style={{ margin: '8px 0 12px' }} />
-              <PayRecords records={payRecords} totalAmount={record.totalAmount} onUpdate={savePayRecords} />
-            </div>
-          </Panel>
-
-          {/* 生命周期 */}
-          <Panel key="lifecycle" style={{ background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }}
-            header={<span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarOutlined style={{ color: '#f59e0b' }} />项目生命周期管理</span>}>
-            <div style={{ padding: '0 4px 8px' }}>
-              <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} />
-            </div>
-          </Panel>
-
-          {/* 子项目 */}
-          {record.children && record.children.length > 0 && (
-            <Panel key="children" style={{ background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }}
-              header={<span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><UnorderedListOutlined style={{ color: '#6941c6' }} />子项目 ({record.children.length})</span>}>
-              <div style={{ padding: '0 4px 8px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {record.children.map(c => (
-                  <div key={c.id} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <StatusDot v={c.status} small />
-                      <span style={{ fontSize: 11, color: '#98a2b3' }}>{c.totalAmount != null ? `${c.totalAmount}万` : '—'}</span>
+      <div style={{ overflowY: 'auto', height: 'calc(100vh - 220px)', padding: '8px 0' }}>
+        <Collapse
+          defaultActiveKey={['basic', 'finance']}
+          ghost
+          expandIconPosition="end"
+          style={{ background: 'transparent' }}
+          items={[
+            {
+              key: 'basic',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><InfoCircleOutlined style={{ color: '#1677ff' }} />基础信息</span>,
+              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              children: (
+                <div style={{ padding: '0 4px 8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <EditableField label="项目名称" value={record.name} onSave={v => save({ name: v })} />
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: '#344054' }}>{c.name}</div>
+                    <EditableField label="立项名称/编号" value={record.applyCode} onSave={v => save({ applyCode: v })} />
+                    <EditableField label="项目级别" value={record.level} type="select" options={Object.keys(LEVEL_CFG)} onSave={v => save({ level: v })} />
+                    <EditableField label="项目类别" value={record.type} type="select" options={TYPE_LIST} onSave={v => save({ type: v })} />
+                    <EditableField label="收款公司主体" value={record.company} onSave={v => save({ company: v })} />
+                    <EditableField label="归属" value={record.owner} onSave={v => save({ owner: v })} />
+                    <EditableField label="项目负责人" value={record.responsible} onSave={v => save({ responsible: v })} />
+                    <EditableField label="项目进度" value={record.status} type="select" options={Object.keys(STATUS_CFG)} onSave={v => save({ status: v })} />
                   </div>
-                ))}
-              </div>
-            </Panel>
-          )}
-
-          {/* 飞书额外字段 */}
-          {extra && Object.keys(extra).length > 0 && (
-            <Panel key="extra" style={{ background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }}
-              header={<span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ color: '#667085' }} />更多信息（飞书导入）</span>}>
-              <div style={{ padding: '0 4px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
-                {Object.entries(extra).map(([k, v]) => (
-                  <div key={k}>
-                    <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 3 }}>{k}</div>
-                    <div style={{ fontSize: 12, color: '#344054', fontWeight: 500, wordBreak: 'break-all' }}>{String(v) || '—'}</div>
+                  <div style={{ marginTop: 14 }}>
+                    <EditableField label="备注" value={record.remark} onSave={v => save({ remark: v })} />
                   </div>
-                ))}
-              </div>
-            </Panel>
-          )}
-        </Collapse>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>周重点项目</div>
+                    <Switch checked={record.star} onChange={v => save({ star: v })}
+                      checkedChildren="⭐ 周重点" unCheckedChildren="普通项目"
+                      style={{ background: record.star ? '#f59e0b' : undefined }} />
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'finance',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><BankOutlined style={{ color: '#10b981' }} />资金与到账管理</span>,
+              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              children: (
+                <div style={{ padding: '0 4px 8px' }}>
+                  <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+                    <EditableField label="总金额(万)" value={record.totalAmount} type="number" onSave={v => save({ totalAmount: v })} />
+                    <EditableField label="已到账(万)" value={record.receivedAmount} type="number" onSave={v => save({ receivedAmount: v })} />
+                  </div>
+                  <Divider style={{ margin: '8px 0 12px' }} />
+                  <PayRecords records={payRecords} totalAmount={record.totalAmount} onUpdate={savePayRecords} />
+                </div>
+              )
+            },
+            {
+              key: 'lifecycle',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarOutlined style={{ color: '#f59e0b' }} />项目生命周期管理</span>,
+              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              children: (
+                <div style={{ padding: '0 4px 8px' }}>
+                  <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} />
+                </div>
+              )
+            },
+            ...(record.children && record.children.length > 0 ? [{
+              key: 'children',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><UnorderedListOutlined style={{ color: '#6941c6' }} />子项目 ({record.children.length})</span>,
+              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              children: (
+                <div style={{ padding: '0 4px 8px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {record.children.map(c => (
+                    <div key={c.id} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <StatusDot v={c.status} small />
+                        <span style={{ fontSize: 11, color: '#98a2b3' }}>{c.totalAmount != null ? `${c.totalAmount}万` : '—'}</span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: '#344054' }}>{c.name}</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            }] : []),
+            ...(extra && Object.keys(extra).length > 0 ? [{
+              key: 'extra',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ color: '#667085' }} />更多信息（飞书导入）</span>,
+              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              children: (
+                <div style={{ padding: '0 4px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
+                  {Object.entries(extra).map(([k, v]) => (
+                    <div key={k}>
+                      <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 3 }}>{k}</div>
+                      <div style={{ fontSize: 12, color: '#344054', fontWeight: 500, wordBreak: 'break-all' }}>{String(v) || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            }] : []),
+          ]}
+        />
       </div>
     </Drawer>
   )

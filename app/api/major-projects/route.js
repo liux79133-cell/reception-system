@@ -81,7 +81,7 @@ export async function PUT(request) {
   } catch (e) { return errorResponse(e) }
 }
 
-
+export async function DELETE(request) {
   try {
     requireEditor(request)
     const { searchParams } = new URL(request.url)
