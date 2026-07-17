@@ -73,7 +73,9 @@ export default function ReceptionsPage() {
   const [detailRecord, setDetailRecord] = useState(null)
   const [importOpen, setImportOpen] = useState(false)
   const [viewMode, setViewMode] = useState('table')
-  const [allData, setAllData] = useState([]) // 看板/卡片用全量数据
+  const [allData, setAllData] = useState([])
+  const [selectedKeys, setSelectedKeys] = useState([])
+  const [batchDeleting, setBatchDeleting] = useState(false)
   const [docLinks, setDocLinks] = useState([])
   const [configOpen, setConfigOpen] = useState(false)
   const [editLinks, setEditLinks] = useState([])
@@ -126,6 +128,22 @@ export default function ReceptionsPage() {
     title: '确认删除', content: `确认删除「${record.title}」？`,
     okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
     onOk: async () => { await api.delete(`/api/receptions/${record.id}`); message.success('删除成功'); setDetailRecord(null); fetchData() }
+  })
+
+  const handleBatchDelete = () => Modal.confirm({
+    title: `确认批量删除 ${selectedKeys.length} 条记录？`,
+    content: '此操作不可恢复',
+    okText: '确认删除', okButtonProps: { danger: true }, cancelText: '取消',
+    onOk: async () => {
+      setBatchDeleting(true)
+      try {
+        await Promise.all(selectedKeys.map(id => api.delete(`/api/receptions/${id}`)))
+        message.success(`已删除 ${selectedKeys.length} 条记录`)
+        setSelectedKeys([])
+        fetchData()
+      } catch (e) { message.error(e || '删除失败') }
+      finally { setBatchDeleting(false) }
+    }
   })
 
   const openConfig = () => { setEditLinks(docLinks.map(l => ({ ...l }))); setConfigOpen(true) }
@@ -266,11 +284,21 @@ export default function ReceptionsPage() {
         )}
       </div>
 
+      {/* 批量操作栏 */}
+      {selectedKeys.length > 0 && (
+        <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 10, padding: '10px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 13, color: '#ad6800', fontWeight: 500 }}>已选中 <b>{selectedKeys.length}</b> 条记录</span>
+          <Button danger size="small" loading={batchDeleting} onClick={handleBatchDelete} style={{ borderRadius: 6 }}>批量删除</Button>
+          <Button size="small" onClick={() => setSelectedKeys([])} style={{ borderRadius: 6 }}>取消选择</Button>
+        </div>
+      )}
+
       {/* ── 表格视图 ── */}
       {viewMode === 'table' && (
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
           <Table rowKey="id" columns={columns} dataSource={data} loading={loading} scroll={{ x: 950 }}
-            onRow={r => ({ onClick: () => setDetailRecord(r), style: { cursor: 'pointer' } })}
+            rowSelection={{ selectedRowKeys: selectedKeys, onChange: keys => setSelectedKeys(keys) }}
+            onRow={r => ({ onClick: (e) => { if (e.target.type !== 'checkbox') setDetailRecord(r) }, style: { cursor: 'pointer' } })}
             pagination={{ current: page, pageSize, total, showSizeChanger: true, showTotal: t => `共 ${t} 条`, pageSizeOptions: [10, 20, 50], onChange: (p, ps) => { setPage(p); setPageSize(ps) }, style: { padding: '10px 20px' } }}
           />
         </div>

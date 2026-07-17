@@ -46,9 +46,16 @@ const FIELD_MAP = {
 function parseDate(val) {
   if (!val) return null
   if (typeof val === 'number') return new Date(val).toISOString()
-  // 处理 "2026/07/15 14:00" 等格式
-  const cleaned = val.replace(/年|月/g, '/').replace(/日/g, '').trim()
-  const d = new Date(cleaned)
+  let s = val.toString().trim()
+  // 统一替换各种分隔符为 "-"：点、斜杠、中文年月日
+  s = s
+    .replace(/年|月/g, '-')
+    .replace(/日/g, '')
+    .replace(/\./g, '-')
+    .replace(/\//g, '-')
+    .trim()
+  // "2025-01-14" 或 "2025-01-14 14:00" 都能解析
+  const d = new Date(s)
   return isNaN(d) ? null : d.toISOString()
 }
 
