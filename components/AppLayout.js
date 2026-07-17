@@ -10,7 +10,7 @@ const { Header, Sider, Content } = Layout
 
 const NAV_ITEMS = [
   { key: '/receptions', label: '政府接待', icon: '🏛️', active: true },
-  { key: '/major-projects', label: '重大项目', icon: '📌', active: false },
+  { key: '/major-projects', label: '重大项目', icon: '📌', active: true },
   { key: '/honors', label: '荣誉资质', icon: '🏆', active: false },
   { key: '/talent-welfare', label: '人才福利', icon: '🎁', active: false },
   { key: '/talent-apply', label: '人才申报', icon: '🎓', active: false },
