@@ -68,10 +68,17 @@ function parseCSV(text) {
     headers.forEach((h, idx) => { fields[h] = (cols[idx] || '').replace(/^"|"$/g, '') })
 
     const record = { _index: i + 1 }
+    const toNum = (v) => {
+      if (!v || v === '—' || v === '-') return null
+      const n = Number(String(v).replace(/[^0-9.\-]/g, ''))
+      return isNaN(n) ? null : n
+    }
     Object.entries(colMap).forEach(([h, field]) => {
       const val = fields[h]
       if (!val) return
-      if (!record[field]) record[field] = val
+      if (field === 'totalAmount' || field === 'receivedAmount') {
+        if (record[field] == null) record[field] = toNum(val)
+      } else if (!record[field]) record[field] = val
     })
     const extra = {}
     Object.entries(fields).forEach(([k, v]) => { if (!colMap[k] && v) extra[k] = v })
@@ -99,10 +106,17 @@ function parsePaste(text) {
     headers.forEach((h, idx) => { fields[h] = cols[idx] || '' })
 
     const record = { _index: i + 1 }
+    const toNum = (v) => {
+      if (!v || v === '—' || v === '-') return null
+      const n = Number(String(v).replace(/[^0-9.\-]/g, ''))
+      return isNaN(n) ? null : n
+    }
     Object.entries(colMap).forEach(([h, field]) => {
       const val = fields[h]
       if (!val) return
-      if (!record[field]) record[field] = val
+      if (field === 'totalAmount' || field === 'receivedAmount') {
+        if (record[field] == null) record[field] = toNum(val)
+      } else if (!record[field]) record[field] = val
     })
     const extra = {}
     Object.entries(fields).forEach(([k, v]) => { if (!colMap[k] && v) extra[k] = v })
