@@ -116,7 +116,8 @@ export default function MajorProjectsPage() {
       render: (v, r) => (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           {r.star && <FireOutlined style={{ color: '#f79009', fontSize: 13, flexShrink: 0, marginTop: 2 }} />}
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#101828', cursor: 'pointer' }} onClick={() => setDetailRecord(r)}>{v}</span>
+          {r.parentId && <span style={{ color: '#d0d5dd', fontSize: 11, flexShrink: 0, marginTop: 3 }}>└</span>}
+          <span style={{ fontSize: 13, fontWeight: r.parentId ? 400 : 600, color: r.parentId ? '#344054' : '#101828', cursor: 'pointer' }} onClick={() => setDetailRecord(r)}>{v}</span>
         </div>
       )
     },
@@ -238,8 +239,19 @@ export default function MajorProjectsPage() {
       {/* ── 表格视图 ── */}
       {viewMode === 'table' && (
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-          <Table rowKey="id" columns={columns} dataSource={projects} loading={loading} scroll={{ x: 1100 }}
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={projects}
+            loading={loading}
+            scroll={{ x: 1100 }}
             pagination={{ pageSize: 20, showTotal: t => `共 ${t} 个项目`, showSizeChanger: true }}
+            expandable={{
+              childrenColumnName: 'children',
+              rowExpandable: r => r.children && r.children.length > 0,
+              expandRowByClick: false,
+            }}
+            rowClassName={r => r.parentId ? 'child-row' : ''}
           />
         </div>
       )}
@@ -306,6 +318,8 @@ export default function MajorProjectsPage() {
         .ant-table-tbody > tr > td { border-bottom: 1px solid #f9fafb !important; padding: 12px 14px !important; }
         .ant-table-tbody > tr:hover > td { background: #f8f9ff !important; }
         .ant-table-tbody > tr:last-child > td { border-bottom: none !important; }
+        .child-row > td { background: #fafbff !important; }
+        .child-row > td:first-child { padding-left: 32px !important; }
       `}</style>
     </AppLayout>
   )

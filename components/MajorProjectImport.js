@@ -17,6 +17,7 @@ const FIELD_MAP = {
   '总金额': 'totalAmount', '总金额(万)': 'totalAmount', '金额': 'totalAmount',
   '已到账': 'receivedAmount', '已到账(万)': 'receivedAmount', '到账金额': 'receivedAmount',
   '归属': 'owner', '负责': 'owner',
+  '父项目': 'parentName', '上级项目': 'parentName', '父级': 'parentName',
   '备注': 'remark',
 }
 
@@ -29,6 +30,7 @@ const FUZZY_MAP = [
   { keywords: ['总金额', '金额'], field: 'totalAmount' },
   { keywords: ['已到账', '到账'], field: 'receivedAmount' },
   { keywords: ['归属', '负责'], field: 'owner' },
+  { keywords: ['父项目', '上级项目', '父级'], field: 'parentName' },
   { keywords: ['备注'], field: 'remark' },
 ]
 
@@ -132,7 +134,7 @@ const PREVIEW_COLS = [
   { title: '级别', dataIndex: 'level', width: 70 },
   { title: '状态', dataIndex: 'status', width: 80 },
   { title: '总金额(万)', dataIndex: 'totalAmount', width: 95 },
-  { title: '收款主体', dataIndex: 'company', ellipsis: true, width: 140 },
+  { title: '父项目', dataIndex: 'parentName', ellipsis: true, width: 140, render: v => v ? <span style={{ color: '#667085', fontSize: 12 }}>{v}</span> : <span style={{ color: '#d0d5dd' }}>—</span> },
 ]
 
 export default function MajorProjectImport({ open, onClose, onSuccess }) {
