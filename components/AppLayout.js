@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { key: '/odc', label: 'ODC', icon: '🏢', active: false },
   { key: '/external-report', label: '对外填报', icon: '📋', active: false },
   { key: '/landing', label: '落地协议', icon: '📄', active: false },
-  { key: '/party', label: '党员关系', icon: '⭐', active: false },
+  { key: '/party', label: '党员关系', icon: '⭐', active: true },
   { key: '/official', label: '公文生成', icon: '📝', active: false },
   { key: '/ai-chat', label: '智库chat', icon: '🤖', active: false },
   { key: '/data-center', label: '数据中台', icon: '📊', active: false },
