@@ -20,7 +20,8 @@ export async function GET(request) {
     if (status) where.status = status
 
     const projects = await prisma.majorProject.findMany({
-      where,
+      where: { ...where, parentId: null },  // 只取顶层
+      include: { children: true },
       orderBy: [{ star: 'desc' }, { createdAt: 'desc' }],
     })
     return Response.json({ projects })

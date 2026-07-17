@@ -115,20 +115,23 @@ model AppConfig {
 }
 
 model MajorProject {
-  id              Int      @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   name            String
-  type            String   @default("其他")
+  type            String         @default("其他")
   company         String?
-  level           String   @default("其他")
-  status          String   @default("进行中")
+  level           String         @default("其他")
+  status          String         @default("进行中")
   totalAmount     Float?
-  receivedAmount  Float    @default(0)
+  receivedAmount  Float          @default(0)
   owner           String?
-  star            Boolean  @default(false)
+  star            Boolean        @default(false)
   remark          String?
   customFields    String?
+  parentId        Int?
+  parent          MajorProject?  @relation("ProjectChildren", fields: [parentId], references: [id])
+  children        MajorProject[] @relation("ProjectChildren")
   createdById     Int
-  createdBy       User     @relation(fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdBy       User           @relation(fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }

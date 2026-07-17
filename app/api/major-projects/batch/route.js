@@ -14,22 +14,41 @@ export async function POST(request) {
       return isNaN(n) ? null : n
     }
 
-    const data = records.map(r => ({
-      name: r.name || '未命名',
-      type: r.type || '其他',
-      company: r.company || null,
-      level: r.level || '其他',
-      status: r.status || '进行中',
-      totalAmount: toNum(r.totalAmount),
-      receivedAmount: toNum(r.receivedAmount) ?? 0,
-      owner: r.owner || null,
-      star: false,
-      remark: r.remark || null,
-      customFields: r._extra ? JSON.stringify(r._extra) : null,
-      createdById: user.id,
-    }))
+    // 第一步：先全部写入（不设 parentId）
+    const created = []
+    for (const r of records) {
+      const project = await prisma.majorProject.create({
+        data: {
+          name: r.name || '未命名',
+          type: r.type || '其他',
+          company: r.company || null,
+          level: r.level || '其他',
+          status: r.status || '进行中',
+          totalAmount: toNum(r.totalAmount),
+          receivedAmount: toNum(r.receivedAmount) ?? 0,
+          owner: r.owner || null,
+          star: false,
+          remark: r.remark || null,
+          customFields: r._extra ? JSON.stringify(r._extra) : null,
+          createdById: user.id,
+        }
+      })
+      created.push({ ...project, _parentName: r.parentName || null })
+    }
 
-    await prisma.majorProject.createMany({ data })
-    return Response.json({ ok: true, count: data.length })
+    // 第二步：按父项目名称匹配并设置 parentId
+    const nameToId = {}
+    created.forEach(p => { nameToId[p.name] = p.id })
+
+    const updates = created
+      .filter(p => p._parentName && nameToId[p._parentName])
+      .map(p => prisma.majorProject.update({
+        where: { id: p.id },
+        data: { parentId: nameToId[p._parentName] }
+      }))
+
+    if (updates.length) await Promise.all(updates)
+
+    return Response.json({ ok: true, count: created.length, linked: updates.length })
   } catch (e) { return errorResponse(e) }
 }

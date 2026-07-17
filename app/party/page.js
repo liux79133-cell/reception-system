@@ -246,7 +246,7 @@ function AdminView() {
 // ── 主页面 ──────────────────────────────────
 export default function PartyPage() {
   // 通过 URL 参数区分视图（后续可接入真实角色判断）
-  const [viewMode, setViewMode] = useState('admin') // 'applicant' | 'admin'
+  const [viewMode, setViewMode] = useState('applicant') // 'applicant' | 'admin'
 
   return (
     <AppLayout>
@@ -274,7 +274,7 @@ export default function PartyPage() {
         </div>
       </div>
 
-      {viewMode === 'admin' ? <AdminView /> : <ApplicantView />}
+      {viewMode === 'applicant' ? <ApplicantView /> : <AdminView />}
     </AppLayout>
   )
 }
