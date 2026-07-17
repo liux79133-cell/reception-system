@@ -1,155 +1,99 @@
 'use client'
 import { useState } from 'react'
-import { Table, Button, Tag, Steps, Tabs, Alert, Modal, Form, Input, Select, Upload, message, Badge, Card, Row, Col, Divider, Space, Progress } from 'antd'
-import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, TeamOutlined, SwapOutlined, InboxOutlined, UserOutlined, StarFilled, SettingOutlined, BellOutlined, UploadOutlined, LinkOutlined } from '@ant-design/icons'
+import { Table, Button, Tag, Steps, Tabs, Alert, Modal, Form, Input, Select, Upload, message, Progress } from 'antd'
+import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, TeamOutlined, SwapOutlined, InboxOutlined, UserOutlined, StarFilled, BellOutlined, UploadOutlined, LinkOutlined, ArrowRightOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 
 const { Option } = Select
-const { Dragger } = Upload
 
-// ── 步骤定义 ─────────────────────────────────
+const RED = '#c0001a'
+const RED_DARK = '#8b0010'
+const RED_LIGHT = '#fff0f1'
+
+// ── 材料列表 ─────────────────────────────────
+const REQUIRED_MATERIALS = [
+  { key: 'join_app', title: '入党申请书', required: true, hint: '手写版，须有本人亲笔签名及日期' },
+  { key: 'transfer_app', title: '转正申请书', required: true, hint: '需与入党志愿书配套，日期须在志愿书之后' },
+  { key: 'political', title: '政审材料', required: true, hint: '由原党支部出具，需加盖公章' },
+  { key: 'will', title: '入党志愿书', required: true, hint: '最核心材料，往往多页，支持 PDF 或多图上传' },
+  { key: 'activist', title: '确定为积极分子的材料', required: true, hint: '含支委会讨论记录及决议' },
+  { key: 'development', title: '确定为发展对象的材料', required: true, hint: '含支委会讨论记录及决议' },
+  { key: 'training', title: '入党培训材料', required: true, hint: '党校结业证书或培训合格证明' },
+  { key: 'pledge', title: '党员承诺书', required: true, hint: '新版格式请联系 @顾峰 获取空白模版' },
+  { key: 'pre', title: '预审材料', required: false, hint: '部分情况需要，如有请上传' },
+  { key: 'other', title: '其他档案材料', required: false, hint: '如有补充材料可在此上传' },
+]
+
 const TRANSFER_IN_STEPS = [
-  { title: '档案上传', desc: '上传党员档案材料', icon: <FileTextOutlined /> },
-  { title: '党费凭证', desc: '上传党费缴纳凭证', icon: <CheckCircleOutlined /> },
-  { title: '转接引导', desc: '获取转接材料', icon: <SwapOutlined /> },
-  { title: '信息采集', desc: '填写个人信息', icon: <UserOutlined /> },
-  { title: '入群确认', desc: '加入党员群', icon: <TeamOutlined /> },
-  { title: '审核归档', desc: '等待审核完成', icon: <InboxOutlined /> },
+  { title: '档案上传', icon: '📄' },
+  { title: '党费凭证', icon: '🪙' },
+  { title: '转接引导', icon: '🔄' },
+  { title: '信息采集', icon: '📋' },
+  { title: '入群确认', icon: '👥' },
+  { title: '审核归档', icon: '🗂️' },
 ]
 
-const TRANSFER_OUT_STEPS = [
-  { title: '申请提交', desc: '提交转出申请', icon: <FileTextOutlined /> },
-  { title: '信息确认', desc: '确认转出信息', icon: <UserOutlined /> },
-  { title: '材料准备', desc: '准备转出材料', icon: <SwapOutlined /> },
-  { title: '审核归档', desc: '等待审核完成', icon: <InboxOutlined /> },
-]
-
-// ── 模拟数据 ─────────────────────────────────
-const MOCK_APPLICATIONS = [
-  { id: 1, name: 'Kaijing Gao', type: '转入申请', stage: '入群确认', submitTime: '2026/7/16', status: '待审核' },
-  { id: 2, name: '张三', type: '转出申请', stage: '材料准备', submitTime: '2026/7/10', status: '进行中' },
-  { id: 3, name: '李四', type: '转入申请', stage: '审核归档', submitTime: '2026/7/5', status: '已完成' },
+const PENDING_STEPS = [
+  { title: '党费凭证', icon: '🪙' },
+  { title: '转接引导', icon: '🔄' },
+  { title: '信息采集', icon: '📋' },
+  { title: '入群确认', icon: '👥' },
+  { title: '审核归档', icon: '🗂️' },
 ]
 
 const STATUS_MAP = {
   '待审核': { color: '#b54708', bg: '#fffaeb', dot: '#f79009' },
   '进行中': { color: '#175cd3', bg: '#eff8ff', dot: '#1677ff' },
   '已完成': { color: '#067647', bg: '#ecfdf3', dot: '#17b26a' },
-  '已拒绝': { color: '#c01048', bg: '#fff1f3', dot: '#f63d68' },
+  '已拒绝': { color: '#c0001a', bg: '#fff0f1', dot: '#f63d68' },
 }
 
 function StatusChip({ status }) {
   const s = STATUS_MAP[status] || STATUS_MAP['进行中']
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />{status}</span>
+}
+
+// ── 材料上传项 ───────────────────────────────
+function MaterialItem({ material, uploaded, onUpload }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />{status}
-    </span>
+    <div style={{ borderRadius: 12, border: `1px solid ${uploaded ? '#abefc6' : material.required ? '#fecdd6' : '#e4e7ec'}`, marginBottom: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: uploaded ? '#ecfdf3' : material.required ? '#fff8f8' : '#fafafa' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${uploaded ? '#17b26a' : material.required ? RED : '#d0d5dd'}`, background: uploaded ? '#17b26a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {uploaded && <span style={{ color: '#fff', fontSize: 12 }}>✓</span>}
+          </div>
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#101828', marginRight: 8 }}>{material.title}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 4, background: material.required ? RED : '#f2f4f7', color: material.required ? '#fff' : '#667085' }}>{material.required ? '必填' : '选填'}</span>
+          </div>
+        </div>
+        <Button size="small" icon={<UploadOutlined />}
+          style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}
+          onClick={() => onUpload(material.key)}>
+          上传文件
+        </Button>
+      </div>
+      {material.hint && <div style={{ padding: '6px 16px 8px', fontSize: 12, color: '#98a2b3', background: uploaded ? '#f6ffed' : material.required ? '#fff8f8' : '#fafafa' }}>{material.hint}</div>}
+      <div style={{ margin: '0 16px 12px', border: `1.5px dashed ${material.required ? '#fecdd6' : '#e4e7ec'}`, borderRadius: 8, padding: '14px', textAlign: 'center', background: '#fff', color: '#98a2b3', fontSize: 12 }}>
+        <UploadOutlined style={{ marginRight: 6 }} />点击上方"上传文件"按钮（JPG / PNG / PDF，≤ 50 MB）
+      </div>
+    </div>
   )
 }
 
-// ── 申请人视图（外部） ───────────────────────
+// ── 申请人视图 ───────────────────────────────
 function ApplicantView() {
-  const [applyModal, setApplyModal] = useState(false)
-  const [applyType, setApplyType] = useState('in')
-  const pending = MOCK_APPLICATIONS.filter(a => a.status === '待审核').length
-  const processing = MOCK_APPLICATIONS.filter(a => a.status === '进行中').length
-  const done = MOCK_APPLICATIONS.filter(a => a.status === '已完成').length
-
-  return (
-    <div>
-      {/* 统计卡片 */}
-      <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
-        {[
-          { label: '待审核', value: pending, color: '#b54708', bg: '#fffaeb', icon: <ClockCircleOutlined /> },
-          { label: '转接中', value: processing, color: '#175cd3', bg: '#eff8ff', icon: <SwapOutlined /> },
-          { label: '已完成', value: done, color: '#067647', bg: '#ecfdf3', icon: <CheckCircleOutlined /> },
-        ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: s.bg, borderRadius: 14, padding: '18px 22px', border: `1.5px solid ${s.color}20` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: '#667085' }}>{s.label}</span>
-              <span style={{ color: s.color, fontSize: 18 }}>{s.icon}</span>
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* 操作按钮 */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <Button type="primary" icon={<SwapOutlined />} size="large"
-          style={{ borderRadius: 10, background: 'linear-gradient(135deg,#c01048,#e31b54)', border: 'none', fontWeight: 600, height: 44 }}
-          onClick={() => { setApplyType('in'); setApplyModal(true) }}>
-          发起转入申请
-        </Button>
-        <Button icon={<SwapOutlined />} size="large"
-          style={{ borderRadius: 10, borderColor: '#d0d5dd', color: '#344054', fontWeight: 600, height: 44 }}
-          onClick={() => { setApplyType('out'); setApplyModal(true) }}>
-          发起转出申请
-        </Button>
-      </div>
-
-      {/* 申请列表 */}
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f2f4f7', fontSize: 14, fontWeight: 700, color: '#101828' }}>申请列表</div>
-        <Table rowKey="id" dataSource={MOCK_APPLICATIONS} pagination={false} size="middle"
-          columns={[
-            { title: '姓名', dataIndex: 'name', width: 120 },
-            { title: '申请类型', dataIndex: 'type', width: 100, render: v => <Tag color={v === '转入申请' ? 'blue' : 'orange'}>{v}</Tag> },
-            { title: '当前阶段', dataIndex: 'stage', width: 120 },
-            { title: '提交时间', dataIndex: 'submitTime', width: 120 },
-            { title: '状态', dataIndex: 'status', width: 100, render: v => <StatusChip status={v} /> },
-            { title: '操作', width: 100, render: (_, r) => <Button type="primary" size="small" style={{ borderRadius: 6 }}>审核详情</Button> },
-          ]}
-        />
-      </div>
-
-      {/* 申请弹窗 */}
-      <Modal open={applyModal} onCancel={() => setApplyModal(false)} footer={null} width={500}
-        title={<span>{applyType === 'in' ? '🔄 发起转入申请' : '🔄 发起转出申请'}</span>}>
-        <div style={{ padding: '8px 0 16px', color: '#667085', fontSize: 13 }}>
-          请填写基本信息，提交后工作人员将与您联系。
-        </div>
-        <Form layout="vertical">
-          <Form.Item label="姓名" required><Input placeholder="请输入姓名" /></Form.Item>
-          <Form.Item label="工号" required><Input placeholder="请输入工号" /></Form.Item>
-          <Form.Item label={applyType === 'in' ? '原所在支部' : '转入目标单位'} required>
-            <Input placeholder="请输入" />
-          </Form.Item>
-          <Form.Item label="备注"><Input.TextArea rows={2} placeholder="可选，补充说明" /></Form.Item>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button onClick={() => setApplyModal(false)}>取消</Button>
-            <Button type="primary" style={{ background: 'linear-gradient(135deg,#c01048,#e31b54)', border: 'none' }}
-              onClick={() => { message.success('申请已提交，请等待审核'); setApplyModal(false) }}>
-              提交申请
-            </Button>
-          </div>
-        </Form>
-      </Modal>
-    </div>
-  )
-}
-
-// ── 管理员视图（内部） ───────────────────────
-function AdminView() {
   const [activeTab, setActiveTab] = useState('in')
-  const [selectedApp, setSelectedApp] = useState(null)
-  const currentStep = 0 // 示例：当前步骤
+  const [currentStep, setCurrentStep] = useState(0)
+  const [uploaded, setUploaded] = useState({})
+  const requiredCount = REQUIRED_MATERIALS.filter(m => m.required).length
+  const uploadedCount = Object.values(uploaded).filter(Boolean).length
 
-  const steps = activeTab === 'in' ? TRANSFER_IN_STEPS : TRANSFER_OUT_STEPS
-
-  const MaterialItem = ({ title, required, hint }) => (
-    <div style={{ padding: '14px 16px', background: '#f9fafb', borderRadius: 10, marginBottom: 10, border: '1px solid #f2f4f7' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FileTextOutlined style={{ color: '#1677ff' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#101828' }}>{title}</span>
-          {required && <Tag color="red" style={{ fontSize: 10 }}>必填</Tag>}
-        </div>
-        <Button size="small" type="primary" ghost icon={<UploadOutlined />} style={{ borderRadius: 6 }}>上传</Button>
-      </div>
-      {hint && <div style={{ fontSize: 12, color: '#98a2b3' }}>{hint}</div>}
-    </div>
-  )
+  const handleUpload = (key) => {
+    // 模拟上传
+    message.success('上传成功')
+    setUploaded(prev => ({ ...prev, [key]: true }))
+  }
 
   return (
     <div>
@@ -159,122 +103,202 @@ function AdminView() {
         description="2024年新入职党员注意：请先完成档案整理，再发起转入申请。如有特殊情况（档案在外省人才市场），请先联系 @Nerida Gao 获取查档函后再操作。"
       />
 
-      <div style={{ display: 'flex', gap: 14 }}>
-        {/* 左侧申请列表 */}
-        <div style={{ width: 300, flexShrink: 0 }}>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-            <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ padding: '0 16px' }} size="small"
-              items={[{ key: 'in', label: '转入申请' }, { key: 'out', label: '转出申请' }]} />
-            <div style={{ padding: '0 8px 8px' }}>
-              {MOCK_APPLICATIONS.filter(a => activeTab === 'in' ? a.type === '转入申请' : a.type === '转出申请').map(app => (
-                <div key={app.id} onClick={() => setSelectedApp(app)}
-                  style={{ padding: '12px 12px', borderRadius: 8, cursor: 'pointer', marginBottom: 4, background: selectedApp?.id === app.id ? '#eff8ff' : 'transparent', border: selectedApp?.id === app.id ? '1px solid #b2ddff' : '1px solid transparent', transition: 'all 0.15s' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#101828' }}>{app.name}</span>
-                    <StatusChip status={app.status} />
+      {/* 转入/转出标签 */}
+      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden', marginBottom: 0 }}>
+        {/* 步骤进度条 */}
+        <div style={{ padding: '20px 24px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {TRANSFER_IN_STEPS.map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < TRANSFER_IN_STEPS.length - 1 ? 1 : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: i < currentStep ? '#17b26a' : i === currentStep ? RED : '#f2f4f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, border: i === currentStep ? `2px solid ${RED}` : '2px solid transparent', boxShadow: i === currentStep ? `0 0 0 3px ${RED}20` : 'none', transition: 'all 0.2s' }}>
+                    {i < currentStep ? <span style={{ color: '#fff', fontSize: 14 }}>✓</span> : <span>{s.icon}</span>}
                   </div>
-                  <div style={{ fontSize: 12, color: '#98a2b3' }}>{app.stage} · {app.submitTime}</div>
+                  <span style={{ fontSize: 11, fontWeight: i === currentStep ? 700 : 400, color: i === currentStep ? RED : i < currentStep ? '#17b26a' : '#98a2b3', whiteSpace: 'nowrap' }}>{s.title}</span>
                 </div>
-              ))}
-            </div>
+                {i < TRANSFER_IN_STEPS.length - 1 && (
+                  <div style={{ flex: 1, height: 2, background: i < currentStep ? '#17b26a' : '#f2f4f7', margin: '0 6px', marginBottom: 24, borderRadius: 2 }} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* 右侧详情 */}
-        <div style={{ flex: 1 }}>
-          {selectedApp ? (
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', padding: '20px 24px' }}>
-              {/* 顶部信息 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f2f4f7' }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#c01048,#e31b54)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, fontWeight: 700 }}>{selectedApp.name[0]}</div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#101828' }}>{selectedApp.name}</div>
-                  <div style={{ fontSize: 12, color: '#98a2b3' }}>{selectedApp.type} · 提交于 {selectedApp.submitTime}</div>
-                </div>
-                <div style={{ marginLeft: 'auto' }}><StatusChip status={selectedApp.status} /></div>
-              </div>
-
-              {/* 步骤条 */}
-              <div style={{ marginBottom: 24 }}>
-                <Steps current={currentStep} size="small" labelPlacement="vertical"
-                  items={steps.map((s, i) => ({ title: s.title, description: s.desc, icon: s.icon }))}
-                />
-              </div>
-
-              {/* 阶段内容 */}
-              <div style={{ background: '#f9fafb', borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <FileTextOutlined style={{ color: '#c01048' }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>阶段1：档案上传</span>
-                  <Tag color="orange">进行中</Tag>
-                </div>
-                <div style={{ fontSize: 13, color: '#667085', marginBottom: 12 }}>上传党员档案材料</div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: '#667085' }}>需要开具查档函，请联系：</span>
-                  <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, fontSize: 12 }}>@ Nerida Gao（飞书）</Button>
-                  <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, fontSize: 12 }}>@ Zoe Gu（飞书）</Button>
-                </div>
-
-                <div style={{ fontSize: 12, color: '#667085', marginBottom: 12 }}>必填材料上传进度</div>
-                <Progress percent={0} format={() => '0 / 8'} strokeColor="#c01048" />
-
-                <MaterialItem title="党员档案（扫描件）" required hint="应届生：学校将档案转入苏州人才市场，再通过人才市场申请查看档案电子版/复印件" />
-                <MaterialItem title="党费缴纳记录" required />
-                <MaterialItem title="组织关系介绍信" required />
-              </div>
-
-              {/* 操作按钮 */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button type="primary" style={{ borderRadius: 8, background: 'linear-gradient(135deg,#c01048,#e31b54)', border: 'none' }}>通过审核</Button>
-                <Button danger style={{ borderRadius: 8 }}>驳回</Button>
-                <Button style={{ borderRadius: 8 }}>催办</Button>
-              </div>
+        {/* 当前阶段内容 */}
+        <div style={{ padding: '0 24px 24px' }}>
+          {/* 阶段标题 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 20, paddingBottom: 14, borderBottom: `1px solid #f2f4f7` }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: RED_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileTextOutlined style={{ color: RED, fontSize: 16 }} />
             </div>
-          ) : (
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', padding: '80px 0', textAlign: 'center' }}>
-              <TeamOutlined style={{ fontSize: 48, color: '#d0d5dd', marginBottom: 16 }} />
-              <div style={{ fontSize: 14, color: '#98a2b3' }}>选择左侧申请查看详情</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#101828' }}>阶段1：档案上传</div>
+              <div style={{ fontSize: 12, color: '#98a2b3' }}>上传党员档案材料</div>
             </div>
-          )}
+            <Tag color="orange" style={{ marginLeft: 'auto' }}>进行中</Tag>
+          </div>
+
+          {/* 如何获取档案 */}
+          <div style={{ background: '#fffbe6', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '1px solid #ffe58f' }}>
+            <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>📄 如何获取党员档案？</div>
+            <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>
+              <div>应届生：学校将档案转入户籍地人才市场，再通过人才市场申请查阅档案电子档/复印件。</div>
+              <div>社招：咨询户籍地人才市场或历任公司党委。</div>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#667085' }}>需要开具查档函，请联系：</span>
+              <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}>@ Nerida Gao（飞书）</Button>
+              <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}>@ Zoe Gu（飞书）</Button>
+            </div>
+          </div>
+
+          {/* 上传进度 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, color: '#344054', fontWeight: 500 }}>必填材料上传进度</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: uploadedCount >= requiredCount ? '#17b26a' : RED }}>{uploadedCount} / {requiredCount}</span>
+          </div>
+          <Progress percent={Math.round(uploadedCount / requiredCount * 100)} strokeColor={RED} showInfo={false} style={{ marginBottom: 16 }} />
+
+          {/* 材料列表 */}
+          {REQUIRED_MATERIALS.map(m => (
+            <MaterialItem key={m.key} material={m} uploaded={!!uploaded[m.key]} onUpload={handleUpload} />
+          ))}
+
+          {/* 操作按钮 */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <Button icon={<ArrowLeftOutlined />} style={{ borderRadius: 8, flex: 1, height: 44 }}>← 上一步</Button>
+            <Button type="primary" icon={<ArrowRightOutlined />} style={{ borderRadius: 8, flex: 3, height: 44, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', fontWeight: 700, fontSize: 15 }}>
+              保存并继续 →
+            </Button>
+          </div>
         </div>
+      </div>
+
+      {/* 后续待办步骤卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 12 }}>
+        {PENDING_STEPS.map((s, i) => (
+          <div key={i} style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', border: '1px solid #f2f4f7', display: 'flex', alignItems: 'center', gap: 10, opacity: 0.55 }}>
+            <span style={{ fontSize: 20 }}>{s.icon}</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#344054' }}>{s.title}</div>
+              <div style={{ fontSize: 11, color: '#98a2b3' }}>待办</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-// ── 主页面 ──────────────────────────────────
-export default function PartyPage() {
-  // 通过 URL 参数区分视图（后续可接入真实角色判断）
-  const [viewMode, setViewMode] = useState('applicant') // 'applicant' | 'admin'
+// ── 管理员视图 ───────────────────────────────
+function AdminView() {
+  const [activeTab, setActiveTab] = useState('in')
+  const [selectedApp, setSelectedApp] = useState(null)
+  const MOCK_APPLICATIONS = [
+    { id: 1, name: 'Kaijing Gao', type: '转入申请', stage: '入群确认', submitTime: '2026/7/16', status: '待审核' },
+    { id: 2, name: '张三', type: '转出申请', stage: '材料准备', submitTime: '2026/7/10', status: '进行中' },
+    { id: 3, name: '李四', type: '转入申请', stage: '审核归档', submitTime: '2026/7/5', status: '已完成' },
+  ]
 
   return (
-    <AppLayout>
-      {/* Banner */}
-      <div style={{ background: 'linear-gradient(135deg,#7f1d1d 0%,#c01048 50%,#e31b54 100%)', borderRadius: 16, padding: '18px 24px 14px', marginBottom: 14, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -40, right: 20, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
-          <div>
-            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, letterSpacing: 2, fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>Party · 党组织</div>
-            <div style={{ color: '#fff', fontSize: 20, fontWeight: 800, marginBottom: 4 }}>党员组织关系转接系统</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 14 }}>Momenta · 初速度（苏州）科技有限公司党支部</div>
-            {/* 视图切换 */}
-            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3 }}>
-              {[{ key: 'admin', label: '内部管理视图' }, { key: 'applicant', label: '申请人视图' }].map(v => (
-                <button key={v.key} onClick={() => setViewMode(v.key)}
-                  style={{ padding: '6px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, transition: 'all 0.15s', background: viewMode === v.key ? '#fff' : 'transparent', color: viewMode === v.key ? '#c01048' : 'rgba(255,255,255,0.7)' }}>
-                  {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {'★★★★★'.split('').map((_, i) => <StarFilled key={i} style={{ color: '#fbbf24', fontSize: 18 }} />)}
+    <div style={{ display: 'flex', gap: 14 }}>
+      <div style={{ width: 280, flexShrink: 0 }}>
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
+          <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ padding: '0 16px' }} size="small"
+            items={[{ key: 'in', label: '转入申请' }, { key: 'out', label: '转出申请' }]} />
+          <div style={{ padding: '0 8px 8px' }}>
+            {MOCK_APPLICATIONS.filter(a => activeTab === 'in' ? a.type === '转入申请' : a.type === '转出申请').map(app => (
+              <div key={app.id} onClick={() => setSelectedApp(app)}
+                style={{ padding: '12px', borderRadius: 8, cursor: 'pointer', marginBottom: 4, background: selectedApp?.id === app.id ? RED_LIGHT : 'transparent', border: `1px solid ${selectedApp?.id === app.id ? '#fecdd6' : 'transparent'}`, transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#101828' }}>{app.name}</span>
+                  <StatusChip status={app.status} />
+                </div>
+                <div style={{ fontSize: 12, color: '#98a2b3' }}>{app.stage} · {app.submitTime}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
+      <div style={{ flex: 1 }}>
+        {selectedApp ? (
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f2f4f7' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg,${RED_DARK},${RED})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, fontWeight: 700 }}>{selectedApp.name[0]}</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#101828' }}>{selectedApp.name}</div>
+                <div style={{ fontSize: 12, color: '#98a2b3' }}>{selectedApp.type} · {selectedApp.submitTime}</div>
+              </div>
+              <div style={{ marginLeft: 'auto' }}><StatusChip status={selectedApp.status} /></div>
+            </div>
+            <Steps current={0} size="small" labelPlacement="vertical"
+              items={TRANSFER_IN_STEPS.map(s => ({ title: s.title }))}
+              style={{ marginBottom: 20 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button type="primary" style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none' }}>通过审核</Button>
+              <Button danger style={{ borderRadius: 8 }}>驳回</Button>
+              <Button style={{ borderRadius: 8 }}>催办</Button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 12, padding: '80px 0', textAlign: 'center', boxShadow: '0 1px 3px rgba(16,24,40,0.06)' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+            <div style={{ fontSize: 14, color: '#98a2b3' }}>选择左侧申请查看详情</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
-      {viewMode === 'applicant' ? <ApplicantView /> : <AdminView />}
+// ── 主页面 ───────────────────────────────────
+export default function PartyPage() {
+  const [viewMode, setViewMode] = useState('applicant')
+
+  return (
+    <AppLayout>
+      {/* Banner - 鲜红色 */}
+      <div style={{ background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED} 60%, #e8002a 100%)`, borderRadius: 16, padding: '0', marginBottom: 14, overflow: 'hidden', boxShadow: '0 4px 20px rgba(192,0,26,0.3)' }}>
+        {/* 顶部标题区 */}
+        <div style={{ padding: '18px 24px 0', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: -30, right: 30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <StarFilled style={{ color: '#fbbf24', fontSize: 22 }} />
+            </div>
+            <div>
+              <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>党员组织关系转接系统</div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Momenta · 初速度（苏州）科技有限公司党总支</div>
+            </div>
+            <Button size="small" icon={<BellOutlined />} style={{ marginLeft: 'auto', borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff' }}>页面配置</Button>
+          </div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            {'★★★★★'.split('').map((_, i) => <StarFilled key={i} style={{ color: '#fbbf24', fontSize: 14 }} />)}
+          </div>
+        </div>
+
+        {/* 标签切换导航（嵌在Banner底部） */}
+        <div style={{ display: 'flex', padding: '0 24px', marginTop: 12 }}>
+          {[{ key: 'applicant', label: '转入申请' }, { key: 'out', label: '转出申请' }].map(v => (
+            <button key={v.key} onClick={() => setViewMode(v.key)}
+              style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: viewMode === v.key ? 700 : 400, color: viewMode === v.key ? '#fff' : 'rgba(255,255,255,0.6)', background: 'transparent', borderBottom: viewMode === v.key ? '3px solid #fbbf24' : '3px solid transparent', transition: 'all 0.15s' }}>
+              {v.label}
+            </button>
+          ))}
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setViewMode('admin')}
+            style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: 13, color: 'rgba(255,255,255,0.7)', background: 'transparent', borderBottom: viewMode === 'admin' ? '3px solid #fbbf24' : '3px solid transparent' }}>
+            审批工作台
+          </button>
+          <button
+            style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: 13, color: 'rgba(255,255,255,0.7)', background: 'transparent', borderBottom: '3px solid transparent' }}>
+            我的申请
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'admin' ? <AdminView /> : <ApplicantView />}
     </AppLayout>
   )
 }
