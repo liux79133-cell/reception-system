@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Table, Button, Tag, Steps, Tabs, Alert, Modal, Form, Input, Select, Upload, message, Progress } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, TeamOutlined, SwapOutlined, InboxOutlined, UserOutlined, StarFilled, BellOutlined, UploadOutlined, LinkOutlined, ArrowRightOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
@@ -86,6 +86,38 @@ function ApplicantView() {
   const [activeTab, setActiveTab] = useState('in')
   const [currentStep, setCurrentStep] = useState(0)
   const [uploaded, setUploaded] = useState({})
+  const [contacts, setContacts] = useState([
+    { name: 'Nerida Gao', feishuUrl: '' },
+    { name: 'Zoe Gu', feishuUrl: '' },
+  ])
+  const [editOpen, setEditOpen] = useState(false)
+  const [editContacts, setEditContacts] = useState([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/config', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      .then(r => r.json()).then(cfg => {
+        if (cfg.party_contacts) {
+          try { setContacts(JSON.parse(cfg.party_contacts)) } catch {}
+        }
+      }).catch(() => {})
+  }, [])
+
+  const openEdit = () => { setEditContacts(contacts.map(c => ({ ...c }))); setEditOpen(true) }
+  const saveContacts = async () => {
+    setSaving(true)
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ party_contacts: JSON.stringify(editContacts.filter(c => c.name.trim())) })
+      })
+      setContacts(editContacts.filter(c => c.name.trim()))
+      setEditOpen(false)
+      message.success('保存成功')
+    } catch { message.error('保存失败') }
+    finally { setSaving(false) }
+  }
   const requiredCount = REQUIRED_MATERIALS.filter(m => m.required).length
   const uploadedCount = Object.values(uploaded).filter(Boolean).length
 
@@ -145,10 +177,20 @@ function ApplicantView() {
               <div>应届生：学校将档案转入户籍地人才市场，再通过人才市场申请查阅档案电子档/复印件。</div>
               <div>社招：咨询户籍地人才市场或历任公司党委。</div>
             </div>
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: '#667085' }}>需要开具查档函，请联系：</span>
-              <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}>@ Nerida Gao（飞书）</Button>
-              <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}>@ Zoe Gu（飞书）</Button>
+              {contacts.map((c, i) => (
+                <a key={i} href={c.feishuUrl || undefined} target={c.feishuUrl ? '_blank' : undefined} rel="noreferrer"
+                  onClick={e => { if (!c.feishuUrl) e.preventDefault() }}>
+                  <Button size="small" icon={<LinkOutlined />} style={{ borderRadius: 6, color: RED, borderColor: RED, fontSize: 12 }}>
+                    @ {c.name}（飞书）
+                  </Button>
+                </a>
+              ))}
+              <Button type="text" size="small" onClick={openEdit}
+                style={{ fontSize: 11, color: '#98a2b3', padding: '0 6px' }}>
+                ✎ 编辑
+              </Button>
             </div>
           </div>
 
@@ -186,6 +228,28 @@ function ApplicantView() {
           </div>
         ))}
       </div>
+
+      {/* 联系人编辑弹窗 */}
+      <Modal title="编辑联系人" open={editOpen} onCancel={() => setEditOpen(false)}
+        onOk={saveContacts} okText="保存" confirmLoading={saving} width={460}>
+        <div style={{ padding: '8px 0' }}>
+          <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 14 }}>
+            设置"需要开具查档函，请联系"区域显示的人员。飞书跳转链接格式：<code style={{ background: '#f5f5f5', padding: '1px 6px', borderRadius: 4 }}>https://applink.feishu.cn/client/chat/open?openId=xxx</code>
+          </div>
+          {editContacts.map((c, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+              <Input value={c.name} onChange={e => setEditContacts(p => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                placeholder="姓名" style={{ width: 130, borderRadius: 8 }} />
+              <Input value={c.feishuUrl} onChange={e => setEditContacts(p => p.map((x, j) => j === i ? { ...x, feishuUrl: e.target.value } : x))}
+                placeholder="飞书跳转链接（选填）" style={{ flex: 1, borderRadius: 8 }} />
+              <Button type="text" danger size="small"
+                onClick={() => setEditContacts(p => p.filter((_, j) => j !== i))}>×</Button>
+            </div>
+          ))}
+          <Button type="dashed" onClick={() => setEditContacts(p => [...p, { name: '', feishuUrl: '' }])}
+            style={{ width: '100%', borderRadius: 8, marginTop: 4 }}>+ 添加联系人</Button>
+        </div>
+      </Modal>
     </div>
   )
 }
