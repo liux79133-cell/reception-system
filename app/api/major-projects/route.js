@@ -19,10 +19,18 @@ export async function GET(request) {
     if (type) where.type = type
     if (status) where.status = status
 
-    const projects = await prisma.majorProject.findMany({
-      where: { ...where, parentId: null },  // 只取顶层
-      include: { children: true },
-      orderBy: [{ star: 'desc' }, { createdAt: 'desc' }],
+    const STATUS_ORDER = { '进行中': 0, '待申报': 1, '已完成': 2, '已终止': 3, '已结束': 4 }
+    const raw = await prisma.majorProject.findMany({
+      where: { ...where, parentId: null },
+      include: { children: { orderBy: { updatedAt: 'desc' } } },
+      orderBy: { updatedAt: 'desc' },
+    })
+    const projects = raw.sort((a, b) => {
+      if (a.star !== b.star) return a.star ? -1 : 1
+      const sa = STATUS_ORDER[a.status] ?? 9
+      const sb = STATUS_ORDER[b.status] ?? 9
+      if (sa !== sb) return sa - sb
+      return new Date(b.updatedAt) - new Date(a.updatedAt)
     })
     return Response.json({ projects })
   } catch (e) { return errorResponse(e) }

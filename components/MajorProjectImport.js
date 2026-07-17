@@ -11,12 +11,12 @@ const { TextArea } = Input
 const FIELD_MAP = {
   '项目名称': 'name', '名称': 'name',
   '项目类别': 'type', '类别': 'type', '类型': 'type',
-  '收款主体': 'company', '主体': 'company', '公司': 'company', '归属公司': 'company',
+  '收款主体': 'company', '主体': 'company',
   '级别': 'level', '项目级别': 'level',
   '状态': 'status', '项目状态': 'status', '项目进度': 'status',
   '总金额': 'totalAmount', '总金额(万)': 'totalAmount',
   '已到账金额': 'receivedAmount', '已到账(万)': 'receivedAmount', '到账金额': 'receivedAmount', '已到账': 'receivedAmount',
-  '归属': 'owner', '负责人': 'owner', '归属公司': 'owner',
+  '归属': 'owner', '负责人': 'owner', '归属公司': 'owner', '归属单位': 'owner',
   '父项目': 'parentName', '上级项目': 'parentName', '父级': 'parentName', '父记录': 'parentName',
   '备注': 'remark',
 }
@@ -28,10 +28,9 @@ const FUZZY_MAP = [
   { keywords: ['收款主体', '收款公司'], field: 'company' },
   { keywords: ['项目级别'], field: 'level' },
   { keywords: ['项目状态', '项目进度'], field: 'status' },
-  // 金额类：必须明确含"金额"或"总金额"，不能只含"金额"避免误匹配
-  { keywords: ['已到账金额', '到账金额', '已到账(万)'], field: 'receivedAmount' },
+  { keywords: ['已到账金额', '到账金额', '已到账'], field: 'receivedAmount' },
   { keywords: ['总金额'], field: 'totalAmount' },
-  { keywords: ['归属公司', '归属单位'], field: 'owner' },
+  { keywords: ['归属公司', '归属单位', '归属'], field: 'owner' },
   { keywords: ['父记录', '父项目', '上级项目'], field: 'parentName' },
   { keywords: ['备注'], field: 'remark' },
 ]
