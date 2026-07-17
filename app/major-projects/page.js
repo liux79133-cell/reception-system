@@ -567,7 +567,14 @@ export default function MajorProjectsPage() {
           <Table rowKey="id" columns={columns} dataSource={projects} loading={loading} scroll={{ x: 1020 }} size="middle"
             onRow={r => ({ onClick: () => setDrawerRecord(r), style: { cursor: 'pointer' } })}
             rowSelection={{ selectedRowKeys: selectedIds, onChange: setSelectedIds }}
-            expandable={{ childrenColumnName: 'children', rowExpandable: r => r.children?.length > 0 }}
+            expandable={{
+              childrenColumnName: 'children',
+              rowExpandable: r => r.children?.length > 0,
+              expandIcon: ({ expanded, onExpand, record }) =>
+                record.children?.length > 0
+                  ? <span onClick={e => onExpand(record, e)} style={{ cursor: 'pointer', color: '#1677ff', fontSize: 12, userSelect: 'none' }}>{expanded ? '▾' : '▸'}</span>
+                  : <span style={{ display: 'inline-block', width: 12 }} />
+            }}
             pagination={{ pageSize: 20, showTotal: t => `共 ${t} 个项目`, showSizeChanger: true, size: 'small' }}
           />
         </div>
