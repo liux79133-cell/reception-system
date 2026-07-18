@@ -166,7 +166,14 @@ function PayRecords({ records = [], totalAmount, onUpdate }) {
 }
 
 // ── 生命周期时间轴 ─────────────────────────────────────
-function LifeCyclePanel({ data = {}, onUpdate }) {
+const LC_STATUS_CFG = {
+  '已完成': { color: '#067647', bg: '#ecfdf3', dot: '#17b26a', ring: '#17b26a' },
+  '进行中': { color: '#175cd3', bg: '#eff8ff', dot: '#1677ff', ring: '#1677ff' },
+  '已延期': { color: '#c01048', bg: '#fff1f3', dot: '#f63d68', ring: '#f63d68' },
+  '待推进': { color: '#667085', bg: '#f9fafb', dot: '#98a2b3', ring: '#e4e7ec' },
+}
+
+function LifeCyclePanel({ data = {}, onUpdate, readOnly }) {
   const stages = [
     { key: 'apply', label: '项目申报', icon: <FileTextOutlined /> },
     { key: 'start', label: '开始/立项', icon: <CheckCircleFilled /> },
@@ -175,32 +182,80 @@ function LifeCyclePanel({ data = {}, onUpdate }) {
   ]
   const statusOptions = ['待推进', '进行中', '已完成', '已延期']
 
+  // 只读：时间轴 + 行列详情
+  if (readOnly) {
+    return (
+      <div>
+        {/* 时间轴 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 20, paddingTop: 4 }}>
+          {stages.map((s, i) => {
+            const d = data[s.key] || {}
+            const st = d.status || '待推进'
+            const cfg = LC_STATUS_CFG[st] || LC_STATUS_CFG['待推进']
+            return (
+              <div key={s.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                {i > 0 && <div style={{ position: 'absolute', left: '-50%', top: 17, width: '100%', height: 2, background: st === '已完成' ? '#17b26a' : '#e4e7ec', zIndex: 0 }} />}
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.ring}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, fontSize: 14, color: cfg.color }}>
+                  {s.icon}
+                </div>
+                <div style={{ fontSize: 11, color: '#344054', marginTop: 6, textAlign: 'center', fontWeight: 600 }}>{s.label}</div>
+                <div style={{ fontSize: 10, color: cfg.color, marginTop: 2, fontWeight: 500 }}>{st}</div>
+                {d.date && <div style={{ fontSize: 10, color: '#98a2b3', marginTop: 1 }}>{d.date}</div>}
+              </div>
+            )
+          })}
+        </div>
+        {/* 有内容的阶段详情 */}
+        {stages.filter(s => data[s.key]?.date || data[s.key]?.note || (data[s.key]?.status && data[s.key]?.status !== '待推进')).map(s => {
+          const d = data[s.key] || {}
+          const st = d.status || '待推进'
+          const cfg = LC_STATUS_CFG[st] || LC_STATUS_CFG['待推进']
+          return (
+            <div key={s.key} style={{ marginBottom: 8, padding: '12px 14px', background: '#fff', borderRadius: 10, border: '1px solid #f2f4f7' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#101828' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                  {s.label}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.ring}30`, padding: '2px 8px', borderRadius: 5 }}>{st}</span>
+              </div>
+              <InfoRow label="日期" value={d.date || '—'} />
+              {d.note && <InfoRow label="备注" value={d.note} />}
+            </div>
+          )
+        })}
+        {stages.every(s => !data[s.key]?.date && !data[s.key]?.note && (!data[s.key]?.status || data[s.key]?.status === '待推进')) && (
+          <div style={{ textAlign: 'center', color: '#d0d5dd', fontSize: 12, padding: '8px 0' }}>暂无时间节点信息</div>
+        )}
+      </div>
+    )
+  }
+
+  // 编辑态
   return (
     <div>
-      {/* 时间轴概览 */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         {stages.map((s, i) => {
           const d = data[s.key] || {}
-          const done = d.status === '已完成'
+          const cfg = LC_STATUS_CFG[d.status || '待推进'] || LC_STATUS_CFG['待推进']
           return (
             <div key={s.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              {i > 0 && <div style={{ position: 'absolute', left: '-50%', top: 16, width: '100%', height: 2, background: done ? '#10b981' : '#e4e7ec', zIndex: 0 }} />}
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: done ? '#ecfdf3' : d.status === '进行中' ? '#eff8ff' : '#f9fafb', border: `2px solid ${done ? '#17b26a' : d.status === '进行中' ? '#1677ff' : '#e4e7ec'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, fontSize: 13, color: done ? '#17b26a' : d.status === '进行中' ? '#1677ff' : '#d0d5dd' }}>
+              {i > 0 && <div style={{ position: 'absolute', left: '-50%', top: 16, width: '100%', height: 2, background: d.status === '已完成' ? '#10b981' : '#e4e7ec', zIndex: 0 }} />}
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.ring}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, fontSize: 13, color: cfg.color }}>
                 {s.icon}
               </div>
               <div style={{ fontSize: 10, color: '#667085', marginTop: 5, textAlign: 'center', fontWeight: 500 }}>{s.label}</div>
-              <div style={{ fontSize: 10, color: done ? '#17b26a' : d.status === '进行中' ? '#1677ff' : '#98a2b3' }}>{d.status || '待推进'}</div>
+              <div style={{ fontSize: 10, color: cfg.color }}>{d.status || '待推进'}</div>
             </div>
           )
         })}
       </div>
-      {/* 各阶段详情 */}
       {stages.map(s => {
         const d = data[s.key] || {}
         const update = (field, val) => onUpdate({ ...data, [s.key]: { ...d, [field]: val } })
         return (
-          <div key={s.key} style={{ marginBottom: 12, padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div key={s.key} style={{ marginBottom: 10, padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#344054' }}>{s.label}</span>
               <Select value={d.status || '待推进'} size="small" style={{ width: 90 }} onChange={v => update('status', v)}>
                 {statusOptions.map(o => <Option key={o}>{o}</Option>)}
@@ -425,7 +480,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
               style: panelStyle,
               children: (
                 <div style={{ padding: '0 4px 8px' }}>
-                  <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} />
+                  <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} readOnly={!editing} />
                 </div>
               )
             },
