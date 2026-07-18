@@ -404,6 +404,7 @@ export default function MajorProjectsPage() {
   const [loading, setLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
+  const [pinStar, setPinStar] = useState(true)
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
@@ -567,6 +568,16 @@ export default function MajorProjectsPage() {
         <Tooltip title="清空全部数据（不可恢复）">
           <Button danger ghost size="small" onClick={handleDeleteAll} style={{ borderRadius: 7, borderColor: '#fca5a5', color: '#ef4444' }}>全部清空</Button>
         </Tooltip>
+        <Tooltip title={pinStar ? '周重点当前置顶，点击关闭' : '点击开启周重点置顶'}>
+          <Button
+            size="small"
+            icon={<StarFilled style={{ color: pinStar ? '#f59e0b' : '#d0d5dd' }} />}
+            onClick={() => setPinStar(v => !v)}
+            style={{ borderRadius: 7, borderColor: pinStar ? '#fde68a' : '#e4e7ec', background: pinStar ? '#fffbeb' : '#fff', color: pinStar ? '#b45309' : '#98a2b3', fontWeight: pinStar ? 600 : 400 }}
+          >
+            周重点置顶
+          </Button>
+        </Tooltip>
         <Button icon={<ImportOutlined />} type="primary" style={{ borderRadius: 8, background: 'linear-gradient(135deg,#2e3fa0,#1677ff)', border: 'none' }} onClick={() => setImportOpen(true)}>导入飞书</Button>
         <Button icon={<DownloadOutlined />} style={{ borderRadius: 8, borderColor: '#e4e7ec', color: '#344054' }}>导出</Button>
         <Button icon={<PlusOutlined />} type="primary" style={{ borderRadius: 8, background: 'linear-gradient(135deg,#2e3fa0,#1677ff)', border: 'none', fontWeight: 600 }}>新建</Button>
@@ -575,7 +586,7 @@ export default function MajorProjectsPage() {
       {/* ── 表格视图 ── */}
       {viewMode === 'table' && (
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-          <Table rowKey="id" columns={columns} dataSource={projects} loading={loading} scroll={{ x: 1020 }} size="middle"
+          <Table rowKey="id" columns={columns} dataSource={pinStar ? [...projects].sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0)) : projects} loading={loading} scroll={{ x: 1020 }} size="middle"
             onRow={r => ({ onClick: () => setDrawerRecord(r), style: { cursor: 'pointer' } })}
             rowSelection={{ selectedRowKeys: selectedIds, onChange: setSelectedIds }}
             expandable={{
