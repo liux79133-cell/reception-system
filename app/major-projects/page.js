@@ -223,13 +223,14 @@ function LifeCyclePanel({ data = {}, onUpdate }) {
   )
 }
 
-// ── 只读字段组件 ──────────────────────────────────────
-function ReadField({ label, value, full }) {
+// ── 只读行：左标签右值，整齐对齐 ─────────────────────
+function InfoRow({ label, value, children }) {
+  const empty = value == null || String(value) === ''
   return (
-    <div style={{ gridColumn: full ? '1 / -1' : undefined }}>
-      <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 5, fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: value ? '#101828' : '#d0d5dd', lineHeight: 1.6, wordBreak: 'break-word' }}>
-        {value != null && value !== '' ? value : <span style={{ fontStyle: 'italic', fontSize: 12 }}>未填写</span>}
+    <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid #f5f6f8' }}>
+      <div style={{ width: 108, flexShrink: 0, fontSize: 12, color: '#98a2b3', fontWeight: 500, lineHeight: 1.6 }}>{label}</div>
+      <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: empty ? '#d0d5dd' : '#101828', lineHeight: 1.6, wordBreak: 'break-word' }}>
+        {children || (empty ? '—' : String(value))}
       </div>
     </div>
   )
@@ -375,16 +376,27 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
                       </div>
                     </>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 32px' }}>
-                      <ReadField label="项目名称" value={record.name} full />
-                      <ReadField label="立项名称/编号" value={record.applyCode} />
-                      <ReadField label="项目级别" value={record.level} />
-                      <ReadField label="项目类别" value={record.type} />
-                      <ReadField label="收款公司主体" value={record.company} />
-                      <ReadField label="归属" value={record.owner} />
-                      <ReadField label="项目负责人" value={record.responsible} />
-                      <ReadField label="项目进度" value={record.status} />
-                      {record.remark && <ReadField label="备注" value={record.remark} full />}
+                    <div>
+                      <InfoRow label="项目名称" value={record.name} />
+                      <InfoRow label="立项名称/编号" value={record.applyCode} />
+                      <InfoRow label="项目级别">
+                        <LevelChip v={record.level} />
+                      </InfoRow>
+                      <InfoRow label="项目类别">
+                        <TypeTag v={record.type} />
+                      </InfoRow>
+                      <InfoRow label="项目进度">
+                        <StatusDot v={record.status} />
+                      </InfoRow>
+                      <InfoRow label="收款公司主体" value={record.company} />
+                      <InfoRow label="归属" value={record.owner} />
+                      <InfoRow label="项目负责人" value={record.responsible} />
+                      {record.remark && <InfoRow label="备注" value={record.remark} />}
+                      <InfoRow label="周重点">
+                        {record.star
+                          ? <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#fffbeb', border:'1px solid #fde68a', borderRadius:5, padding:'2px 8px', fontSize:12, fontWeight:600, color:'#b45309' }}><StarFilled style={{ color:'#f59e0b', fontSize:11 }} />周重点项目</span>
+                          : <span style={{ color:'#d0d5dd' }}>—</span>}
+                      </InfoRow>
                     </div>
                   )}
                 </div>
