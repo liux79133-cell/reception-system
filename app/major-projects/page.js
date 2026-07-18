@@ -17,11 +17,16 @@ const LEVEL_CFG = {
   '其他':   { color: '#667085', bg: '#f9fafb', border: '#e4e7ec' },
 }
 const STATUS_CFG = {
-  '进行中': { color: '#175cd3', bg: '#eff8ff', dot: '#1677ff' },
-  '已完成': { color: '#067647', bg: '#ecfdf3', dot: '#17b26a' },
-  '已终止': { color: '#c01048', bg: '#fff1f3', dot: '#f63d68' },
-  '待申报': { color: '#b54708', bg: '#fffaeb', dot: '#f79009' },
-  '已结束': { color: '#667085', bg: '#f9fafb', dot: '#98a2b3' },
+  '进行中': { color: '#175cd3', bg: '#eff8ff', dot: '#1677ff' },   // 蓝
+  '未开始': { color: '#5925dc', bg: '#f4f3ff', dot: '#7c3aed' },   // 紫
+  '待定':   { color: '#b54708', bg: '#fffaeb', dot: '#f79009' },   // 橙
+  '待申报': { color: '#b54708', bg: '#fffaeb', dot: '#f79009' },   // 橙
+  '申报中': { color: '#0e7090', bg: '#f0f9ff', dot: '#0284c7' },   // 青
+  '已立项': { color: '#175cd3', bg: '#eff8ff', dot: '#2563eb' },   // 蓝深
+  '验收中': { color: '#6941c6', bg: '#f5f3ff', dot: '#7c3aed' },   // 紫
+  '已完成': { color: '#067647', bg: '#ecfdf3', dot: '#17b26a' },   // 绿
+  '已结束': { color: '#667085', bg: '#f9fafb', dot: '#98a2b3' },   // 灰
+  '已终止': { color: '#c01048', bg: '#fff1f3', dot: '#f63d68' },   // 红
 }
 const TYPE_LIST = ['荣誉资质', '项目补贴', '人才项目', '研发项目', '其他']
 const TYPE_COLORS = { '荣誉资质': '#6941c6', '项目补贴': '#175cd3', '人才项目': '#067647', '研发项目': '#b54708', '其他': '#667085' }
@@ -32,7 +37,7 @@ function LevelChip({ v }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: 'nowrap' }}>{v}</span>
 }
 function StatusDot({ v, small }) {
-  const s = STATUS_CFG[v] || STATUS_CFG['进行中']
+  const s = STATUS_CFG[v] || { color: '#667085', bg: '#f9fafb', dot: '#98a2b3' }
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: small ? '1px 6px' : '2px 8px', borderRadius: 5, fontSize: small ? 10 : 11, fontWeight: 500, background: s.bg, color: s.color }}>
     <span style={{ width: small ? 4 : 5, height: small ? 4 : 5, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />{v}
   </span>

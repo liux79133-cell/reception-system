@@ -19,7 +19,7 @@ export async function GET(request) {
     if (type) where.type = type
     if (status) where.status = status
 
-    const STATUS_ORDER = { '进行中': 0, '待申报': 1, '已完成': 2, '已终止': 3, '已结束': 4 }
+    const STATUS_ORDER = { '进行中': 0, '申报中': 1, '已立项': 2, '验收中': 3, '未开始': 4, '待定': 5, '待申报': 6, '已完成': 7, '已结束': 8, '已终止': 9 }
     const raw = await prisma.majorProject.findMany({
       where: { ...where, parentId: null },
       include: { children: { orderBy: { updatedAt: 'desc' } } },
