@@ -223,15 +223,39 @@ function LifeCyclePanel({ data = {}, onUpdate }) {
   )
 }
 
+// ── 只读字段组件 ──────────────────────────────────────
+function ReadField({ label, value, full }) {
+  return (
+    <div style={{ gridColumn: full ? '1 / -1' : undefined }}>
+      <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 5, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, color: value ? '#101828' : '#d0d5dd', lineHeight: 1.6, wordBreak: 'break-word' }}>
+        {value != null && value !== '' ? value : <span style={{ fontStyle: 'italic', fontSize: 12 }}>未填写</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── 右侧详情抽屉 ────────────────────────────────────────
 function ProjectDrawer({ record, onClose, onUpdate }) {
   const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const prevId = useRef(null)
+  useEffect(() => {
+    if (record?.id !== prevId.current) { setEditing(false); prevId.current = record?.id }
+  }, [record?.id])
 
   if (!record) return null
 
   const payRecords = (() => { try { return record.payRecords ? JSON.parse(record.payRecords) : [] } catch { return [] } })()
   const lifeCycle = (() => { try { return record.lifeCycle ? JSON.parse(record.lifeCycle) : {} } catch { return {} } })()
   const extra = (() => { try { return record.customFields ? JSON.parse(record.customFields) : null } catch { return null } })()
+
+  const attachments = extra ? Object.entries(extra).filter(([k]) =>
+    ['证明材料', '附件', '材料', '文件', '申报材料', '证明文件'].some(kw => k.includes(kw))
+  ) : []
+  const otherExtra = extra ? Object.entries(extra).filter(([k]) =>
+    !['证明材料', '附件', '材料', '文件', '申报材料', '证明文件'].some(kw => k.includes(kw))
+  ) : []
 
   const save = async (patch) => {
     setSaving(true)
@@ -249,29 +273,46 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
 
   const pct = record.totalAmount ? Math.round((record.receivedAmount / record.totalAmount) * 100) : 0
 
+  const panelStyle = { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' }
+
   return (
-    <Drawer open={!!record} onClose={onClose} width={460} closable={false}
-      styles={{ body: { padding: 0, background: '#f9fafb' }, header: { display: 'none' } }}>
+    <Drawer open={!!record} onClose={onClose} width={680} closable={false}
+      styles={{ body: { padding: 0, background: '#f4f6f9' }, header: { display: 'none' } }}>
 
       {/* ── 头部 ── */}
-      <div style={{ background: 'linear-gradient(135deg,#1d2b6b 0%,#2e3fa0 60%,#1e6fbf 100%)', padding: '18px 20px 16px' }}>
+      <div style={{ background: 'linear-gradient(135deg,#1d2b6b 0%,#2e3fa0 60%,#1e6fbf 100%)', padding: '20px 24px 18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1, marginRight: 8 }}>
             <LevelChip v={record.level} />
             <TypeTag v={record.type} />
             <StatusDot v={record.status} />
+            {record.star && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.4)', borderRadius: 5, padding: '1px 7px' }}>
+                <StarFilled style={{ color: '#fbbf24', fontSize: 11 }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#fde68a' }}>周重点</span>
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             <Tooltip title={record.star ? '取消周重点' : '标记为周重点'}>
               <Button type="text" size="small" icon={record.star ? <StarFilled style={{ color: '#fbbf24' }} /> : <StarOutlined />}
                 onClick={toggleStar} style={{ color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.1)', borderRadius: 7 }} />
             </Tooltip>
+            <Button type="text" size="small"
+              icon={editing ? <SaveOutlined /> : <EditOutlined />}
+              onClick={() => setEditing(v => !v)}
+              style={{ color: editing ? '#fbbf24' : 'rgba(255,255,255,0.7)', background: editing ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.1)', borderRadius: 7, fontWeight: editing ? 700 : 400 }}>
+              {editing ? '完成编辑' : '编辑'}
+            </Button>
             <Button type="text" size="small" icon={<CloseOutlined />} onClick={onClose}
               style={{ color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.1)', borderRadius: 7 }} />
           </div>
         </div>
-        <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.5, marginTop: 10 }}>{record.name}</div>
-        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>项目详情 · 点击字段即可修改</div>
+        <div style={{ color: '#fff', fontSize: 17, fontWeight: 700, lineHeight: 1.5, marginTop: 10 }}>{record.name}</div>
+        {record.applyCode && <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 3 }}>立项编号：{record.applyCode}</div>}
+        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
+          {editing ? '✏️ 编辑模式 — 点击字段修改' : '查看模式 — 点击右上角「编辑」按钮修改'}
+        </div>
       </div>
 
       {/* ── 快速指标条 ── */}
@@ -281,17 +322,24 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
           { label: '已到账', val: record.receivedAmount > 0 ? `${record.receivedAmount}万` : '0万', color: record.receivedAmount > 0 ? '#067647' : '#98a2b3' },
           { label: '到账率', val: record.totalAmount ? `${pct}%` : '—', color: pct >= 100 ? '#067647' : '#1677ff' },
         ].map(({ label, val, color }) => (
-          <div key={label} style={{ padding: '12px 8px', textAlign: 'center', borderRight: '1px solid #f2f4f7' }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: 10, color: '#98a2b3', marginTop: 4 }}>{label}</div>
+          <div key={label} style={{ padding: '14px 10px', textAlign: 'center', borderRight: '1px solid #f2f4f7' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: 11, color: '#98a2b3', marginTop: 4 }}>{label}</div>
           </div>
         ))}
       </div>
 
+      {/* ── 进度条 ── */}
+      {record.totalAmount > 0 && (
+        <div style={{ background: '#fff', padding: '0 20px 10px', borderBottom: '1px solid #f2f4f7' }}>
+          <Progress percent={pct} strokeColor={{ '0%': '#3b82f6', '100%': '#10b981' }} showInfo={false} size="small" />
+        </div>
+      )}
+
       {/* ── 折叠板块 ── */}
-      <div style={{ overflowY: 'auto', height: 'calc(100vh - 220px)', padding: '8px 0' }}>
+      <div style={{ overflowY: 'auto', height: 'calc(100vh - 260px)', padding: '10px 12px' }}>
         <Collapse
-          defaultActiveKey={['basic', 'finance']}
+          defaultActiveKey={['basic', 'finance', 'lifecycle']}
           ghost
           expandIconPosition="end"
           style={{ background: 'transparent' }}
@@ -299,44 +347,62 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
             {
               key: 'basic',
               label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><InfoCircleOutlined style={{ color: '#1677ff' }} />基础信息</span>,
-              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              style: panelStyle,
               children: (
-                <div style={{ padding: '0 4px 8px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <EditableField label="项目名称" value={record.name} onSave={v => save({ name: v })} />
+                <div style={{ padding: '4px 8px 12px' }}>
+                  {editing ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <EditableField label="项目名称" value={record.name} onSave={v => save({ name: v })} />
+                        </div>
+                        <EditableField label="立项名称/编号" value={record.applyCode} onSave={v => save({ applyCode: v })} />
+                        <EditableField label="项目级别" value={record.level} type="select" options={Object.keys(LEVEL_CFG)} onSave={v => save({ level: v })} />
+                        <EditableField label="项目类别" value={record.type} type="select" options={TYPE_LIST} onSave={v => save({ type: v })} />
+                        <EditableField label="收款公司主体" value={record.company} onSave={v => save({ company: v })} />
+                        <EditableField label="归属" value={record.owner} onSave={v => save({ owner: v })} />
+                        <EditableField label="项目负责人" value={record.responsible} onSave={v => save({ responsible: v })} />
+                        <EditableField label="项目进度" value={record.status} type="select" options={Object.keys(STATUS_CFG)} onSave={v => save({ status: v })} />
+                      </div>
+                      <div style={{ marginTop: 14 }}>
+                        <EditableField label="备注" value={record.remark} onSave={v => save({ remark: v })} />
+                      </div>
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>周重点项目</div>
+                        <Switch checked={record.star} onChange={v => save({ star: v })}
+                          checkedChildren="⭐ 周重点" unCheckedChildren="普通项目"
+                          style={{ background: record.star ? '#f59e0b' : undefined }} />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 32px' }}>
+                      <ReadField label="项目名称" value={record.name} full />
+                      <ReadField label="立项名称/编号" value={record.applyCode} />
+                      <ReadField label="项目级别" value={record.level} />
+                      <ReadField label="项目类别" value={record.type} />
+                      <ReadField label="收款公司主体" value={record.company} />
+                      <ReadField label="归属" value={record.owner} />
+                      <ReadField label="项目负责人" value={record.responsible} />
+                      <ReadField label="项目进度" value={record.status} />
+                      {record.remark && <ReadField label="备注" value={record.remark} full />}
                     </div>
-                    <EditableField label="立项名称/编号" value={record.applyCode} onSave={v => save({ applyCode: v })} />
-                    <EditableField label="项目级别" value={record.level} type="select" options={Object.keys(LEVEL_CFG)} onSave={v => save({ level: v })} />
-                    <EditableField label="项目类别" value={record.type} type="select" options={TYPE_LIST} onSave={v => save({ type: v })} />
-                    <EditableField label="收款公司主体" value={record.company} onSave={v => save({ company: v })} />
-                    <EditableField label="归属" value={record.owner} onSave={v => save({ owner: v })} />
-                    <EditableField label="项目负责人" value={record.responsible} onSave={v => save({ responsible: v })} />
-                    <EditableField label="项目进度" value={record.status} type="select" options={Object.keys(STATUS_CFG)} onSave={v => save({ status: v })} />
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <EditableField label="备注" value={record.remark} onSave={v => save({ remark: v })} />
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>周重点项目</div>
-                    <Switch checked={record.star} onChange={v => save({ star: v })}
-                      checkedChildren="⭐ 周重点" unCheckedChildren="普通项目"
-                      style={{ background: record.star ? '#f59e0b' : undefined }} />
-                  </div>
+                  )}
                 </div>
               )
             },
             {
               key: 'finance',
               label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><BankOutlined style={{ color: '#10b981' }} />资金与到账管理</span>,
-              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              style: panelStyle,
               children: (
                 <div style={{ padding: '0 4px 8px' }}>
-                  <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
-                    <EditableField label="总金额(万)" value={record.totalAmount} type="number" onSave={v => save({ totalAmount: v })} />
-                    <EditableField label="已到账(万)" value={record.receivedAmount} type="number" onSave={v => save({ receivedAmount: v })} />
-                  </div>
-                  <Divider style={{ margin: '8px 0 12px' }} />
+                  {editing && (
+                    <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+                      <EditableField label="总金额(万)" value={record.totalAmount} type="number" onSave={v => save({ totalAmount: v })} />
+                      <EditableField label="已到账(万)" value={record.receivedAmount} type="number" onSave={v => save({ receivedAmount: v })} />
+                    </div>
+                  )}
+                  {editing && <Divider style={{ margin: '8px 0 12px' }} />}
                   <PayRecords records={payRecords} totalAmount={record.totalAmount} onUpdate={savePayRecords} />
                 </div>
               )
@@ -344,39 +410,71 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
             {
               key: 'lifecycle',
               label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarOutlined style={{ color: '#f59e0b' }} />项目生命周期管理</span>,
-              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              style: panelStyle,
               children: (
                 <div style={{ padding: '0 4px 8px' }}>
                   <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} />
                 </div>
               )
             },
+            ...(attachments.length > 0 ? [{
+              key: 'attachments',
+              label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ color: '#0284c7' }} />附件材料 ({attachments.length})</span>,
+              style: panelStyle,
+              children: (
+                <div style={{ padding: '4px 8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {attachments.map(([k, v]) => {
+                    const urls = String(v).split(/[,，\s]+/).filter(Boolean)
+                    return (
+                      <div key={k}>
+                        <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>{k}</div>
+                        {urls.map((url, i) => {
+                          const isUrl = url.startsWith('http')
+                          return isUrl ? (
+                            <a key={i} href={url} target="_blank" rel="noreferrer"
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae0ff', marginBottom: 5, color: '#0284c7', fontSize: 13, textDecoration: 'none' }}>
+                              <FileTextOutlined style={{ fontSize: 16, color: '#0284c7' }} />
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url.split('/').pop() || '附件'}</span>
+                              <span style={{ fontSize: 11, color: '#7dd3fc', flexShrink: 0 }}>点击打开 →</span>
+                            </a>
+                          ) : (
+                            <div key={i} style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7', marginBottom: 5, fontSize: 13, color: '#344054', wordBreak: 'break-all' }}>
+                              {url}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }] : []),
             ...(record.children && record.children.length > 0 ? [{
               key: 'children',
               label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><UnorderedListOutlined style={{ color: '#6941c6' }} />子项目 ({record.children.length})</span>,
-              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              style: panelStyle,
               children: (
-                <div style={{ padding: '0 4px 8px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ padding: '4px 8px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {record.children.map(c => (
-                    <div key={c.id} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
+                    <div key={c.id} style={{ padding: '12px 14px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                         <StatusDot v={c.status} small />
                         <span style={{ fontSize: 11, color: '#98a2b3' }}>{c.totalAmount != null ? `${c.totalAmount}万` : '—'}</span>
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: '#344054' }}>{c.name}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#344054' }}>{c.name}</div>
                     </div>
                   ))}
                 </div>
               )
             }] : []),
-            ...(extra && Object.keys(extra).length > 0 ? [{
+            ...(otherExtra && otherExtra.length > 0 ? [{
               key: 'extra',
               label: <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ color: '#667085' }} />更多信息（飞书导入）</span>,
-              style: { background: '#fff', marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid #f2f4f7' },
+              style: panelStyle,
               children: (
                 <div style={{ padding: '0 4px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
-                  {Object.entries(extra).map(([k, v]) => (
-                    <div key={k}>
+                  {otherExtra.map(([k, v]) => (
+                    <div key={k} style={{ gridColumn: String(v).length > 30 ? '1 / -1' : undefined }}>
                       <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 3 }}>{k}</div>
                       <div style={{ fontSize: 12, color: '#344054', fontWeight: 500, wordBreak: 'break-all' }}>{String(v) || '—'}</div>
                     </div>
