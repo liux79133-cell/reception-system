@@ -466,7 +466,12 @@ export default function MajorProjectsPage() {
       title: '项目名称', dataIndex: 'name', ellipsis: false, width: 320,
       render: (v, r) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', cursor: 'pointer' }} onClick={() => setDrawerRecord(r)}>
-          {r.star && <StarFilled style={{ color: '#fbbf24', fontSize: 12, flexShrink: 0 }} />}
+          {r.star && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
+              <StarFilled style={{ color: '#f59e0b', fontSize: 11 }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309' }}>周重点</span>
+            </span>
+          )}
           <span style={{ fontSize: 13, fontWeight: r.parentId ? 400 : 600, color: r.parentId ? '#475467' : '#101828', lineHeight: 1.4 }}>{v}</span>
           <StatusDot v={r.status} small />
         </div>
