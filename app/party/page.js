@@ -82,10 +82,189 @@ function MaterialItem({ material, uploaded, onUpload }) {
 }
 
 // ── 申请人视图 ───────────────────────────────
+// ── 转接引导步骤 ─────────────────────────────
+function TransferGuideStep({ contacts, onEditContacts }) {
+  const [method, setMethod] = useState('online')
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: '#667085', marginBottom: 16, lineHeight: 1.8 }}>
+        请根据您原所在党组织的性质，选择对应的转接方式。如有疑问请联系{' '}
+        {contacts.map((c, i) => <span key={i} style={{ color: RED, fontWeight: 600, cursor: 'pointer' }}>@{c.name}{i < contacts.length - 1 ? ' 或 ' : ''}</span>)} 咨询。
+        <Button type="text" size="small" onClick={onEditContacts} style={{ fontSize: 11, color: '#98a2b3', padding: '0 4px' }}>✎ 编辑</Button>
+      </div>
+
+      {/* 方式选择卡片 */}
+      {[
+        { key: 'online', icon: '🖥️', title: '线上系统转入', badge: '适用于苏州大市内及江苏省内', desc: '由前党支部在苏州平台 / 国家平台上统一操作转入' },
+        { key: 'offline', icon: '📄', title: '线下纸质介绍信', badge: '适用于其他省市', desc: '由原党支部开具纸质介绍信，交由 @顾峰 / @Zoe Gu 处理' },
+      ].map(opt => (
+        <div key={opt.key} onClick={() => setMethod(opt.key)}
+          style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', borderRadius: 12, marginBottom: 12, border: `2px solid ${method === opt.key ? RED : '#f2f4f7'}`, background: method === opt.key ? RED_LIGHT : '#fff', cursor: 'pointer', transition: 'all 0.18s' }}>
+          <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${method === opt.key ? RED : '#d0d5dd'}`, background: method === opt.key ? RED : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+            {method === opt.key && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', display: 'block' }} />}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 16 }}>{opt.icon}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>{opt.title}</span>
+            </div>
+            <div style={{ fontSize: 12, color: RED, fontWeight: 500, marginBottom: 4 }}>{opt.badge}</div>
+            <div style={{ fontSize: 13, color: '#667085' }}>{opt.desc}</div>
+          </div>
+        </div>
+      ))}
+
+      {/* 根据选择显示操作指引 */}
+      {method === 'online' && (
+        <div style={{ background: RED_LIGHT, borderRadius: 12, padding: '18px 20px', border: `1px solid ${RED}30` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: RED, marginBottom: 14 }}>📋 线上转入操作指引</div>
+          <div style={{ fontSize: 13, color: '#344054', lineHeight: 2 }}>
+            <div><span style={{ color: '#667085' }}>苏州大市内：</span>由前党支部在苏州平台和国家平台上统一转入「初速度（苏州）科技有限公司党总支 X 支部」</div>
+            <div><span style={{ color: '#667085' }}>江苏省内及部分外省：</span>由前党支部在国家平台上统一转入「初速度（苏州）科技有限公司党总支 X 支部」</div>
+          </div>
+          <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(192,0,26,0.06)', borderRadius: 8 }}>
+            <div style={{ fontSize: 13, color: '#344054', marginBottom: 8, fontWeight: 600 }}>党组编号参考：</div>
+            <div style={{ fontSize: 13, color: '#667085', lineHeight: 2 }}>
+              <div>第三支部：<code style={{ background: '#f5f5f5', padding: '1px 8px', borderRadius: 4 }}>032800100398</code></div>
+              <div>党总支：<code style={{ background: '#f5f5f5', padding: '1px 8px', borderRadius: 4 }}>032800100395</code></div>
+              <div>苏州高铁新城商会党委：<code style={{ background: '#f5f5f5', padding: '1px 8px', borderRadius: 4 }}>032000038526</code></div>
+            </div>
+          </div>
+          <Button type="primary" block style={{ marginTop: 14, borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
+            🔗 一键联系审核员（飞书跳转）
+          </Button>
+        </div>
+      )}
+
+      {method === 'offline' && (
+        <div style={{ background: RED_LIGHT, borderRadius: 12, padding: '18px 20px', border: `1px solid ${RED}30` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: RED, marginBottom: 14 }}>📄 线下介绍信开具指引</div>
+          <div style={{ fontSize: 13, color: '#344054', lineHeight: 2, marginBottom: 12 }}>
+            由原党支部开具纸质介绍信，抬头为：
+          </div>
+          <div style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', marginBottom: 12, border: '1px solid #fecdd6', fontSize: 14, color: '#101828', fontWeight: 500 }}>
+            「智慧大道街区党委」
+          </div>
+          <div style={{ fontSize: 13, color: '#344054', marginBottom: 6 }}>转入组织名称：</div>
+          <div style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', marginBottom: 16, border: '1px solid #fecdd6', fontSize: 14, color: '#101828', fontWeight: 500 }}>
+            「初速度（苏州）科技有限公司党总支 X 支部」
+          </div>
+          <div style={{ fontSize: 13, color: '#667085', marginBottom: 14 }}>介绍信开好后请交给 @顾峰 / @Zoe Gu。</div>
+          <Button type="primary" block style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
+            📱 一键联系 @顾峰（飞书）
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── 信息采集步骤 ─────────────────────────────
+function InfoCollectStep() {
+  const ETHNICS = ['汉族','回族','满族','壮族','藏族','维吾尔族','苗族','彝族','土家族','蒙古族','其他']
+  const EDUCATIONS = ['博士研究生','硕士研究生','本科','大专','高中及以下']
+
+  return (
+    <div>
+      <div style={{ background: '#fff8f8', borderRadius: 10, padding: '12px 16px', marginBottom: 20, border: `1px solid ${RED}20`, fontSize: 13, color: '#667085' }}>
+        ⚠️ 请如实填写，信息将用于全国党员管理系统登记，提交后不可修改
+      </div>
+      <Form layout="vertical" size="large">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+          <Form.Item label={<span>姓名 <span style={{ color: RED }}>*</span></span>}>
+            <Input placeholder="请输入真实姓名" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>工号 <span style={{ color: RED }}>*</span></span>}>
+            <Input placeholder="如 M12345" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>民族 <span style={{ color: RED }}>*</span></span>}>
+            <Select placeholder="请选择" style={{ borderRadius: 8 }}>
+              {ETHNICS.map(e => <Select.Option key={e}>{e}</Select.Option>)}
+            </Select>
+          </Form.Item>
+          <Form.Item label={<span>学历 <span style={{ color: RED }}>*</span></span>}>
+            <Select placeholder="请选择" style={{ borderRadius: 8 }}>
+              {EDUCATIONS.map(e => <Select.Option key={e}>{e}</Select.Option>)}
+            </Select>
+          </Form.Item>
+          <Form.Item label={<span>入党时间 <span style={{ color: RED }}>*</span></span>}>
+            <Input placeholder="yyyy/mm/日" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>现居地址</span>}>
+            <Input placeholder="省/市/区" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>原屋党支部全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
+            <Input placeholder="如：XX大学XX学院XX支部" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>原屋党委全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
+            <Input placeholder="如：XX大学党委" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label={<span>党费基数（元/月）<span style={{ color: RED }}>*</span></span>}>
+            <Input placeholder="如：10.00" style={{ borderRadius: 8 }} />
+          </Form.Item>
+          <Form.Item label="联系电话">
+            <Input placeholder="选填" style={{ borderRadius: 8 }} />
+          </Form.Item>
+        </div>
+      </Form>
+    </div>
+  )
+}
+
+// ── 审核归档步骤 ─────────────────────────────
+function ArchiveStep() {
+  const [checks, setChecks] = useState({ a: false, b: false, c: false, d: false })
+  const allDone = Object.values(checks).every(Boolean)
+  const toggle = k => setChecks(p => ({ ...p, [k]: !p[k] }))
+
+  return (
+    <div>
+      {/* 等待提示 */}
+      <div style={{ textAlign: 'center', padding: '28px 0 20px' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: `linear-gradient(135deg,${RED_DARK},${RED})`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, boxShadow: `0 8px 24px ${RED}40` }}>
+          <span style={{ fontSize: 32 }}>🗂️</span>
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#101828', marginBottom: 8 }}>等待审核员最终确认归档</div>
+        <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>
+          您的全部材料已提交完毕，正在等待党建专员完成最终核查。<br />
+          归档完成后您将收到飞书通知，系统将自动生成您的电子党员档案。
+        </div>
+      </div>
+
+      {/* 审核员归档清单 */}
+      <div style={{ background: RED_LIGHT, borderRadius: 12, padding: '18px 20px', border: `1px solid ${RED}25`, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: RED, marginBottom: 14 }}>归档最终检查单（审核员操作）</div>
+        {[
+          { key: 'a', text: '档案材料已全部入库' },
+          { key: 'b', text: '信息已录入全国党员管理系统' },
+          { key: 'c', text: '党费基数已核定' },
+          { key: 'd', text: '党员已加入 Momenta 党员飞书群' },
+        ].map(item => (
+          <div key={item.key} onClick={() => toggle(item.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(192,0,26,0.08)', cursor: 'pointer' }}>
+            <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${checks[item.key] ? RED : '#d0d5dd'}`, background: checks[item.key] ? RED : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+              {checks[item.key] && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>}
+            </div>
+            <span style={{ fontSize: 13, color: checks[item.key] ? '#667085' : '#101828', textDecoration: checks[item.key] ? 'line-through' : 'none', fontWeight: checks[item.key] ? 400 : 500 }}>{item.text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 提交按钮区域（由外层渲染，这里给一个进度提示） */}
+      {allDone && (
+        <div style={{ background: '#ecfdf3', borderRadius: 10, padding: '12px 16px', border: '1px solid #abefc6', textAlign: 'center', fontSize: 13, color: '#067647', fontWeight: 600 }}>
+          ✅ 全部检查完成，可点击"提交完成"按钮归档
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ApplicantView() {
   const [currentStep, setCurrentStep] = useState(0)
   const [uploaded, setUploaded] = useState({})
-  const [contacts, setContacts] = useState([{ name: 'Nerida Gao', feishuUrl: '' }, { name: 'Zoe Gu', feishuUrl: '' }])
+  const [contacts, setContacts] = useState([{ name: 'Tako', feishuUrl: '' }, { name: 'Nerida Gao', feishuUrl: '' }, { name: 'Zoe Gu', feishuUrl: '' }])
   const [editContactOpen, setEditContactOpen] = useState(false)
   const [editContacts, setEditContacts] = useState([])
   const [notice, setNotice] = useState('2024年新入职党员注意：请先完成档案整理，再发起转入申请。如有特殊情况（档案在外省人才市场），请先联系 @Nerida Gao 获取查档函后再操作。')
@@ -168,60 +347,28 @@ function ApplicantView() {
     </div>,
 
     // 步骤2：转接引导
-    <div key={2}>
-      <div style={{ background: '#f0f9ff', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '1px solid #b9e6fe' }}>
-        <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>🔄 转接引导说明</div>
-        <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>
-          <div>1. 向原单位党委申请《组织关系介绍信》</div>
-          <div>2. 将介绍信原件带至公司党委盖章确认</div>
-          <div>3. 联系 HR 完成档案转接登记</div>
-        </div>
-      </div>
-      <MaterialItem material={{ key: 'intro_letter', title: '组织关系介绍信', required: true, hint: '原件扫描或拍照上传，需加盖原单位公章' }} uploaded={!!uploaded['intro_letter']} onUpload={handleUpload} />
-    </div>,
+    <TransferGuideStep key={2} contacts={contacts} onEditContacts={() => { setEditContacts(contacts.map(c => ({ ...c }))); setEditContactOpen(true) }} />,
 
     // 步骤3：信息采集
-    <div key={3}>
-      <div style={{ background: '#f0f9ff', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '1px solid #b9e6fe' }}>
-        <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>📋 请填写个人基本信息</div>
-      </div>
-      <Form layout="vertical">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="姓名" required><Input placeholder="请输入真实姓名" /></Form.Item>
-          <Form.Item label="工号" required><Input placeholder="请输入工号" /></Form.Item>
-          <Form.Item label="籍贯" required><Input placeholder="省/市/区" /></Form.Item>
-          <Form.Item label="入党时间" required><Input placeholder="如：2018年6月" /></Form.Item>
-          <Form.Item label="原所在支部" required style={{ gridColumn: 'span 2' }}><Input placeholder="请填写完整的支部名称" /></Form.Item>
-          <Form.Item label="联系电话" required><Input placeholder="请输入手机号" /></Form.Item>
-          <Form.Item label="个人邮箱"><Input placeholder="选填" /></Form.Item>
-        </div>
-      </Form>
-    </div>,
+    <InfoCollectStep key={3} />,
 
     // 步骤4：入群确认
     <div key={4}>
       <div style={{ background: '#ecfdf3', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '1px solid #abefc6' }}>
-        <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>👥 加入党员工作群</div>
-        <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>请扫描下方二维码或点击链接申请加入党员工作微信群，加群后通知管理员确认。</div>
+        <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>👥 加入 Momenta 党员飞书群</div>
+        <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>请联系党委管理员，确认已加入 Momenta 党员飞书群。加群后点击下方按钮通知管理员完成确认。</div>
       </div>
       <div style={{ textAlign: 'center', padding: '32px 0', background: '#f9fafb', borderRadius: 10, marginBottom: 16 }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>📱</div>
-        <div style={{ fontSize: 14, color: '#667085', marginBottom: 16 }}>党员工作群二维码（管理员可在系统设置中配置）</div>
-        <Button style={{ borderRadius: 8 }}>已加入，通知管理员</Button>
+        <div style={{ fontSize: 52, marginBottom: 12 }}>💬</div>
+        <div style={{ fontSize: 14, color: '#667085', marginBottom: 20 }}>加入 Momenta 党员飞书群后，在群内发送消息：<br /><span style={{ color: RED, fontWeight: 600 }}>「我是新转入党员 [姓名]，请确认入群」</span></div>
+        <Button type="primary" style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 40, padding: '0 24px' }}>
+          🔔 已发送，通知管理员确认
+        </Button>
       </div>
     </div>,
 
     // 步骤5：审核归档
-    <div key={5}>
-      <div style={{ background: '#ecfdf3', borderRadius: 10, padding: '40px 24px', textAlign: 'center', border: '1px solid #abefc6' }}>
-        <div style={{ fontSize: 52, marginBottom: 16 }}>🎉</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#101828', marginBottom: 8 }}>材料已提交，等待审核</div>
-        <div style={{ fontSize: 14, color: '#667085', marginBottom: 20 }}>党委将在3个工作日内完成审核，审核结果将通过飞书通知您。</div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 20px', background: '#fff', borderRadius: 20, border: '1px solid #abefc6', fontSize: 13, color: '#067647' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#17b26a' }} />审核中
-        </div>
-      </div>
-    </div>,
+    <ArchiveStep key={5} />,
   ]
 
   return (
@@ -278,15 +425,21 @@ function ApplicantView() {
           {STEP_CONTENTS[currentStep]}
 
           {/* 操作按钮 */}
-          {currentStep < TRANSFER_IN_STEPS.length - 1 && (
-            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-              <Button disabled={currentStep === 0} onClick={() => setCurrentStep(s => s - 1)} style={{ borderRadius: 8, flex: 1, height: 44 }}>← 上一步</Button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+            <Button disabled={currentStep === 0} onClick={() => setCurrentStep(s => s - 1)}
+              style={{ borderRadius: 8, flex: 1, height: 44 }}>← 上一步</Button>
+            {currentStep < TRANSFER_IN_STEPS.length - 1 ? (
               <Button type="primary" onClick={() => setCurrentStep(s => s + 1)}
                 style={{ borderRadius: 8, flex: 3, height: 44, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', fontWeight: 700, fontSize: 15 }}>
                 保存并继续 →
               </Button>
-            </div>
-          )}
+            ) : (
+              <Button type="primary" onClick={() => message.success('已提交！等待党委审核')}
+                style={{ borderRadius: 8, flex: 3, height: 44, background: 'linear-gradient(135deg,#047857,#059669)', border: 'none', fontWeight: 700, fontSize: 15 }}>
+                ✓ 提交完成
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
