@@ -90,14 +90,20 @@ function TransferGuideStep({ contacts, onEditContacts }) {
     <div>
       <div style={{ fontSize: 13, color: '#667085', marginBottom: 16, lineHeight: 1.8 }}>
         请根据您原所在党组织的性质，选择对应的转接方式。如有疑问请联系{' '}
-        {contacts.map((c, i) => <span key={i} style={{ color: RED, fontWeight: 600, cursor: 'pointer' }}>@{c.name}{i < contacts.length - 1 ? ' 或 ' : ''}</span>)} 咨询。
+        {contacts.map((c, i) => (
+          <a key={i} href={c.feishuUrl || undefined} target={c.feishuUrl ? '_blank' : undefined} rel="noreferrer"
+            onClick={e => { if (!c.feishuUrl) e.preventDefault() }}
+            style={{ color: RED, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' }}>
+            @{c.name}
+          </a>
+        )).reduce((prev, curr, i) => [prev, <span key={`sep-${i}`} style={{ color: '#667085' }}> 或 </span>, curr])} 咨询。
         <Button type="text" size="small" onClick={onEditContacts} style={{ fontSize: 11, color: '#98a2b3', padding: '0 4px' }}>✎ 编辑</Button>
       </div>
 
       {/* 方式选择卡片 */}
       {[
         { key: 'online', icon: '🖥️', title: '线上系统转入', badge: '适用于苏州大市内及江苏省内', desc: '由前党支部在苏州平台 / 国家平台上统一操作转入' },
-        { key: 'offline', icon: '📄', title: '线下纸质介绍信', badge: '适用于其他省市', desc: '由原党支部开具纸质介绍信，交由 @顾峰 / @Zoe Gu 处理' },
+        { key: 'offline', icon: '📄', title: '线下纸质介绍信', badge: '适用于其他省市', desc: '由原党支部开具纸质介绍信，交由 @Tako / @Zoe Gu 处理' },
       ].map(opt => (
         <div key={opt.key} onClick={() => setMethod(opt.key)}
           style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', borderRadius: 12, marginBottom: 12, border: `2px solid ${method === opt.key ? RED : '#f2f4f7'}`, background: method === opt.key ? RED_LIGHT : '#fff', cursor: 'pointer', transition: 'all 0.18s' }}>
@@ -131,9 +137,12 @@ function TransferGuideStep({ contacts, onEditContacts }) {
               <div>苏州高铁新城商会党委：<code style={{ background: '#f5f5f5', padding: '1px 8px', borderRadius: 4 }}>032000038526</code></div>
             </div>
           </div>
-          <Button type="primary" block style={{ marginTop: 14, borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
-            🔗 一键联系审核员（飞书跳转）
-          </Button>
+          <a href={contacts.find(c => c.name === 'Tako')?.feishuUrl || contacts[0]?.feishuUrl || undefined}
+            target="_blank" rel="noreferrer" style={{ display: 'block', marginTop: 14 }}>
+            <Button type="primary" block style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
+              🔗 一键联系 @Tako（飞书跳转）
+            </Button>
+          </a>
         </div>
       )}
 
@@ -150,10 +159,19 @@ function TransferGuideStep({ contacts, onEditContacts }) {
           <div style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', marginBottom: 16, border: '1px solid #fecdd6', fontSize: 14, color: '#101828', fontWeight: 500 }}>
             「初速度（苏州）科技有限公司党总支 X 支部」
           </div>
-          <div style={{ fontSize: 13, color: '#667085', marginBottom: 14 }}>介绍信开好后请交给 @顾峰 / @Zoe Gu。</div>
-          <Button type="primary" block style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
-            📱 一键联系 @顾峰（飞书）
-          </Button>
+          <div style={{ fontSize: 13, color: '#667085', marginBottom: 14 }}>介绍信开好后请交给 @Tako / @Zoe Gu。</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <a href={contacts.find(c => c.name === 'Tako')?.feishuUrl || undefined} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
+              <Button type="primary" block style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 42, fontWeight: 600 }}>
+                📱 联系 @Tako（飞书）
+              </Button>
+            </a>
+            <a href={contacts.find(c => c.name === 'Zoe Gu')?.feishuUrl || undefined} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
+              <Button block style={{ borderRadius: 8, height: 42, fontWeight: 600, borderColor: RED, color: RED }}>
+                📱 联系 @Zoe Gu（飞书）
+              </Button>
+            </a>
+          </div>
         </div>
       )}
     </div>
@@ -194,10 +212,10 @@ function InfoCollectStep() {
           <Form.Item label={<span>现居地址</span>}>
             <Input placeholder="省/市/区" style={{ borderRadius: 8 }} />
           </Form.Item>
-          <Form.Item label={<span>原屋党支部全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
+          <Form.Item label={<span>原属党支部全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
             <Input placeholder="如：XX大学XX学院XX支部" style={{ borderRadius: 8 }} />
           </Form.Item>
-          <Form.Item label={<span>原屋党委全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
+          <Form.Item label={<span>原属党委全称 <span style={{ color: RED }}>*</span></span>} style={{ gridColumn: 'span 2' }}>
             <Input placeholder="如：XX大学党委" style={{ borderRadius: 8 }} />
           </Form.Item>
           <Form.Item label={<span>党费基数（元/月）<span style={{ color: RED }}>*</span></span>}>
@@ -358,12 +376,15 @@ function ApplicantView() {
         <div style={{ fontWeight: 600, color: '#101828', marginBottom: 8 }}>👥 加入 Momenta 党员飞书群</div>
         <div style={{ fontSize: 13, color: '#667085', lineHeight: 1.8 }}>请联系党委管理员，确认已加入 Momenta 党员飞书群。加群后点击下方按钮通知管理员完成确认。</div>
       </div>
-      <div style={{ textAlign: 'center', padding: '32px 0', background: '#f9fafb', borderRadius: 10, marginBottom: 16 }}>
+      <div style={{ textAlign: 'center', padding: '32px 24px', background: '#f9fafb', borderRadius: 10, marginBottom: 16 }}>
         <div style={{ fontSize: 52, marginBottom: 12 }}>💬</div>
-        <div style={{ fontSize: 14, color: '#667085', marginBottom: 20 }}>加入 Momenta 党员飞书群后，在群内发送消息：<br /><span style={{ color: RED, fontWeight: 600 }}>「我是新转入党员 [姓名]，请确认入群」</span></div>
-        <Button type="primary" style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 40, padding: '0 24px' }}>
-          🔔 已发送，通知管理员确认
-        </Button>
+        <div style={{ fontSize: 14, color: '#667085', marginBottom: 8 }}>请联系党委管理员申请加入 Momenta 党员飞书群</div>
+        <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 20 }}>加入后请通知管理员在系统内完成入群确认</div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <Button type="primary" style={{ borderRadius: 8, background: `linear-gradient(135deg,${RED_DARK},${RED})`, border: 'none', height: 40, padding: '0 24px', fontWeight: 600 }}>
+            🔔 已加入，通知管理员确认
+          </Button>
+        </div>
       </div>
     </div>,
 
