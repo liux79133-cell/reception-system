@@ -13,11 +13,17 @@ const FIELD_MAP = {
   '项目类别': 'type', '类别': 'type', '类型': 'type',
   '收款主体': 'company', '主体': 'company',
   '级别': 'level', '项目级别': 'level',
-  '状态': 'status', '项目状态': 'status', '项目进度': 'status',
+  '状态': 'status', '项目状态': 'status', '项目进度': 'status', '进度': 'status',
   '总金额': 'totalAmount', '总金额(万)': 'totalAmount',
   '已到账金额': 'receivedAmount', '已到账(万)': 'receivedAmount', '到账金额': 'receivedAmount', '已到账': 'receivedAmount',
   '归属': 'owner', '负责人': 'owner', '归属公司': 'owner', '归属单位': 'owner',
   '父项目': 'parentName', '上级项目': 'parentName', '父级': 'parentName', '父记录': 'parentName',
+  '周重点': 'star',
+  '立项名称': 'applyCode', '立项编号': 'applyCode',
+  '待办事项': 'todos',
+  '开始时间': '_lcStart', '立项时间': '_lcStart',
+  '中期验收时间': '_lcMid', '中期检查时间': '_lcMid',
+  '结项时间': '_lcEnd', '结束时间': '_lcEnd',
   '备注': 'remark',
 }
 
@@ -31,6 +37,9 @@ const FUZZY_MAP = [
   { keywords: ['总金额'], field: 'totalAmount' },
   { keywords: ['归属公司', '归属单位', '归属'], field: 'owner' },
   { keywords: ['父记录', '父项目', '上级项目'], field: 'parentName' },
+  { keywords: ['周重点'], field: 'star' },
+  { keywords: ['立项名称', '立项编号'], field: 'applyCode' },
+  { keywords: ['待办事项'], field: 'todos' },
   { keywords: ['备注'], field: 'remark' },
 ]
 
@@ -141,12 +150,23 @@ function rowsToRecords(rows) {
   const records = rows.slice(1).map((cols, i) => {
     const record = { _index: i + 1 }
     const extra = {}
+    const lc = {}  // 生命周期时间暂存
+
     cols.forEach((val, idx) => {
       const v = val.trim()
       const field = colMap[idx]
       if (field) {
         if (field === 'totalAmount' || field === 'receivedAmount') {
           if (record[field] == null) record[field] = toNum(v)
+        } else if (field === 'star') {
+          // 「是」「yes」「true」「✓」「√」均视为 true
+          record.star = /^(是|yes|true|✓|√|1)$/i.test(v)
+        } else if (field === '_lcStart') {
+          lc.start = { date: v, status: v ? '已完成' : '待推进' }
+        } else if (field === '_lcMid') {
+          lc.mid = { date: v, status: v ? '待推进' : '待推进' }
+        } else if (field === '_lcEnd') {
+          lc.end = { date: v, status: '待推进' }
         } else if (!record[field] && v) {
           record[field] = v
         }
@@ -154,9 +174,11 @@ function rowsToRecords(rows) {
         extra[headers[idx]] = v
       }
     })
+
+    if (Object.keys(lc).length) record.lifeCycle = lc
     if (Object.keys(extra).length) record._extra = extra
     return record
-  }).filter(r => r.name && r.name.length < 200)  // 名称超长的是乱码，过滤掉
+  }).filter(r => r.name && r.name.length < 200)
 
   return { records, colMap, headers }
 }

@@ -25,10 +25,12 @@ export async function POST(request) {
           level: r.level || '其他',
           status: r.status || '进行中',
           totalAmount: toNum(r.totalAmount),
-          receivedAmount: toNum(r.receivedAmount) ?? 0,  // schema default 0，null时用0
+          receivedAmount: toNum(r.receivedAmount) ?? 0,
           owner: r.owner || null,
-          star: false,
+          star: r.star === true,
+          applyCode: r.applyCode || null,
           remark: r.remark || null,
+          lifeCycle: r.lifeCycle ? JSON.stringify(r.lifeCycle) : null,
           customFields: r._extra ? JSON.stringify(r._extra) : null,
           createdById: user.id,
         }
