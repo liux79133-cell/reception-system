@@ -278,6 +278,90 @@ function LifeCyclePanel({ data = {}, onUpdate, readOnly }) {
   )
 }
 
+// ── 考核指标面板 ───────────────────────────────────────
+const DEFAULT_METRICS = [
+  { id: 'invest',  name: '项目投入指标（万元）' },
+  { id: 'income',  name: '项目新增收入指标（万元）' },
+  { id: 'ip',      name: 'IP 考核指标' },
+  { id: 'tech',    name: '技术考核指标' },
+  { id: 'other',   name: '其他指标' },
+]
+
+function MetricsPanel({ metrics = [], onUpdate, readOnly }) {
+  const addMetric = () => onUpdate([...metrics, { id: Date.now(), name: '', value: '', owner: '' }])
+  const updateMetric = (id, field, val) => onUpdate(metrics.map(m => m.id === id ? { ...m, [field]: val } : m))
+  const removeMetric = (id) => onUpdate(metrics.filter(m => m.id !== id))
+  const applyTemplate = () => {
+    const existing = new Set(metrics.map(m => m.name))
+    const toAdd = DEFAULT_METRICS.filter(d => !existing.has(d.name)).map(d => ({ id: Date.now() + Math.random(), name: d.name, value: '', owner: '' }))
+    if (!toAdd.length) return message.info('默认指标已全部添加')
+    onUpdate([...metrics, ...toAdd])
+  }
+
+  // 只读
+  if (readOnly) {
+    if (!metrics.length) return <div style={{ textAlign: 'center', color: '#d0d5dd', fontSize: 12, padding: '12px 0' }}>暂无考核指标</div>
+    return (
+      <div>
+        {metrics.map((m, i) => (
+          <div key={m.id || i} style={{ padding: '10px 0', borderBottom: '1px solid #f5f6f8' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ width: 108, flexShrink: 0 }}>
+                <div style={{ fontSize: 12, color: '#344054', fontWeight: 600, lineHeight: 1.5 }}>{m.name || '—'}</div>
+                {m.owner && <div style={{ fontSize: 11, color: '#98a2b3', marginTop: 2 }}>负责人：{m.owner}</div>}
+              </div>
+              <div style={{ flex: 1, fontSize: 13, color: m.value ? '#101828' : '#d0d5dd', lineHeight: 1.6, wordBreak: 'break-word' }}>
+                {m.value || '—'}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // 编辑态
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <Button type="link" size="small" icon={<PlusCircleOutlined />} onClick={applyTemplate} style={{ fontSize: 12, color: '#1677ff', padding: 0 }}>
+          生成默认模板
+        </Button>
+      </div>
+      {metrics.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#d0d5dd', fontSize: 12, padding: '12px 0' }}>暂无指标，点击「生成默认模板」或「添加指标」</div>
+      )}
+      {metrics.map((m, i) => (
+        <div key={m.id || i} style={{ marginBottom: 10, padding: '12px 14px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <Input
+              value={m.name} placeholder="指标名称"
+              onChange={e => updateMetric(m.id, 'name', e.target.value)}
+              style={{ flex: 1, borderRadius: 6, fontWeight: 500 }}
+            />
+            <Input.TextArea
+              value={m.value} placeholder="指标值/描述（支持回车换行）"
+              onChange={e => updateMetric(m.id, 'value', e.target.value)}
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              style={{ flex: 1.5, borderRadius: 6 }}
+            />
+            <Button type="text" danger icon={<DeleteOutlined />} size="small" onClick={() => removeMetric(m.id)} style={{ flexShrink: 0 }} />
+          </div>
+          <Input
+            value={m.owner} placeholder="@负责人（选填）"
+            prefix={<span style={{ color: '#98a2b3', fontSize: 12 }}>@</span>}
+            onChange={e => updateMetric(m.id, 'owner', e.target.value)}
+            size="small" style={{ borderRadius: 6 }}
+          />
+        </div>
+      ))}
+      <Button type="dashed" icon={<PlusOutlined />} onClick={addMetric} style={{ width: '100%', borderRadius: 8, color: '#667085', marginTop: 2 }}>
+        添加自定义指标
+      </Button>
+    </div>
+  )
+}
+
 // ── 只读行：左标签右值，整齐对齐 ─────────────────────
 function InfoRow({ label, value, children }) {
   const empty = value == null || String(value) === ''
@@ -304,6 +388,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
 
   const payRecords = (() => { try { return record.payRecords ? JSON.parse(record.payRecords) : [] } catch { return [] } })()
   const lifeCycle = (() => { try { return record.lifeCycle ? JSON.parse(record.lifeCycle) : {} } catch { return {} } })()
+  const metrics = (() => { try { return record.metrics ? JSON.parse(record.metrics) : [] } catch { return [] } })()
   const extra = (() => { try { return record.customFields ? JSON.parse(record.customFields) : null } catch { return null } })()
 
   const attachments = extra ? Object.entries(extra).filter(([k]) =>
@@ -325,6 +410,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
 
   const savePayRecords = (recs) => save({ payRecords: recs, receivedAmount: recs.reduce((s, r) => s + (r.amount || 0), 0) })
   const saveLifeCycle = (lc) => save({ lifeCycle: lc })
+  const saveMetrics = (m) => save({ metrics: m })
   const toggleStar = () => save({ star: !record.star })
 
   const pct = record.totalAmount ? Math.round((record.receivedAmount / record.totalAmount) * 100) : 0
@@ -395,7 +481,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
       {/* ── 折叠板块 ── */}
       <div style={{ overflowY: 'auto', height: 'calc(100vh - 260px)', padding: '10px 12px' }}>
         <Collapse
-          defaultActiveKey={['basic', 'finance', 'lifecycle']}
+          defaultActiveKey={['basic', 'finance', 'lifecycle', 'metrics']}
           ghost
           expandIconPosition="end"
           style={{ background: 'transparent' }}
@@ -481,6 +567,24 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
               children: (
                 <div style={{ padding: '0 4px 8px' }}>
                   <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} readOnly={!editing} />
+                </div>
+              )
+            },
+            {
+              key: 'metrics',
+              label: (
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#ecfdf3', border: '2px solid #17b26a', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#17b26a' }} />
+                  </span>
+                  考核指标
+                  {metrics.length > 0 && <span style={{ fontSize: 11, color: '#98a2b3', fontWeight: 400 }}>（{metrics.length} 项）</span>}
+                </span>
+              ),
+              style: panelStyle,
+              children: (
+                <div style={{ padding: '0 4px 8px' }}>
+                  <MetricsPanel metrics={metrics} onUpdate={saveMetrics} readOnly={!editing} />
                 </div>
               )
             },

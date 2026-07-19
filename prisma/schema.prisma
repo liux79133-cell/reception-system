@@ -131,6 +131,7 @@ model MajorProject {
   customFields    String?
   payRecords      String?
   lifeCycle       String?
+  metrics         String?
   parentId        Int?
   parent          MajorProject?  @relation("ProjectChildren", fields: [parentId], references: [id])
   children        MajorProject[] @relation("ProjectChildren")

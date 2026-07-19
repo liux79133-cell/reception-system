@@ -83,6 +83,7 @@ export async function PUT(request) {
         remark: fields.remark || null,
         payRecords: fields.payRecords != null ? JSON.stringify(fields.payRecords) : undefined,
         lifeCycle: fields.lifeCycle != null ? JSON.stringify(fields.lifeCycle) : undefined,
+        metrics: fields.metrics != null ? JSON.stringify(fields.metrics) : undefined,
       }
     })
     return Response.json({ project })
