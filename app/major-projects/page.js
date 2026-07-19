@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Table, Button, Input, Select, Space, Progress, Empty, Modal, Drawer, Divider, message, Tooltip, Collapse, Form, InputNumber, DatePicker, Switch } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, ImportOutlined, StarFilled, StarOutlined, AppstoreOutlined, BarChartOutlined, UnorderedListOutlined, DeleteOutlined, ExclamationCircleOutlined, CloseOutlined, EditOutlined, SaveOutlined, PlusCircleOutlined, BankOutlined, CalendarOutlined, FileTextOutlined, InfoCircleOutlined, CheckCircleFilled, ClockCircleOutlined } from '@ant-design/icons'
+import { Table, Button, Input, Select, Space, Progress, Empty, Modal, Drawer, Divider, message, Tooltip, Collapse, Form, InputNumber, DatePicker, Switch, DatePicker as AntDatePicker } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, ImportOutlined, StarFilled, StarOutlined, AppstoreOutlined, BarChartOutlined, UnorderedListOutlined, DeleteOutlined, ExclamationCircleOutlined, CloseOutlined, EditOutlined, SaveOutlined, PlusCircleOutlined, BankOutlined, CalendarOutlined, FileTextOutlined, InfoCircleOutlined, CheckCircleFilled, ClockCircleOutlined, RiseOutlined, DollarOutlined, TrophyOutlined, FireOutlined } from '@ant-design/icons'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, Legend, ResponsiveContainer } from 'recharts'
 import AppLayout from '@/components/AppLayout'
 import MajorProjectImport from '@/components/MajorProjectImport'
 import { api } from '@/lib/api'
@@ -734,6 +735,255 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
   )
 }
 
+// ── 数据大屏 ─────────────────────────────────────────────
+const PIE_COLORS = ['#6941c6','#175cd3','#0891b2','#067647','#b45309','#c01048','#667085','#0e7090']
+
+function StatCard({ icon, title, value, sub, color, bg }) {
+  return (
+    <div style={{ background: bg || '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color }}>
+          {icon}
+        </div>
+        <span style={{ fontSize: 13, color: '#667085', fontWeight: 500 }}>{title}</span>
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: color || '#101828', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: '#98a2b3', marginTop: 6 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function DonutChart({ data, title, subtitle, onClickFilter }) {
+  const total = data.reduce((s, d) => s + d.value, 0)
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)', height: '100%' }}>
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BarChartOutlined style={{ color: '#2563eb', fontSize: 14 }} />{title}
+        </div>
+        {subtitle && <div style={{ fontSize: 11, color: '#98a2b3', marginTop: 2 }}>{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
+        <PieChart width={130} height={130}>
+          <Pie data={data} cx={60} cy={60} innerRadius={38} outerRadius={60} paddingAngle={2} dataKey="value"
+            onClick={d => onClickFilter && onClickFilter(d.name)}>
+            {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} cursor={onClickFilter ? 'pointer' : 'default'} />)}
+          </Pie>
+        </PieChart>
+        <div style={{ flex: 1, overflowY: 'auto', maxHeight: 130 }}>
+          {data.map((d, i) => (
+            <div key={d.name} onClick={() => onClickFilter && onClickFilter(d.name)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', cursor: onClickFilter ? 'pointer' : 'default', borderBottom: '1px solid #f9fafb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: '#344054', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: PIE_COLORS[i % PIE_COLORS.length] }}>{d.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DashboardView({ projects, onFilter }) {
+  const [period, setPeriod] = useState('all')
+
+  // 展平所有项目（含子项目）
+  const all = projects.flatMap(p => [p, ...(p.children || [])])
+  const main = projects  // 只算顶层
+
+  // 资金统计
+  const totalAmt = Math.round(all.reduce((s, p) => s + (p.totalAmount || 0), 0) * 100) / 100
+  const receivedAmt = Math.round(all.reduce((s, p) => s + (p.receivedAmount || 0), 0) * 100) / 100
+  const pendingAmt = Math.round((totalAmt - receivedAmt) * 100) / 100
+  const finishRate = totalAmt ? Math.round((receivedAmt / totalAmt) * 100) : 0
+  const starCount = all.filter(p => p.star).length
+
+  // 分组统计
+  const byType = Object.entries(
+    all.reduce((acc, p) => { acc[p.type || '其他'] = (acc[p.type || '其他'] || 0) + 1; return acc }, {})
+  ).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
+
+  const byLevel = Object.entries(
+    all.reduce((acc, p) => { acc[p.level || '其他'] = (acc[p.level || '其他'] || 0) + 1; return acc }, {})
+  ).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
+
+  const byStatus = Object.entries(
+    all.reduce((acc, p) => { acc[p.status || '进行中'] = (acc[p.status || '进行中'] || 0) + 1; return acc }, {})
+  ).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
+
+  const byOwner = Object.entries(
+    all.reduce((acc, p) => {
+      const o = p.owner ? (p.owner.includes('公司') || p.owner === '公司' ? '公司' : p.owner.includes('个人') || p.owner === '个人' ? '个人' : p.owner) : '未指定'
+      acc[o] = (acc[o] || 0) + 1; return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name, value }))
+
+  const byCompany = Object.entries(
+    all.reduce((acc, p) => {
+      if (p.company) { const k = p.company.length > 12 ? p.company.slice(0, 12) + '…' : p.company; acc[k] = (acc[k] || 0) + 1 }
+      return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, value]) => ({ name, value }))
+
+  // 各级别金额
+  const amtByLevel = ['国家级','省级','市级','区级','板块','其他'].map(lv => ({
+    name: lv,
+    总金额: Math.round(all.filter(p => p.level === lv).reduce((s, p) => s + (p.totalAmount || 0), 0)),
+    已到账: Math.round(all.filter(p => p.level === lv).reduce((s, p) => s + (p.receivedAmount || 0), 0)),
+  })).filter(d => d.总金额 > 0)
+
+  const PERIOD_BTNS = [
+    { key: 'week', label: '本周' },
+    { key: 'month', label: '本月' },
+    { key: 'year', label: '本年' },
+    { key: 'all', label: '全部' },
+  ]
+
+  return (
+    <div style={{ background: '#f4f6f9', borderRadius: 12, padding: 20 }}>
+      {/* 时间筛选 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+        <span style={{ fontSize: 13, color: '#667085', fontWeight: 500 }}>资金到账时间筛选：</span>
+        {PERIOD_BTNS.map(b => (
+          <button key={b.key} onClick={() => setPeriod(b.key)}
+            style={{ padding: '5px 14px', borderRadius: 8, border: `1px solid ${period === b.key ? '#2563eb' : '#e4e7ec'}`, background: period === b.key ? '#2563eb' : '#fff', color: period === b.key ? '#fff' : '#344054', fontSize: 13, cursor: 'pointer', fontWeight: period === b.key ? 600 : 400 }}>
+            {b.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 顶部 KPI 卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1.2fr', gap: 14, marginBottom: 14 }}>
+        {/* 项目总数 */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eff8ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, color: '#2563eb' }}><RiseOutlined /></div>
+            <span style={{ fontSize: 13, color: '#667085', fontWeight: 500 }}>项目总数</span>
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: '#2563eb', lineHeight: 1 }}>{all.length} <span style={{ fontSize: 16, fontWeight: 500 }}>个</span></div>
+          <Progress percent={Math.round((main.length / all.length) * 100)} showInfo={false} strokeColor="#2563eb" size="small" style={{ marginTop: 10, marginBottom: 4 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#98a2b3' }}>
+            <span>主项目 {main.length} 个（{Math.round((main.length / all.length) * 100)}%）</span>
+            <span>子项目 {all.length - main.length} 个</span>
+          </div>
+          {starCount > 0 && <div style={{ marginTop: 8, fontSize: 12, color: '#b45309', background: '#fffbeb', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}><StarFilled style={{ fontSize: 11, color: '#f59e0b' }} />周重点 {starCount} 个</div>}
+        </div>
+
+        {/* 资金概览 */}
+        <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)', borderRadius: 14, padding: '18px 20px', border: '1px solid #bbf7d0', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, color: '#16a34a' }}><DollarOutlined /></div>
+            <span style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>项目总预期金额</span>
+            <span style={{ fontSize: 11, color: '#98a2b3', marginLeft: 16 }}>历史累计已到账</span>
+          </div>
+          <div style={{ display: 'flex', gap: 32, alignItems: 'flex-end', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: '#16a34a', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{totalAmt.toLocaleString()}<span style={{ fontSize: 16, fontWeight: 500 }}> 万</span></div>
+            </div>
+            <div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: '#0891b2', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{receivedAmt.toLocaleString()}<span style={{ fontSize: 16, fontWeight: 500 }}> 万</span></div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Progress percent={finishRate} strokeColor={{ '0%': '#16a34a', '100%': '#0891b2' }} showInfo={false} style={{ flex: 1, marginBottom: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#15803d', flexShrink: 0 }}>{finishRate}%</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#15803d', marginTop: 4 }}>整体资金完成率 {finishRate}%</div>
+        </div>
+
+        {/* 全部期间到账 */}
+        <div style={{ background: 'linear-gradient(135deg,#fff7ed,#fffbeb)', borderRadius: 14, padding: '18px 20px', border: '1px solid #fed7aa', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, color: '#ea580c' }}><TrophyOutlined /></div>
+            <span style={{ fontSize: 13, color: '#9a3412', fontWeight: 600 }}>全部期间到账</span>
+          </div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: '#ea580c', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{receivedAmt.toLocaleString()}<span style={{ fontSize: 16, fontWeight: 500 }}> 万</span></div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#c2410c' }}>占总目标 {finishRate}%</div>
+          <div style={{ marginTop: 6, height: 3, background: '#fed7aa', borderRadius: 3 }}>
+            <div style={{ height: 3, background: '#ea580c', borderRadius: 3, width: `${finishRate}%`, transition: 'width 0.5s' }} />
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#98a2b3' }}>待到账 <span style={{ fontWeight: 600, color: '#b45309' }}>{pendingAmt.toLocaleString()} 万</span></div>
+        </div>
+      </div>
+
+      {/* 中间 4 个环形图 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <DonutChart data={byType} title="项目类别分布" subtitle="点击图例可跳转至表格筛选" onClickFilter={v => onFilter('type', v)} />
+        <DonutChart data={byCompany} title="收款公司主体分布" subtitle="点击图块→跳转表格筛选" onClickFilter={v => {}} />
+        <DonutChart data={byLevel} title="项目级别分布" subtitle="点击可跳转至表格筛选" onClickFilter={v => onFilter('level', v)} />
+        <DonutChart data={byOwner} title="归属分布" subtitle="公司 vs 个人" onClickFilter={v => {}} />
+      </div>
+
+      {/* 底部柱状图 */}
+      <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)', marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <DollarOutlined style={{ color: '#f59e0b' }} />各级别金额统计（万元）
+        </div>
+        <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 14 }}>总金额 vs 已到账</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={amtByLevel} barGap={4} barCategoryGap="35%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f2f4f7" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#667085' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#98a2b3' }} axisLine={false} tickLine={false} width={50} />
+            <RTooltip contentStyle={{ borderRadius: 8, border: '1px solid #f2f4f7', fontSize: 12 }} formatter={(v, n) => [`${v} 万`, n]} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="总金额" fill="#93c5fd" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="已到账" fill="#2563eb" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 状态分布 + 周重点列表 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <BarChartOutlined style={{ color: '#6941c6' }} />项目进度状态分布
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={byStatus} layout="vertical" barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f2f4f7" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: '#98a2b3' }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#344054' }} axisLine={false} tickLine={false} width={60} />
+              <RTooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} formatter={v => [`${v} 个`]} />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                {byStatus.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #f2f4f7', boxShadow: '0 1px 4px rgba(16,24,40,0.06)' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#101828', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FireOutlined style={{ color: '#f59e0b' }} />周重点项目
+            <span style={{ fontSize: 12, color: '#98a2b3', fontWeight: 400 }}>（{starCount} 个）</span>
+          </div>
+          {starCount === 0
+            ? <div style={{ textAlign: 'center', color: '#d0d5dd', fontSize: 13, padding: '40px 0' }}>暂无周重点项目</div>
+            : <div style={{ overflowY: 'auto', maxHeight: 200 }}>
+                {all.filter(p => p.star).map((p, i) => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f9fafb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 11, color: '#98a2b3', width: 16, flexShrink: 0 }}>{i + 1}</span>
+                      <StarFilled style={{ color: '#f59e0b', fontSize: 11, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: '#101828', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <StatusDot v={p.status} small />
+                      {p.totalAmount && <span style={{ fontSize: 11, color: '#667085' }}>{p.totalAmount}万</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 主页面 ───────────────────────────────────────────────
 export default function MajorProjectsPage() {
   const [viewMode, setViewMode] = useState('table')
@@ -979,13 +1229,13 @@ export default function MajorProjectsPage() {
             </div>
       )}
 
-      {/* ── 数据大屏占位 ── */}
+      {/* ── 数据大屏 ── */}
       {viewMode === 'screen' && (
-        <div style={{ background: '#fff', borderRadius: 12, padding: '80px 0', textAlign: 'center', boxShadow: '0 1px 3px rgba(16,24,40,0.06)' }}>
-          <BarChartOutlined style={{ fontSize: 48, color: '#d0d5dd', marginBottom: 16 }} />
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#667085', marginBottom: 8 }}>数据大屏</div>
-          <div style={{ fontSize: 13, color: '#98a2b3' }}>可视化看板即将上线</div>
-        </div>
+        <DashboardView projects={projects} onFilter={(field, value) => {
+          if (field === 'type') setTypeFilter(value)
+          if (field === 'level') setLevelFilter(value)
+          setViewMode('table')
+        }} />
       )}
 
       <MajorProjectImport open={importOpen} onClose={() => setImportOpen(false)} onSuccess={() => { fetchProjects(); setImportOpen(false) }} />
