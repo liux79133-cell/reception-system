@@ -175,18 +175,46 @@ const LC_STATUS_CFG = {
 
 function LifeCyclePanel({ data = {}, onUpdate, readOnly }) {
   const stages = [
-    { key: 'apply', label: '项目申报', icon: <FileTextOutlined /> },
-    { key: 'start', label: '开始/立项', icon: <CheckCircleFilled /> },
-    { key: 'mid', label: '中期验收', icon: <CalendarOutlined /> },
-    { key: 'end', label: '结项时间', icon: <ClockCircleOutlined /> },
+    { key: 'apply', label: '项目申报', icon: <FileTextOutlined />, color: '#6941c6' },
+    { key: 'start', label: '开始/立项', icon: <CheckCircleFilled />, color: '#1677ff' },
+    { key: 'mid',   label: '中期验收',  icon: <CalendarOutlined />, color: '#f59e0b' },
+    { key: 'end',   label: '结项时间',  icon: <ClockCircleOutlined />, color: '#17b26a' },
   ]
   const statusOptions = ['待推进', '进行中', '已完成', '已延期']
 
-  // 只读：时间轴 + 行列详情
+  const updateStage = (key, field, val) => {
+    const d = data[key] || {}
+    onUpdate({ ...data, [key]: { ...d, [field]: val } })
+  }
+  const updateMetric = (key, metricId, field, val) => {
+    const d = data[key] || {}
+    const metrics = (d.metrics || []).map(m => m.id === metricId ? { ...m, [field]: val } : m)
+    onUpdate({ ...data, [key]: { ...d, metrics } })
+  }
+  const addMetric = (key) => {
+    const d = data[key] || {}
+    const metrics = [...(d.metrics || []), { id: Date.now(), name: '', value: '' }]
+    onUpdate({ ...data, [key]: { ...d, metrics } })
+  }
+  const removeMetric = (key, metricId) => {
+    const d = data[key] || {}
+    const metrics = (d.metrics || []).filter(m => m.id !== metricId)
+    onUpdate({ ...data, [key]: { ...d, metrics } })
+  }
+  const applyTemplate = (key) => {
+    const d = data[key] || {}
+    const existing = new Set((d.metrics || []).map(m => m.name))
+    const TEMPLATES = ['项目投入指标（万元）','项目新增收入指标（万元）','IP 考核指标','技术考核指标','其他指标']
+    const toAdd = TEMPLATES.filter(t => !existing.has(t)).map(t => ({ id: Date.now() + Math.random(), name: t, value: '' }))
+    if (!toAdd.length) { message.info('模板已全部添加'); return }
+    onUpdate({ ...data, [key]: { ...d, metrics: [...(d.metrics || []), ...toAdd] } })
+  }
+
+  // READ-ONLY
   if (readOnly) {
     return (
       <div>
-        {/* 时间轴 */}
+        {/* Timeline overview */}
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 20, paddingTop: 4 }}>
           {stages.map((s, i) => {
             const d = data[s.key] || {}
@@ -205,35 +233,61 @@ function LifeCyclePanel({ data = {}, onUpdate, readOnly }) {
             )
           })}
         </div>
-        {/* 有内容的阶段详情 */}
-        {stages.filter(s => data[s.key]?.date || data[s.key]?.note || (data[s.key]?.status && data[s.key]?.status !== '待推进')).map(s => {
+        {/* Stage details — only show stages with content */}
+        {stages.filter(s => {
+          const d = data[s.key] || {}
+          return d.date || d.note || d.debate || (d.metrics && d.metrics.length > 0) || (d.status && d.status !== '待推进')
+        }).map(s => {
           const d = data[s.key] || {}
           const st = d.status || '待推进'
           const cfg = LC_STATUS_CFG[st] || LC_STATUS_CFG['待推进']
           return (
-            <div key={s.key} style={{ marginBottom: 8, padding: '12px 14px', background: '#fff', borderRadius: 10, border: '1px solid #f2f4f7' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#101828' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+            <div key={s.key} style={{ marginBottom: 10, borderRadius: 10, border: '1px solid #f2f4f7', overflow: 'hidden' }}>
+              {/* Stage header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: `${s.color}08`, borderBottom: d.date || d.note || d.debate || (d.metrics && d.metrics.length > 0) ? '1px solid #f2f4f7' : 'none' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#101828' }}>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.ring}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: cfg.color }}>{s.icon}</span>
                   {s.label}
+                  {d.debate && <span style={{ fontSize: 10, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>含答辩</span>}
                 </span>
                 <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.ring}30`, padding: '2px 8px', borderRadius: 5 }}>{st}</span>
               </div>
-              <InfoRow label="日期" value={d.date || '—'} />
-              {d.note && <InfoRow label="备注" value={d.note} />}
+              {/* Stage body */}
+              <div style={{ padding: '10px 14px', background: '#fff' }}>
+                {d.date && <InfoRow label="时间" value={d.date} />}
+                {d.note && <InfoRow label="备注" value={d.note} />}
+                {/* Metrics */}
+                {d.metrics && d.metrics.length > 0 && (
+                  <div style={{ marginTop: d.date || d.note ? 10 : 0 }}>
+                    <div style={{ fontSize: 11, color: '#98a2b3', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#17b26a' }} />考核指标
+                    </div>
+                    {d.metrics.map((m, i) => (
+                      <div key={m.id || i} style={{ display: 'flex', gap: 10, padding: '6px 0', borderBottom: '1px solid #f5f6f8' }}>
+                        <div style={{ width: 100, flexShrink: 0, fontSize: 12, color: '#344054', fontWeight: 500 }}>{m.name || '—'}</div>
+                        <div style={{ flex: 1, fontSize: 12, color: m.value ? '#101828' : '#d0d5dd' }}>{m.value || '—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
-        {stages.every(s => !data[s.key]?.date && !data[s.key]?.note && (!data[s.key]?.status || data[s.key]?.status === '待推进')) && (
+        {stages.every(s => {
+          const d = data[s.key] || {}
+          return !d.date && !d.note && !d.debate && (!d.metrics || !d.metrics.length) && (!d.status || d.status === '待推进')
+        }) && (
           <div style={{ textAlign: 'center', color: '#d0d5dd', fontSize: 12, padding: '8px 0' }}>暂无时间节点信息</div>
         )}
       </div>
     )
   }
 
-  // 编辑态
+  // EDIT MODE
   return (
     <div>
+      {/* Timeline overview */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         {stages.map((s, i) => {
           const d = data[s.key] || {}
@@ -241,34 +295,72 @@ function LifeCyclePanel({ data = {}, onUpdate, readOnly }) {
           return (
             <div key={s.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
               {i > 0 && <div style={{ position: 'absolute', left: '-50%', top: 16, width: '100%', height: 2, background: d.status === '已完成' ? '#10b981' : '#e4e7ec', zIndex: 0 }} />}
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.ring}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, fontSize: 13, color: cfg.color }}>
-                {s.icon}
-              </div>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.ring}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, fontSize: 13, color: cfg.color }}>{s.icon}</div>
               <div style={{ fontSize: 10, color: '#667085', marginTop: 5, textAlign: 'center', fontWeight: 500 }}>{s.label}</div>
               <div style={{ fontSize: 10, color: cfg.color }}>{d.status || '待推进'}</div>
             </div>
           )
         })}
       </div>
+      {/* Per-stage edit blocks */}
       {stages.map(s => {
         const d = data[s.key] || {}
-        const update = (field, val) => onUpdate({ ...data, [s.key]: { ...d, [field]: val } })
+        const metrics = d.metrics || []
         return (
-          <div key={s.key} style={{ marginBottom: 10, padding: '10px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#344054' }}>{s.label}</span>
-              <Select value={d.status || '待推进'} size="small" style={{ width: 90 }} onChange={v => update('status', v)}>
+          <div key={s.key} style={{ marginBottom: 12, borderRadius: 10, border: '1px solid #f2f4f7', overflow: 'hidden' }}>
+            {/* Stage header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: `${s.color}08`, borderBottom: '1px solid #f2f4f7' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14, color: s.color }}>{s.icon}</span>{s.label}
+              </span>
+              <Select value={d.status || '待推进'} size="small" style={{ width: 90 }} onChange={v => updateStage(s.key, 'status', v)}>
                 {statusOptions.map(o => <Option key={o}>{o}</Option>)}
               </Select>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 3 }}>时间</div>
-                <Input size="small" value={d.date || ''} placeholder="时间未定" onChange={e => update('date', e.target.value)} style={{ borderRadius: 6 }} />
+            {/* Stage body */}
+            <div style={{ padding: '12px 14px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Date + Note */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 4 }}>时间</div>
+                  <Input size="small" value={d.date || ''} placeholder="时间未定" onChange={e => updateStage(s.key, 'date', e.target.value)} style={{ borderRadius: 6 }} />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 4 }}>备注</div>
+                  <Input size="small" value={d.note || ''} placeholder="—" onChange={e => updateStage(s.key, 'note', e.target.value)} style={{ borderRadius: 6 }} />
+                </div>
               </div>
-              <div style={{ flex: 2 }}>
-                <div style={{ fontSize: 10, color: '#98a2b3', marginBottom: 3 }}>备注</div>
-                <Input size="small" value={d.note || ''} placeholder="—" onChange={e => update('note', e.target.value)} style={{ borderRadius: 6 }} />
+              {/* Debate checkbox */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" id={`debate-${s.key}`} checked={!!d.debate} onChange={e => updateStage(s.key, 'debate', e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#f59e0b' }} />
+                <label htmlFor={`debate-${s.key}`} style={{ fontSize: 12, color: '#344054', cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>🔔</span> 本环节包含答辩
+                </label>
+              </div>
+              {/* Metrics */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: '#98a2b3', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#17b26a' }} />考核指标
+                  </div>
+                  <Button type="link" size="small" style={{ fontSize: 11, padding: 0, color: '#1677ff' }} onClick={() => applyTemplate(s.key)}>
+                    + 生成默认模板
+                  </Button>
+                </div>
+                {metrics.length === 0 && (
+                  <div style={{ fontSize: 11, color: '#d0d5dd', textAlign: 'center', padding: '4px 0 8px' }}>暂无指标</div>
+                )}
+                {metrics.map((m, i) => (
+                  <div key={m.id || i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+                    <Input value={m.name} placeholder="指标名称" size="small" onChange={e => updateMetric(s.key, m.id, 'name', e.target.value)} style={{ flex: 1, borderRadius: 6 }} />
+                    <Input.TextArea value={m.value} placeholder="指标值/描述" autoSize={{ minRows: 1, maxRows: 3 }} size="small" onChange={e => updateMetric(s.key, m.id, 'value', e.target.value)} style={{ flex: 1.5, borderRadius: 6 }} />
+                    <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeMetric(s.key, m.id)} style={{ flexShrink: 0, marginTop: 1 }} />
+                  </div>
+                ))}
+                <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => addMetric(s.key)} style={{ width: '100%', borderRadius: 6, color: '#667085', fontSize: 11 }}>
+                  添加自定义指标
+                </Button>
               </div>
             </div>
           </div>
@@ -422,7 +514,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
       styles={{ body: { padding: 0, background: '#f4f6f9' }, header: { display: 'none' } }}>
 
       {/* ── 头部 ── */}
-      <div style={{ background: 'linear-gradient(135deg,#1d2b6b 0%,#2e3fa0 60%,#1e6fbf 100%)', padding: '20px 24px 18px' }}>
+      <div style={{ background: 'linear-gradient(135deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%)', padding: '20px 24px 18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1, marginRight: 8 }}>
             <LevelChip v={record.level} />
@@ -481,7 +573,7 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
       {/* ── 折叠板块 ── */}
       <div style={{ overflowY: 'auto', height: 'calc(100vh - 260px)', padding: '10px 12px' }}>
         <Collapse
-          defaultActiveKey={['basic', 'finance', 'lifecycle', 'metrics']}
+          defaultActiveKey={['basic', 'finance', 'lifecycle']}
           ghost
           expandIconPosition="end"
           style={{ background: 'transparent' }}
@@ -567,24 +659,6 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
               children: (
                 <div style={{ padding: '0 4px 8px' }}>
                   <LifeCyclePanel data={lifeCycle} onUpdate={saveLifeCycle} readOnly={!editing} />
-                </div>
-              )
-            },
-            {
-              key: 'metrics',
-              label: (
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#344054', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#ecfdf3', border: '2px solid #17b26a', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#17b26a' }} />
-                  </span>
-                  考核指标
-                  {metrics.length > 0 && <span style={{ fontSize: 11, color: '#98a2b3', fontWeight: 400 }}>（{metrics.length} 项）</span>}
-                </span>
-              ),
-              style: panelStyle,
-              children: (
-                <div style={{ padding: '0 4px 8px' }}>
-                  <MetricsPanel metrics={metrics} onUpdate={saveMetrics} readOnly={!editing} />
                 </div>
               )
             },
@@ -783,14 +857,14 @@ export default function MajorProjectsPage() {
   return (
     <AppLayout>
       {/* ── Banner ── */}
-      <div style={{ background: 'linear-gradient(135deg,#1d2b6b 0%,#2e3fa0 50%,#1e6fbf 100%)', borderRadius: 16, padding: '18px 24px 16px', marginBottom: 12, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -60, right: -20, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+      <div style={{ background: 'linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%)', borderRadius: 16, padding: '18px 24px 16px', marginBottom: 12, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -60, right: -20, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
           <div>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 2.5, fontWeight: 600, marginBottom: 5, textTransform: 'uppercase' }}>LPA Platform · Projects</div>
             <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginBottom: 3, letterSpacing: -0.3 }}>重大项目管理</div>
             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 16 }}>项目全生命周期跟踪与资金管理</div>
-            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, width: 'fit-content' }}>
+            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: 3, width: 'fit-content' }}>
               {VIEWS.map(v => (
                 <button key={v.key} onClick={() => setViewMode(v.key)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, transition: 'all 0.15s', background: viewMode === v.key ? '#fff' : 'transparent', color: viewMode === v.key ? '#1d2b6b' : 'rgba(255,255,255,0.65)' }}>
@@ -805,7 +879,7 @@ export default function MajorProjectsPage() {
               { label: '总金额(万)', val: totalAmt || '—', color: '#93c5fd' },
               { label: '已到账(万)', val: receivedAmt || '—', color: '#6ee7b7' },
             ].map(({ label, val, color }) => (
-              <div key={label} style={{ textAlign: 'center', padding: '10px 16px', background: 'rgba(255,255,255,0.08)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', minWidth: 80 }}>
+              <div key={label} style={{ textAlign: 'center', padding: '10px 16px', background: 'rgba(255,255,255,0.12)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', minWidth: 80 }}>
                 <div style={{ color, fontSize: 24, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{val}</div>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 5 }}>{label}</div>
               </div>
