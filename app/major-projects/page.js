@@ -859,12 +859,9 @@ export default function MajorProjectsPage() {
       {/* ── Banner ── */}
       <div style={{ background: 'linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%)', borderRadius: 16, padding: '18px 24px 16px', marginBottom: 12, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -60, right: -20, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
-        {/* Momenta logo 水印 */}
-        <div style={{ position: 'absolute', bottom: 14, right: 20, opacity: 0.2, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
-          <svg width="26" height="20" viewBox="0 0 56 44" fill="white">
-            <path d="M 0 44 L 0 0 L 14 22 L 28 0 L 42 22 L 56 0 L 56 44 L 46 28 L 28 44 L 10 28 Z" />
-          </svg>
-          <span style={{ color: '#fff', fontSize: 17, fontWeight: 700, letterSpacing: 0.5, fontFamily: 'system-ui, sans-serif' }}>momenta</span>
+        {/* Momenta 水印 */}
+        <div style={{ position: 'absolute', bottom: 14, right: 22, opacity: 0.22, pointerEvents: 'none' }}>
+          <span style={{ color: '#fff', fontSize: 17, fontWeight: 700, letterSpacing: 1, fontFamily: 'system-ui, sans-serif' }}>momenta</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
           <div>
