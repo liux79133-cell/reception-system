@@ -670,22 +670,28 @@ function ProjectDrawer({ record, onClose, onUpdate }) {
               children: (
                 <div style={{ padding: '4px 8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {attachments.map(([k, v]) => {
-                    const urls = String(v).split(/[,，\s]+/).filter(Boolean)
+                    // 飞书附件可能是逗号/换行分隔的多个文件名或URL
+                    const items = String(v).split(/[,，\n]+/).map(s => s.trim()).filter(Boolean)
                     return (
                       <div key={k}>
                         <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 6, fontWeight: 500 }}>{k}</div>
-                        {urls.map((url, i) => {
-                          const isUrl = url.startsWith('http')
+                        {items.map((item, i) => {
+                          const isUrl = /^https?:\/\//.test(item)
+                          const isFeishuUrl = item.includes('feishu') || item.includes('larksuite')
+                          // 文件名（不是URL）：尝试搜索飞书文档
+                          const fileName = item.split('/').pop().replace(/\?.*$/, '') || item
                           return isUrl ? (
-                            <a key={i} href={url} target="_blank" rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae0ff', marginBottom: 5, color: '#0284c7', fontSize: 13, textDecoration: 'none' }}>
-                              <FileTextOutlined style={{ fontSize: 16, color: '#0284c7' }} />
-                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url.split('/').pop() || '附件'}</span>
+                            <a key={i} href={item} target="_blank" rel="noreferrer"
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae0ff', marginBottom: 6, color: '#0284c7', fontSize: 13, textDecoration: 'none' }}>
+                              <FileTextOutlined style={{ fontSize: 15, color: '#0284c7', flexShrink: 0 }} />
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
                               <span style={{ fontSize: 11, color: '#7dd3fc', flexShrink: 0 }}>点击打开 →</span>
                             </a>
                           ) : (
-                            <div key={i} style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7', marginBottom: 5, fontSize: 13, color: '#344054', wordBreak: 'break-all' }}>
-                              {url}
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f2f4f7', marginBottom: 6 }}>
+                              <FileTextOutlined style={{ fontSize: 15, color: '#98a2b3', flexShrink: 0 }} />
+                              <span style={{ flex: 1, fontSize: 13, color: '#344054', wordBreak: 'break-all' }}>{item}</span>
+                              <span style={{ fontSize: 11, color: '#98a2b3', flexShrink: 0 }}>飞书附件</span>
                             </div>
                           )
                         })}
