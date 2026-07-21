@@ -8,14 +8,13 @@ datasource db {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  username      String         @unique
-  password      String
-  name          String
-  role          String         @default("viewer")
-  createdAt     DateTime       @default(now())
-  receptions    Reception[]
-  majorProjects MajorProject[]
+  id         Int         @id @default(autoincrement())
+  username   String      @unique
+  password   String
+  name       String
+  role       String      @default("viewer")
+  createdAt  DateTime    @default(now())
+  receptions Reception[]
 }
 
 model Reception {
@@ -114,29 +113,47 @@ model AppConfig {
   updatedAt DateTime @updatedAt
 }
 
-model MajorProject {
-  id              Int            @id @default(autoincrement())
-  name            String
-  type            String         @default("其他")
-  company         String?
-  level           String         @default("其他")
-  status          String         @default("进行中")
-  totalAmount     Float?
-  receivedAmount  Float          @default(0)
-  owner           String?
-  responsible     String?
-  applyCode       String?
-  star            Boolean        @default(false)
-  remark          String?
-  customFields    String?
-  payRecords      String?
-  lifeCycle       String?
-  metrics         String?
-  parentId        Int?
-  parent          MajorProject?  @relation("ProjectChildren", fields: [parentId], references: [id])
-  children        MajorProject[] @relation("ProjectChildren")
-  createdById     Int
-  createdBy       User           @relation(fields: [createdById], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+// 落地协议模块
+
+model AgreementData {
+  id          Int      @id @default(autoincrement())
+  period      String
+  category    String
+  payload     String
+  submittedBy Int?
+  lockedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([period, category])
+}
+
+model QualitativeObligation {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  articleRef   String
+  requirement  String
+  status       String   @default("pending")
+  description  String?
+  evidenceUrls String?
+  updatedById  Int?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
+model SubsidyApplication {
+  id            Int      @id @default(autoincrement())
+  code          String
+  policyItem    String
+  year          Int
+  appliedAmount Float?
+  submittedAt   DateTime?
+  status        String   @default("draft")
+  paidAmount    Float?
+  paidAt        DateTime?
+  remark        String?
+  createdById   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

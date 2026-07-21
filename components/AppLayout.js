@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Layout, Typography, Dropdown, Space, Avatar, Tooltip } from 'antd'
-import { LogoutOutlined, UserOutlined } from '@ant-design/icons'
+import { Layout, Typography, Dropdown, Space, Avatar, Tooltip, Button } from 'antd'
+import { LogoutOutlined, FileProtectOutlined } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -16,11 +16,11 @@ const NAV_ITEMS = [
   { key: '/talent-apply', label: '人才申报', icon: '🎓', active: false },
   { key: '/odc', label: 'ODC', icon: '🏢', active: false },
   { key: '/external-report', label: '对外填报', icon: '📋', active: false },
-  { key: '/landing', label: '落地协议', icon: '📄', active: false },
+  { key: '/landing', label: '落地协议', icon: '📄', active: true },
   { key: '/party', label: '党员关系', icon: '⭐', active: true },
   { key: '/official', label: '公文生成', icon: '📝', active: false },
   { key: '/ai-chat', label: '智库chat', icon: '🤖', active: false },
-  { key: '/data-center', label: '数据中台', icon: '📊', active: false },
+  { key: '/data-center', label: '数据中台', icon: '📊', active: true },
 ]
 
 const ADMIN_ITEMS = [
@@ -129,17 +129,42 @@ export default function AppLayout({ children }) {
               <span style={{ margin: '0 6px', color: '#d0d5dd' }}>/</span>
               <span style={{ color: '#1a2d5a', fontWeight: 600 }}>{activeNav.label}</span>
             </div>
-            {user && (
-              <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: logout }] }}>
-                <Space style={{ cursor: 'pointer' }}>
-                  <Avatar size={28} style={{ background: 'linear-gradient(135deg,#1677ff,#4096ff)', fontSize: 12 }}>{user.name?.[0]}</Avatar>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1a2d5a' }}>{user.name}</span>
-                  <span style={{ fontSize: 11, color: '#1677ff', background: '#d6e8ff', padding: '1px 8px', borderRadius: 20 }}>
-                    {user.role === 'admin' ? '管理员' : user.role === 'editor' ? '编辑员' : '查看者'}
-                  </span>
-                </Space>
-              </Dropdown>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* 落地协议快捷入口 */}
+              {pathname !== '/landing' && (
+                <Tooltip title="跳转到落地协议履约追踪">
+                  <Button
+                    size="small"
+                    icon={<FileProtectOutlined />}
+                    onClick={() => router.push('/landing')}
+                    style={{
+                      background: 'linear-gradient(135deg, #0f172a, #1e3a5f)',
+                      borderColor: 'transparent',
+                      color: '#fff',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      height: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    落地协议
+                  </Button>
+                </Tooltip>
+              )}
+              {user && (
+                <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: logout }] }}>
+                  <Space style={{ cursor: 'pointer' }}>
+                    <Avatar size={28} style={{ background: 'linear-gradient(135deg,#1677ff,#4096ff)', fontSize: 12 }}>{user.name?.[0]}</Avatar>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#1a2d5a' }}>{user.name}</span>
+                    <span style={{ fontSize: 11, color: '#1677ff', background: '#d6e8ff', padding: '1px 8px', borderRadius: 20 }}>
+                      {user.role === 'admin' ? '管理员' : user.role === 'editor' ? '编辑员' : '查看者'}
+                    </span>
+                  </Space>
+                </Dropdown>
+              )}
+            </div>
           </Header>
           <Content style={{ margin: '16px 20px 20px' }}>{children}</Content>
         </Layout>
