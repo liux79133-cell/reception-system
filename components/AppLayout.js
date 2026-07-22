@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { key: '/major-projects', label: '重大项目', icon: '📌', active: true },
   { key: '/honors', label: '荣誉资质', icon: '🏆', active: false },
   { key: '/talent-welfare', label: '人才福利', icon: '🎁', active: false },
-  { key: '/talent-apply', label: '人才申报', icon: '🎓', active: false },
+
   { key: '/odc', label: 'ODC', icon: '🏢', active: false },
   { key: '/external-report', label: '对外填报', icon: '📋', active: false },
   { key: '/landing', label: '落地协议', icon: '📄', active: true },
