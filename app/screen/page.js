@@ -409,7 +409,7 @@ export default function ScreenPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
               {[
                 { color: C.blue,  label: '月度收入（亿元）' },
-                { color: C.indigo, label: 'YTD 累计（亿元）' },
+                { color: C.indigo, label: '年度累计（亿元）' },
               ].map(s => (
                 <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <div style={{ width: 16, height: 2.5, background: s.color, borderRadius: 2 }} />
@@ -424,7 +424,7 @@ export default function ScreenPage() {
               width={560} height={110}
               series={[
                 { data: monthly.revenue    || [], color: C.blue,   label: '月度' },
-                { data: monthly.revenueYTD || [], color: C.indigo,  label: 'YTD' },
+                { data: monthly.revenueYTD || [], color: C.indigo,  label: '年度累计' },
               ]}
               yMax={data.kpis.find(k => k.key === 'REVENUE')?.target || undefined}
             />

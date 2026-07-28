@@ -13,7 +13,13 @@ export async function GET(request) {
     }
 
     const rows = await prisma.agreementData.findMany({
-      where: { period: { startsWith: `${year}-` }, category },
+      where: {
+        category,
+        OR: [
+          { period: { startsWith: `${year}-` } },
+          { period: String(year) },
+        ],
+      },
       orderBy: { period: 'asc' },
     })
 

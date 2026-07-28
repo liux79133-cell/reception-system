@@ -11,47 +11,70 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const year = Number(searchParams.get('year') || new Date().getFullYear())
 
-    // 查询该年所有月度数据
+    // 查询该年所有数据（月度 YYYY-MM、年度 YYYY、累计月度）
     const allData = await prisma.agreementData.findMany({
-      where: { period: { startsWith: `${year}-` } },
+      where: {
+        OR: [
+          { period: { startsWith: `${year}-` } }, // 月度：YYYY-MM
+          { period: String(year) },                // 年度：YYYY
+        ]
+      },
       orderBy: { period: 'asc' },
     })
 
-    const financeRows = allData.filter(d => d.category === 'finance').map(d => ({ period: d.period, ...JSON.parse(d.payload) }))
-    const hrRows = allData.filter(d => d.category === 'hr').map(d => ({ period: d.period, ...JSON.parse(d.payload) }))
-    const ipRows = allData.filter(d => d.category === 'ip').map(d => ({ period: d.period, ...JSON.parse(d.payload) }))
+    const parseRow = (r) => ({ period: r.period, ...JSON.parse(r.payload) })
+    const financeRows = allData.filter(d => d.category === 'finance').map(parseRow)
+    const hrRows      = allData.filter(d => d.category === 'hr').map(parseRow)
+    const ipRows      = allData.filter(d => d.category === 'ip').map(parseRow)
 
-    // YTD 累计值
-    const sumFinance = (field) => financeRows.reduce((s, r) => s + (Number(r[field]) || 0), 0)
-    const latestHr = hrRows.length ? hrRows[hrRows.length - 1] : {}
-    const latestIp = ipRows.length ? ipRows[ipRows.length - 1] : {}
+    // 计算 YTD 实绩：
+    // 规则1：若存在年度记录（period="YYYY"），直接用年度值（优先）
+    // 规则2：若存在累计标记（inputMode="cumulative"），取最后一条的累计值
+    // 规则3：否则累加所有月度值
+    const calcFinanceField = (rows, field) => {
+      const yearRow = rows.find(r => r.period === String(year))
+      if (yearRow && yearRow[field] != null) return Number(yearRow[field]) || 0
+      const cumRows = rows.filter(r => r.inputMode === 'cumulative' && r.period !== String(year))
+      if (cumRows.length > 0) {
+        const last = cumRows[cumRows.length - 1]
+        return Number(last[field]) || 0
+      }
+      return rows.filter(r => r.period !== String(year)).reduce((s, r) => s + (Number(r[field]) || 0), 0)
+    }
+    const latestSnapshot = (rows, field) => {
+      const yearRow = rows.find(r => r.period === String(year))
+      if (yearRow && yearRow[field] != null) return Number(yearRow[field]) || 0
+      const all = rows.filter(r => r[field] != null)
+      return all.length ? Number(all[all.length - 1][field]) || 0 : 0
+    }
 
-    // 个税：财务录入单位为万元，协议目标单位为亿元，需转换
-    const pitSuzhouWan = sumFinance('pitSuzhou')
-    const pitSuzhouYi = pitSuzhouWan / 10000
+    const hasAny = (rows) => rows.length > 0
 
-    // 综合税收 = 增值税实缴苏州 + 企业所得税实缴苏州（万元 → 亿元）
-    const taxTotalWan = sumFinance('vatPaidSuzhou') + sumFinance('citPaidSuzhou')
-    const taxTotalYi = taxTotalWan / 10000
+    const revenueYi    = calcFinanceField(financeRows, 'revenue')
+    const vatPaidWan   = calcFinanceField(financeRows, 'vatPaidSuzhou')
+    const citPaidWan   = calcFinanceField(financeRows, 'citPaidSuzhou')
+    const pitWan       = calcFinanceField(financeRows, 'pitSuzhou')
+    const taxTotalYi   = (vatPaidWan + citPaidWan) / 10000
+    const pitSuzhouYi  = pitWan / 10000
 
     const actuals = {
-      REVENUE:          sumFinance('revenue'),
+      REVENUE:          revenueYi,
       TAX_TOTAL:        taxTotalYi,
       PERSONAL_TAX:     pitSuzhouYi,
-      SOCIAL_INSURANCE: Number(latestHr.socialInsuranceCount) || 0,
-      NATIONAL_TALENT:  Number(latestHr.nationalTalentCount) || 0,
-      INVENTION_PATENT: Number(latestIp.inventionPatentApplied) || 0,
-      INDUSTRY_CHAIN:   Number(latestHr.industryChainCount) || 0,
+      SOCIAL_INSURANCE: latestSnapshot(hrRows, 'socialInsuranceCount'),
+      NATIONAL_TALENT:  latestSnapshot(hrRows, 'nationalTalentCount'),
+      INVENTION_PATENT: latestSnapshot(ipRows, 'inventionPatentApplied'),
+      INDUSTRY_CHAIN:   latestSnapshot(hrRows, 'industryChainCount'),
     }
 
     const hasData = {
-      REVENUE:          financeRows.length > 0,
-      TAX_TOTAL:        financeRows.length > 0,
-      PERSONAL_TAX:     financeRows.length > 0,
-      SOCIAL_INSURANCE: hrRows.length > 0,
-      NATIONAL_TALENT:  hrRows.length > 0,
-      INVENTION_PATENT: ipRows.length > 0,
-      INDUSTRY_CHAIN:   hrRows.length > 0,
+      REVENUE:          hasAny(financeRows),
+      TAX_TOTAL:        hasAny(financeRows),
+      PERSONAL_TAX:     hasAny(financeRows),
+      SOCIAL_INSURANCE: hasAny(hrRows),
+      NATIONAL_TALENT:  hasAny(hrRows),
+      INVENTION_PATENT: hasAny(ipRows),
+      INDUSTRY_CHAIN:   hasAny(hrRows),
     }
 
     const targets = KPI_TARGETS
@@ -111,29 +134,39 @@ export async function GET(request) {
       }))
     })
 
-    // 月度趋势（折线图用）——12个月 slot，有数据填实绩，无数据为 null
+    // 月度趋势（折线图）—— 年度记录时全年只有一个点（月=12）
     const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12']
-    const monthlyRevenue = MONTHS.map(m => {
-      const row = financeRows.find(r => r.period === `${year}-${m}`)
-      return { month: Number(m), value: row ? (Number(row.revenue) || null) : null }
-    })
-    const monthlyTax = MONTHS.map(m => {
-      const row = financeRows.find(r => r.period === `${year}-${m}`)
-      if (!row) return { month: Number(m), value: null }
-      const v = (Number(row.vatPaidSuzhou) || 0) + (Number(row.citPaidSuzhou) || 0)
-      return { month: Number(m), value: v > 0 ? v / 10000 : null }
-    })
-    const monthlySocial = MONTHS.map(m => {
-      const row = hrRows.find(r => r.period === `${year}-${m}`)
-      return { month: Number(m), value: row ? (Number(row.socialInsuranceCount) || null) : null }
-    })
+    const yearOnlyFinance = financeRows.find(r => r.period === String(year))
+    const monthlyRevenue = yearOnlyFinance
+      ? [{ month: 12, value: Number(yearOnlyFinance.revenue) || null }]
+      : MONTHS.map(m => {
+          const row = financeRows.find(r => r.period === `${year}-${m}`)
+          return { month: Number(m), value: row ? (Number(row.revenue) || null) : null }
+        })
+    const monthlyTax = yearOnlyFinance
+      ? [{ month: 12, value: ((Number(yearOnlyFinance.vatPaidSuzhou)||0)+(Number(yearOnlyFinance.citPaidSuzhou)||0)) / 10000 || null }]
+      : MONTHS.map(m => {
+          const row = financeRows.find(r => r.period === `${year}-${m}`)
+          if (!row) return { month: Number(m), value: null }
+          const v = (Number(row.vatPaidSuzhou) || 0) + (Number(row.citPaidSuzhou) || 0)
+          return { month: Number(m), value: v > 0 ? v / 10000 : null }
+        })
+    const yearOnlyHr = hrRows.find(r => r.period === String(year))
+    const monthlySocial = yearOnlyHr
+      ? [{ month: 12, value: Number(yearOnlyHr.socialInsuranceCount) || null }]
+      : MONTHS.map(m => {
+          const row = hrRows.find(r => r.period === `${year}-${m}`)
+          return { month: Number(m), value: row ? (Number(row.socialInsuranceCount) || null) : null }
+        })
 
-    // YTD 累计折线（每月累加收入，用于趋势图）
+    // YTD 累计折线
     let cumRevenue = 0
-    const monthlyRevenueYTD = MONTHS.map(m => {
-      const row = financeRows.find(r => r.period === `${year}-${m}`)
-      if (row && Number(row.revenue)) cumRevenue += Number(row.revenue)
-      return { month: Number(m), value: financeRows.some(r => r.period === `${year}-${m}`) ? cumRevenue : null }
+    const monthlyRevenueYTD = yearOnlyFinance
+      ? [{ month: 12, value: Number(yearOnlyFinance.revenue) || null }]
+      : MONTHS.map(m => {
+          const row = financeRows.find(r => r.period === `${year}-${m}`)
+          if (row && Number(row.revenue)) cumRevenue += Number(row.revenue)
+          return { month: Number(m), value: financeRows.some(r => r.period === `${year}-${m}`) ? cumRevenue : null }
     })
 
     return Response.json({

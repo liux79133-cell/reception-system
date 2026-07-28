@@ -1,167 +1,64 @@
 'use client'
+import { Card, Row, Col, Tag, Typography, Empty } from 'antd'
 import dayjs from 'dayjs'
-import { Empty } from 'antd'
-import { UserOutlined, EnvironmentOutlined, ArrowRightOutlined } from '@ant-design/icons'
 
-const LEVEL_MAP = {
-  '板块':     { color: '#6941c6', bg: 'rgba(105,65,198,0.15)', border: 'rgba(105,65,198,0.3)' },
-  '省级':     { color: '#60a5fa', bg: 'rgba(96,165,250,0.15)', border: 'rgba(96,165,250,0.3)' },
-  '市级':     { color: '#34d399', bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.3)' },
-  '区级':     { color: '#4ade80', bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.3)' },
-  '企业/院所':{ color: '#fbbf24', bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)' },
-  '其他':     { color: '#9ca3af', bg: 'rgba(156,163,175,0.15)', border: 'rgba(156,163,175,0.3)' },
-}
-const LEVEL_MAP_LIGHT = {
-  '板块':     { color: '#6941c6', bg: '#f4f3ff', border: '#e9d7fe' },
-  '省级':     { color: '#175cd3', bg: '#eff8ff', border: '#b2ddff' },
-  '市级':     { color: '#0e7090', bg: '#f0f9ff', border: '#b9e6fe' },
-  '区级':     { color: '#067647', bg: '#ecfdf3', border: '#abefc6' },
-  '企业/院所':{ color: '#b54708', bg: '#fffaeb', border: '#fedf89' },
-  '其他':     { color: '#667085', bg: '#f9fafb', border: '#e4e7ec' },
-}
-const STATUS_MAP = {
-  '正常':   { color: '#4ade80', bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.3)' },
-  '取消':   { color: '#f87171', bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.3)' },
-  '待确认': { color: '#fbbf24', bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)' },
-}
-const STATUS_MAP_LIGHT = {
-  '正常':   { color: '#067647', bg: '#ecfdf3', border: '#abefc6' },
-  '取消':   { color: '#c01048', bg: '#fff1f3', border: '#fecdd6' },
-  '待确认': { color: '#b54708', bg: '#fffaeb', border: '#fedf89' },
+const { Text } = Typography
+
+const LEVEL_COLOR = {
+  '板块': '#6941c6', '省级': '#175cd3', '市级': '#0e7090',
+  '区级': '#067647', '企业/院所': '#b54708', '其他': '#667085',
 }
 
-function Pill({ label, color, bg, border }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: bg, color, border: `1px solid ${border}`, whiteSpace: 'nowrap', backdropFilter: 'blur(4px)' }}>
-      {label}
-    </span>
-  )
-}
+export default function ReceptionCards({ data = [], onCardClick, groupBy = 'none' }) {
+  if (!data.length) return <Empty description="暂无数据" style={{ marginTop: 60 }} />
 
-function ReceptionCard({ record, onClick }) {
-  const photos = record.photos ? (() => { try { return JSON.parse(record.photos) } catch { return [] } })() : []
-  const firstPhoto = photos[0]?.url || null
-  const hasPhoto = !!firstPhoto
-  const level = LEVEL_MAP_LIGHT[record.level] || LEVEL_MAP_LIGHT['其他']
-  const status = STATUS_MAP_LIGHT[record.status] || STATUS_MAP_LIGHT['正常']
-
-  if (hasPhoto) {
-    // 有照片：照片铺满全卡片，内容浮在底部
-    return (
-      <div onClick={onClick}
-        style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', position: 'relative', height: 240, boxShadow: '0 2px 8px rgba(16,24,40,0.12)' }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(16,24,40,0.22)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(16,24,40,0.12)' }}>
-
-        {/* 背景图铺满 */}
-        <img src={firstPhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-
-        {/* 顶部极淡蒙层（放标签） */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 100%)' }} />
-
-        {/* 底部渐变蒙层（放内容文字） */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(0deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.2) 65%, transparent 100%)' }} />
-
-        {/* 顶部标签 */}
-        <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-          <div style={{ display: 'flex', gap: 5 }}>
-            <Pill label={record.level} color={LEVEL_MAP[record.level]?.color || '#9ca3af'} bg="rgba(255,255,255,0.18)" border="rgba(255,255,255,0.25)" />
-            <Pill label={record.status} color={STATUS_MAP[record.status]?.color || '#9ca3af'} bg="rgba(255,255,255,0.18)" border="rgba(255,255,255,0.25)" />
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{dayjs(record.startTime).format('MM/DD')}</span>
-        </div>
-
-        {/* 底部内容 */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 13px 13px', zIndex: 2 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
-            {record.title}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', marginBottom: 6 }}>
-            {dayjs(record.startTime).format('HH:mm')}
-            <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 4px' }}>→</span>
-            {dayjs(record.endTime).format('HH:mm')}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {record.host && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 4 }}><UserOutlined style={{ fontSize: 10 }} />{record.host}</span>}
-              {record.purpose && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{record.purpose}</span>}
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)' }}>{record.form}</span>
-          </div>
-          {record.location && (
-            <div style={{ marginTop: 4, fontSize: 11, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <EnvironmentOutlined style={{ fontSize: 10 }} />{record.location}
-            </div>
-          )}
-          {photos.length > 1 && <span style={{ position: 'absolute', bottom: 13, right: 13, fontSize: 11, color: 'rgba(255,255,255,0.6)', background: 'rgba(0,0,0,0.3)', padding: '1px 7px', borderRadius: 20 }}>📷 {photos.length}</span>}
-        </div>
-      </div>
-    )
-  }
-
-  // 无照片：普通白色卡片
-  return (
-    <div onClick={onClick}
-      style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(16,24,40,0.08)', border: '1px solid #f2f4f7', background: '#fff', display: 'flex', flexDirection: 'column' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,24,40,0.12)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(16,24,40,0.08)' }}>
-      <div style={{ height: 5, background: `linear-gradient(90deg, ${level.color}70, ${level.color}20)` }} />
-      <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ display: 'flex', gap: 5 }}>
-            <Pill label={record.level} {...level} />
-            <Pill label={record.status} {...status} />
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#98a2b3' }}>{dayjs(record.startTime).format('MM/DD')}</span>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#101828', lineHeight: 1.45, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{record.title}</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1677ff', marginBottom: 8 }}>
-          {dayjs(record.startTime).format('HH:mm')}<span style={{ color: '#d0d5dd', margin: '0 4px' }}>→</span>{dayjs(record.endTime).format('HH:mm')}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
-          {record.host && <div style={{ fontSize: 12, color: '#667085', display: 'flex', alignItems: 'center', gap: 5 }}><UserOutlined style={{ fontSize: 11 }} />{record.host}</div>}
-          {record.purpose && <div style={{ fontSize: 12, color: '#667085' }}>◎ {record.purpose}</div>}
-          {record.location && <div style={{ fontSize: 12, color: '#1677ff', display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><EnvironmentOutlined style={{ fontSize: 11 }} />{record.location}</div>}
-        </div>
-        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#f0f9ff', color: '#175cd3' }}>{record.form}</span>
-          <ArrowRightOutlined style={{ fontSize: 11, color: '#d0d5dd' }} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function ReceptionCards({ data, onCardClick, groupBy = 'month' }) {
-  if (!data.length) return <Empty description="暂无接待记录" style={{ padding: 60 }} />
-
-  const getKey = (r) => {
-    if (groupBy === 'level') return r.level || '其他'
-    if (groupBy === 'purpose') return r.purpose || '其他'
-    return dayjs(r.startTime).format('YYYY年M月')
-  }
-
-  const groups = {}
-  data.forEach(r => {
-    const key = getKey(r)
-    if (!groups[key]) groups[key] = []
-    groups[key].push(r)
-  })
+  const groups = groupBy === 'none'
+    ? [{ label: '全部', items: data }]
+    : Object.entries(
+        data.reduce((acc, r) => {
+          const key = r[groupBy] || '未分类'
+          ;(acc[key] = acc[key] || []).push(r)
+          return acc
+        }, {})
+      ).map(([label, items]) => ({ label, items }))
 
   return (
     <div>
-      {Object.entries(groups).map(([month, records]) => (
-        <div key={month} style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#101828', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            {month}
-            <span style={{ fontSize: 12, color: '#98a2b3', fontWeight: 400, background: '#f2f4f7', padding: '1px 8px', borderRadius: 20 }}>{records.length} 条</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
-            {records.map(r => (
-              <ReceptionCard key={r.id} record={r} onClick={() => onCardClick(r)} />
+      {groups.map(({ label, items }) => (
+        <div key={label} style={{ marginBottom: 24 }}>
+          {groupBy !== 'none' && (
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#667085', marginBottom: 12 }}>
+              {label} <Text type="secondary">({items.length})</Text>
+            </div>
+          )}
+          <Row gutter={[12, 12]}>
+            {items.map(r => (
+              <Col key={r.id} xs={24} sm={12} md={8} lg={6}>
+                <Card
+                  hoverable
+                  onClick={() => onCardClick?.(r)}
+                  style={{ borderRadius: 12, border: '1px solid #e8ecf0', cursor: 'pointer' }}
+                  styles={{ body: { padding: '14px 16px' } }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Tag color={LEVEL_COLOR[r.level] ? undefined : 'default'}
+                      style={{ color: LEVEL_COLOR[r.level], background: 'transparent', border: `1px solid ${LEVEL_COLOR[r.level] || '#d9d9d9'}`, margin: 0, fontSize: 11 }}>
+                      {r.level}
+                    </Tag>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {dayjs(r.startTime).format('MM/DD')}
+                    </Text>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1a2d5a', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.host} · {r.form}
+                  </div>
+                </Card>
+              </Col>
             ))}
-          </div>
+          </Row>
         </div>
       ))}
     </div>

@@ -3,13 +3,14 @@ import { useState, useEffect } from 'react'
 import {
   Drawer, Input, Select, DatePicker, Tag, Button, Space,
   message, Popconfirm, Row, Col, Avatar, Upload,
-  Checkbox, Progress, Modal, AutoComplete
+  Checkbox, Progress, Modal, AutoComplete, Form, InputNumber, Divider,
 } from 'antd'
 import {
   EditOutlined, DeleteOutlined, SaveOutlined, CloseOutlined,
   CalendarOutlined, UserOutlined, BellOutlined, PaperClipOutlined,
   PictureOutlined, CheckSquareOutlined, EnvironmentOutlined,
   PlusOutlined, DeleteFilled, UploadOutlined, FileOutlined, EyeOutlined,
+  AlertOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { api } from '@/lib/api'
@@ -156,6 +157,46 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
   const [photos, setPhotos] = useState([])
   const [todos, setTodos] = useState([])
   const [remark, setRemark] = useState('')
+  // 工单相关
+  const [workOrderModal, setWorkOrderModal] = useState({ open: false, todoText: '' })
+  const [woTargetId, setWoTargetId]   = useState(null)
+  const [woTargets, setWoTargets]     = useState([])
+  const [woRoom, setWoRoom]           = useState('')
+  const [woTime, setWoTime]           = useState('')
+  const [woGuest, setWoGuest]         = useState(0)
+  const [woHost, setWoHost]           = useState(0)
+  const [woSupplies, setWoSupplies]   = useState({})
+  const [woSending, setWoSending]     = useState(false)
+  // 物资配置：每项包含 checked + 特定字段
+  const WO_SUPPLY_CONFIG = [
+    { key: '热茶',    label: '热茶',    fields: [
+      { k: 'qty',  label: '份数',    type: 'number', placeholder: '0' },
+      { k: 'mode', label: '方式',    type: 'select', options: ['我们自己倒', '行政准备茶包', '外部订购'] },
+      { k: 'time', label: 'X点X分前准备好（选填）', type: 'text', placeholder: '如：15:30' },
+    ]},
+    { key: '矿泉水',  label: '矿泉水',  fields: [
+      { k: 'qty',  label: '份数',    type: 'number', placeholder: '0' },
+      { k: 'mode', label: '摆放方式', type: 'select', options: ['按人摆放桌上', '放旁边备用', '冰镇后摆放'] },
+    ]},
+    { key: '三件套',  label: '三件套',  fields: [
+      { k: 'qty',  label: '份数（默认对方人数）', type: 'number', placeholder: '0' },
+    ]},
+    { key: '饮品',    label: '饮品',    fields: [
+      { k: 'detail', label: '具体种类与份数', type: 'text', placeholder: '如：可乐×2，橙汁×3' },
+    ]},
+    { key: '果盘',    label: '果盘',    fields: [
+      { k: 'detail', label: '具体种类与份数（如：西瓜1盘，拼盘2份）', type: 'text', placeholder: '0' },
+    ]},
+    { key: '席卡壳子', label: '席卡壳子', fields: [
+      { k: 'qty',  label: '个数（默认总人数）', type: 'number', placeholder: '0' },
+    ]},
+    { key: '展厅雨伞', label: '展厅雨伞', fields: [
+      { k: 'qty',  label: '把数', type: 'number', placeholder: '0' },
+    ]},
+    { key: '白板笔',  label: '白板笔',  fields: [
+      { k: 'qty',  label: '支数', type: 'number', placeholder: '0' },
+    ]},
+  ]
   const [uploadingMinute, setUploadingMinute] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
@@ -183,8 +224,61 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
       setTodos(record.todos ? JSON.parse(record.todos) : [])
       setRemark(record.remark || '')
       setEditing(false)
+      // 预填工单默认时间和地点
+      setWoTime(dayjs(record.startTime).format('YYYY/MM/DD HH:mm'))
+      setWoRoom(record.location || '')
     }
   }, [record])
+
+  // 工单：打开时加载通知目标
+  const openWorkOrder = (todoText) => {
+    if (woTargets.length === 0) {
+      api.get('/api/notify-targets').then(t => {
+        setWoTargets(t)
+        if (t.length > 0) setWoTargetId(t[0].id)
+      }).catch(() => {})
+    }
+    setWoSupplies({})
+    setWorkOrderModal({ open: true, todoText })
+  }
+
+  // 把物资对象格式化成可读字符串数组
+  const formatSupplies = () => {
+    return WO_SUPPLY_CONFIG
+      .filter(s => woSupplies[s.key]?.checked)
+      .map(s => {
+        const v = woSupplies[s.key] || {}
+        const parts = [s.label]
+        if (v.qty) parts.push(`${v.qty}份`)
+        if (v.detail) parts.push(v.detail)
+        if (v.mode) parts.push(`（${v.mode}）`)
+        if (v.time) parts.push(`${v.time}前准备好`)
+        return parts.join(' ')
+      })
+  }
+
+  const sendWorkOrder = async () => {
+    if (!woTargetId && woTargets.length > 0) return message.error('请选择通知目标')
+    setWoSending(true)
+    try {
+      await api.post('/api/notify/workorder', {
+        receptionId: record.id,
+        targetId: woTargetId,
+        todoText: workOrderModal.todoText,
+        room: woRoom,
+        meetingTime: woTime,
+        guestCount: woGuest || undefined,
+        hostCount: woHost || undefined,
+        supplies: formatSupplies(),
+      })
+      message.success('行政工单已发送至飞书')
+      setWorkOrderModal({ open: false, todoText: '' })
+    } catch (e) {
+      message.error('发送失败：' + (e?.message || e))
+    } finally {
+      setWoSending(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -397,24 +491,161 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
                 {editing && <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setTodos(p => [...p, { id: Date.now(), text: '', done: false }])}>新增</Button>}
               </Space>
             }>
+            {/* 进度条 */}
             {todos.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
                   <span>{todos.filter(t => t.done).length}/{todos.length} 已完成</span>
-                  <span>{todos.length > 0 ? Math.round(todos.filter(t => t.done).length / todos.length * 100) : 0}%</span>
+                  <span>{Math.round(todos.filter(t => t.done).length / todos.length * 100)}%</span>
                 </div>
-                <Progress percent={todos.length > 0 ? Math.round(todos.filter(t => t.done).length / todos.length * 100) : 0} showInfo={false} strokeColor={{ from: '#52c41a', to: '#1677ff' }} size="small" />
+                <Progress percent={Math.round(todos.filter(t => t.done).length / todos.length * 100)} showInfo={false} strokeColor={{ from: '#52c41a', to: '#1677ff' }} size="small" />
               </div>
             )}
-            {todos.map((t, i) => (
-              <div key={t.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                <Checkbox checked={t.done} onChange={e => setTodos(p => p.map((x, j) => j === i ? { ...x, done: e.target.checked } : x))} />
-                {editing
-                  ? <Input size="small" value={t.text} style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none' }} onChange={e => setTodos(p => p.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} />
-                  : <span style={{ flex: 1, fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? '#bfbfbf' : '#333' }}>{t.text}</span>}
-                {editing && <Button type="text" size="small" danger icon={<DeleteFilled />} onClick={() => setTodos(p => p.filter((_, j) => j !== i))} />}
-              </div>
-            ))}
+
+            {/* 分组渲染 */}
+            {(() => {
+              // 按 category 分组
+              const groups = []
+              const groupMap = {}
+              todos.forEach((t, i) => {
+                const grp = t.category || '其他'
+                if (!groupMap[grp]) { groupMap[grp] = []; groups.push(grp) }
+                groupMap[grp].push({ ...t, _idx: i })
+              })
+
+              if (groups.length === 0 && !editing) {
+                return <span style={{ color: '#bfbfbf', fontSize: 13 }}>暂无待办，点击"从预设导入"快速添加</span>
+              }
+
+              // 没有分类时平铺显示（手动新增的）
+              const ungrouped = (groupMap['其他'] || []).filter(t => !t.category)
+              const grouped = groups.filter(g => g !== '其他' || (groupMap['其他'] || []).some(t => t.category))
+
+              // 哪些大类显示「派发工单」，哪些显示「去办理」（跳飞书）
+              const WORK_ORDER_GROUPS = ['行政支持']   // 含这些关键词的大类才显示派发工单
+              const FEISHU_CAL_GROUPS = ['日程创建', '会议室预约', '日程', '会议室']  // 含这些词显示去办理
+              const FEISHU_CAL_URL = 'https://www.feishu.cn/calendar'
+
+              const isWorkOrderGroup = (grp) => WORK_ORDER_GROUPS.some(k => grp.includes(k))
+              const isCalGroup = (grp) => FEISHU_CAL_GROUPS.some(k => grp.includes(k))
+              const isWorkOrderItem = (grp, text) => isWorkOrderGroup(grp)
+              const isCalItem = (grp, text) => isCalGroup(grp) ||
+                ['日程', '会议室', '预约', '日历', 'calendar'].some(k => text.includes(k))
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {groups.map(grp => {
+                    const items = groupMap[grp] || []
+                    const allDone = items.every(t => t.done)
+                    const someDone = items.some(t => t.done)
+                    const showWorkOrder = isWorkOrderGroup(grp)
+                    const showCal = isCalGroup(grp)
+
+                    return (
+                      <div key={grp} style={{ marginBottom: 4 }}>
+                        {/* 父记录行（大类） */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '7px 8px', borderRadius: 8,
+                          background: allDone ? '#f9f9f9' : '#fff',
+                          borderBottom: '1px solid #f0f0f0',
+                        }}>
+                          <Checkbox
+                            checked={allDone}
+                            indeterminate={someDone && !allDone}
+                            onChange={e => {
+                              const val = e.target.checked
+                              setTodos(p => p.map((x, j) =>
+                                items.find(it => it._idx === j) ? { ...x, done: val } : x
+                              ))
+                            }}
+                          />
+                          <span style={{
+                            flex: 1, fontSize: 13, fontWeight: 600,
+                            color: allDone ? '#bfbfbf' : '#1a1f3e',
+                            textDecoration: allDone ? 'line-through' : 'none',
+                          }}>
+                            {grp}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#bfbfbf', marginRight: 4 }}>
+                            {items.filter(t => t.done).length}/{items.length}
+                          </span>
+                          {/* 行政支持大类 → 派发工单 */}
+                          {!editing && showWorkOrder && (
+                            <Button size="small" icon={<AlertOutlined />}
+                              onClick={() => openWorkOrder(`【${grp}】共 ${items.length} 项子任务`)}
+                              style={{ fontSize: 11, borderRadius: 6, height: 24, padding: '0 8px', color: '#d46b08', borderColor: '#ffd591', background: '#fff7e6' }}
+                            >
+                              派发工单
+                            </Button>
+                          )}
+                          {editing && (
+                            <Button type="text" size="small" danger icon={<DeleteFilled />}
+                              onClick={() => setTodos(p => p.filter((_, j) => !items.find(it => it._idx === j)))}
+                            />
+                          )}
+                        </div>
+
+                        {/* 子任务行 */}
+                        {items.map((t) => {
+                          const showItemWorkOrder = !editing && t.text && isWorkOrderItem(grp, t.text)
+                          const showItemCal = !editing && t.text && isCalItem(grp, t.text)
+                          return (
+                            <div key={t.id || t._idx} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '6px 8px 6px 32px',
+                              borderBottom: '1px solid rgba(0,0,0,0.03)',
+                              background: t.done ? '#fafafa' : '#fff',
+                            }}>
+                              <Checkbox
+                                checked={t.done}
+                                onChange={e => setTodos(p => p.map((x, j) => j === t._idx ? { ...x, done: e.target.checked } : x))}
+                              />
+                              {editing
+                                ? <Input size="small" value={t.text}
+                                    style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none' }}
+                                    onChange={e => setTodos(p => p.map((x, j) => j === t._idx ? { ...x, text: e.target.value } : x))}
+                                  />
+                                : <span style={{
+                                    flex: 1, fontSize: 13,
+                                    textDecoration: t.done ? 'line-through' : 'none',
+                                    color: t.done ? '#bfbfbf' : '#595959',
+                                  }}>
+                                    {t.text}
+                                  </span>
+                              }
+                              {/* 行政支持子任务 → 派发工单 */}
+                              {showItemWorkOrder && (
+                                <Button size="small" icon={<AlertOutlined />}
+                                  onClick={() => openWorkOrder(t.text)}
+                                  style={{ fontSize: 11, borderRadius: 6, height: 24, padding: '0 8px', color: '#d46b08', borderColor: '#ffd591', background: '#fff7e6' }}
+                                >
+                                  派发工单
+                                </Button>
+                              )}
+                              {/* 日程/会议室子任务 → 去办理（跳飞书日历） */}
+                              {showItemCal && !showItemWorkOrder && (
+                                <Button size="small"
+                                  onClick={() => window.open(FEISHU_CAL_URL, '_blank')}
+                                  style={{ fontSize: 11, borderRadius: 6, height: 24, padding: '0 8px', color: '#1677ff', borderColor: '#91caff', background: '#e6f4ff' }}
+                                >
+                                  ↗ 去办理
+                                </Button>
+                              )}
+                              {editing && (
+                                <Button type="text" size="small" danger icon={<DeleteFilled />}
+                                  onClick={() => setTodos(p => p.filter((_, j) => j !== t._idx))}
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
             {todos.length === 0 && !editing && <span style={{ color: '#bfbfbf', fontSize: 13 }}>暂无待办，点击"从预设导入"快速添加</span>}
           </Section>
 
@@ -498,6 +729,185 @@ export default function ReceptionDetail({ record, customFields, onClose, onDelet
       <NotifyModal open={notifyOpen} onClose={() => setNotifyOpen(false)} record={record} />
       <TodoPresetModal open={todoPresetOpen} onClose={() => setTodoPresetOpen(false)}
         currentTodos={todos} onImport={items => setTodos(p => [...p, ...items])} />
+
+      {/* ── 派发行政工单 Modal ─────────────────────────────────── */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#fa8c16,#d46b08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+              🔔
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>派发行政工单</div>
+              <div style={{ fontSize: 11, color: '#8c8c8c', fontWeight: 400 }}>{record?.title}</div>
+            </div>
+          </div>
+        }
+        open={workOrderModal.open}
+        onCancel={() => setWorkOrderModal({ open: false, todoText: '' })}
+        onOk={sendWorkOrder}
+        okText={<span><span style={{ marginRight: 4 }}>✈</span>派发工单</span>}
+        okButtonProps={{ loading: woSending, style: { background: '#1677ff', borderColor: '#1677ff', borderRadius: 8 } }}
+        cancelText="取消"
+        cancelButtonProps={{ style: { borderRadius: 8 } }}
+        width={520}
+        styles={{ body: { paddingTop: 4 } }}
+      >
+        {/* 任务内容（只读展示） */}
+        <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: '#d46b08', fontWeight: 600, marginBottom: 4 }}>📌 任务内容</div>
+          <div style={{ fontSize: 14, color: '#1a1a1a', fontWeight: 500 }}>{workOrderModal.todoText}</div>
+        </div>
+
+        {/* 通知目标 */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1f3e', marginBottom: 6 }}>📣 通知目标</div>
+          {woTargets.length > 0 ? (
+            <Select
+              value={woTargetId}
+              onChange={setWoTargetId}
+              style={{ width: '100%' }}
+              placeholder="选择发送目标（群组或个人）"
+              options={woTargets.map(t => ({
+                value: t.id,
+                label: (
+                  <span>
+                    <span style={{ marginRight: 6 }}>{t.type === 'group_webhook' ? '👥' : '👤'}</span>
+                    {t.name}
+                  </span>
+                ),
+              }))}
+            />
+          ) : (
+            <div style={{ fontSize: 12, color: '#faad14', padding: '8px 12px', background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f' }}>
+              ⚠️ 尚未配置通知目标，请前往「系统设置 → 通知目标」添加飞书 Webhook
+            </div>
+          )}
+        </div>
+
+        <Divider style={{ margin: '12px 0' }}>会议背景（可选）</Divider>
+
+        {/* 会议背景 */}
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col span={12}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>会议室 / 地点</div>
+            <Input
+              value={woRoom}
+              onChange={e => setWoRoom(e.target.value)}
+              placeholder="如：302 会议室"
+              style={{ borderRadius: 8 }}
+            />
+          </Col>
+          <Col span={12}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>会议时间</div>
+            <Input
+              value={woTime}
+              onChange={e => setWoTime(e.target.value)}
+              placeholder="如：2026/07/30 15:30"
+              style={{ borderRadius: 8 }}
+            />
+          </Col>
+        </Row>
+        <Row gutter={12} style={{ marginBottom: 16 }}>
+          <Col span={12}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>对方人数</div>
+            <InputNumber
+              value={woGuest}
+              onChange={setWoGuest}
+              min={0}
+              style={{ width: '100%', borderRadius: 8 }}
+            />
+          </Col>
+          <Col span={12}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>己方人数</div>
+            <InputNumber
+              value={woHost}
+              onChange={setWoHost}
+              min={0}
+              style={{ width: '100%', borderRadius: 8 }}
+            />
+          </Col>
+        </Row>
+
+        {/* 物资选配 */}
+        <Divider style={{ margin: '12px 0' }}>物资选配（可选）</Divider>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {WO_SUPPLY_CONFIG.map(supply => {
+            const v = woSupplies[supply.key] || {}
+            const checked = !!v.checked
+            const toggleItem = () => setWoSupplies(p => ({
+              ...p,
+              [supply.key]: { ...(p[supply.key] || {}), checked: !checked }
+            }))
+            const setField = (k, val) => setWoSupplies(p => ({
+              ...p,
+              [supply.key]: { ...(p[supply.key] || {}), checked: true, [k]: val }
+            }))
+
+            return (
+              <div key={supply.key} style={{
+                borderRadius: 10, overflow: 'hidden',
+                border: `1px solid ${checked ? '#bfdbfe' : '#f0f0f0'}`,
+                background: checked ? '#f8fbff' : '#fafafa',
+                transition: 'all 0.15s',
+              }}>
+                {/* 标题行 */}
+                <div
+                  onClick={toggleItem}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 14px', cursor: 'pointer',
+                  }}
+                >
+                  <Checkbox checked={checked} onChange={toggleItem} onClick={e => e.stopPropagation()} />
+                  <span style={{
+                    fontSize: 14, fontWeight: 600,
+                    color: checked ? '#1d4ed8' : '#595959',
+                  }}>
+                    {supply.label}
+                  </span>
+                </div>
+
+                {/* 展开的详细字段（仅选中时显示） */}
+                {checked && (
+                  <div style={{ padding: '0 14px 12px 36px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {supply.fields.map(field => (
+                      <div key={field.k}>
+                        <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>{field.label}</div>
+                        {field.type === 'number' && (
+                          <InputNumber
+                            value={v[field.k] ?? 0}
+                            min={0}
+                            onChange={val => setField(field.k, val)}
+                            style={{ width: '100%', borderRadius: 8 }}
+                            placeholder={field.placeholder}
+                          />
+                        )}
+                        {field.type === 'text' && (
+                          <Input
+                            value={v[field.k] || ''}
+                            onChange={e => setField(field.k, e.target.value)}
+                            placeholder={field.placeholder}
+                            style={{ borderRadius: 8 }}
+                          />
+                        )}
+                        {field.type === 'select' && (
+                          <Select
+                            value={v[field.k] || field.options[0]}
+                            onChange={val => setField(field.k, val)}
+                            style={{ width: '100%' }}
+                            options={field.options.map(o => ({ value: o, label: o }))}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </Modal>
     </>
   )
 }
