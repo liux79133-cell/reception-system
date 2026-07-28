@@ -1,17 +1,17 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import {
-  Card, Tabs, Form, InputNumber, Button, DatePicker, Typography,
-  Tag, Spin, message, Row, Col, Alert, Switch, Tooltip, Divider,
+  Card, Tabs, InputNumber, Button, Typography,
+  Tag, Spin, message, Row, Col, Alert, Switch, Tooltip,
   Badge, Upload, Modal, Select, Radio, Input,
 } from 'antd'
 import {
-  SaveOutlined, CheckCircleOutlined, ClockCircleOutlined,
+  SaveOutlined, CheckCircleOutlined,
   DollarOutlined, TeamOutlined, BulbOutlined,
   FileExcelOutlined, SettingOutlined, EditOutlined,
   ArrowRightOutlined, HistoryOutlined, InfoCircleOutlined,
   CalendarOutlined, FieldTimeOutlined, LockOutlined, CloseOutlined,
-  EyeInvisibleOutlined,
+  PlusOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
@@ -20,24 +20,22 @@ import dayjs from 'dayjs'
 
 const { Text, Title } = Typography
 
-// 存储单位统一为亿元，录入时可选元/万元/亿元
 const MONEY_UNITS = ['元', '万元', '亿元']
 const toYi = { '元': v => v / 1e8, '万元': v => v / 1e4, '亿元': v => v }
 const fromYi = { '元': v => v * 1e8, '万元': v => v * 1e4, '亿元': v => v }
-
 function toBase(value, inputUnit) { return toYi[inputUnit]?.(Number(value)) ?? Number(value) }
 function fromBase(value, displayUnit) { return fromYi[displayUnit]?.(Number(value)) ?? Number(value) }
 
 const ALL_FIELDS = {
   finance: [
-    { key: 'revenue',       label: '营业收入',          baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'REVENUE',      tooltip: '财务确认的营业收入（存储为亿元）' },
-    { key: 'revenueSuzhou', label: '其中：苏州确认收入', baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '在苏州确认的销售收入，协议要求≥60%' },
-    { key: 'vatPaidSuzhou', label: '增值税实缴苏州',     baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'TAX_TOTAL',    tooltip: '实际在苏州缴纳的增值税' },
-    { key: 'citPaidSuzhou', label: '企业所得税实缴苏州', baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'TAX_TOTAL',    tooltip: '实际在苏州缴纳的企业所得税' },
-    { key: 'pitSuzhou',     label: '个人所得税苏州代扣', baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'PERSONAL_TAX', tooltip: '在苏州代扣代缴的个税' },
-    { key: 'vatPayable',    label: '增值税应缴',         baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '参考值' },
-    { key: 'citPayable',    label: '企业所得税应缴',     baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '参考值' },
-    { key: 'rdExpense',     label: '研发投入',           baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '用于高企申报' },
+    { key: 'revenue',       label: '营业收入',           baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'REVENUE',      tooltip: '财务确认的营业收入（存储为亿元）' },
+    { key: 'revenueSuzhou', label: '其中：苏州确认收入',  baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '在苏州确认的销售收入，协议要求≥60%' },
+    { key: 'vatPaidSuzhou', label: '增值税实缴苏州',      baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'TAX_TOTAL',    tooltip: '实际在苏州缴纳的增值税' },
+    { key: 'citPaidSuzhou', label: '企业所得税实缴苏州',  baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'TAX_TOTAL',    tooltip: '实际在苏州缴纳的企业所得税' },
+    { key: 'pitSuzhou',     label: '个人所得税苏州代扣',  baseUnit: '亿元', inputUnits: MONEY_UNITS, required: true,  kpi: 'PERSONAL_TAX', tooltip: '在苏州代扣代缴的个税' },
+    { key: 'vatPayable',    label: '增值税应缴',          baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '参考值' },
+    { key: 'citPayable',    label: '企业所得税应缴',      baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '参考值' },
+    { key: 'rdExpense',     label: '研发投入',            baseUnit: '亿元', inputUnits: MONEY_UNITS, required: false, kpi: null,           tooltip: '用于高企申报' },
   ],
   hr: [
     { key: 'socialInsuranceCount', label: '苏州社保参保人数',          baseUnit: '人', inputUnits: ['人'], required: true,  kpi: 'SOCIAL_INSURANCE', tooltip: '在苏州高铁新城参保的员工总人数' },
@@ -57,14 +55,16 @@ const ALL_FIELDS = {
   ],
 }
 
-const CAT_LABELS  = { finance: '经营与财务', hr: '人才与团队', ip: '研发与知识产权' }
-const CAT_ICONS   = { finance: <DollarOutlined />, hr: <TeamOutlined />, ip: <BulbOutlined /> }
-const CAT_COLORS  = { finance: '#1d6fdb', hr: '#7c3aed', ip: '#059669' }
+const CAT_LABELS = { finance: '经营与财务', hr: '人才与团队', ip: '研发与知识产权' }
+const CAT_ICONS  = { finance: <DollarOutlined />, hr: <TeamOutlined />, ip: <BulbOutlined /> }
+const CAT_COLORS = { finance: '#1d6fdb', hr: '#7c3aed', ip: '#059669' }
 const CAT_KPI_HINT = {
   finance: '关联 KPI：营业收入 · 综合税收 · 个税金额',
   hr:      '关联 KPI：社保人数 · 国家级人才（本年申报）· 产业链引进',
   ip:      '关联 KPI：发明专利申请（本年新增）',
 }
+
+const ALL_UNITS = ['亿元', '万元', '元', '人', '项', '家', '%', '个', '辆', '万辆']
 
 function splitCumulativeRevenue(cumByMonth) {
   const result = {}
@@ -78,14 +78,94 @@ function splitCumulativeRevenue(cumByMonth) {
   return result
 }
 
-const MONEY_BASE_UNITS = ['亿元']
-const isMoneyUnit = (unit) => MONEY_BASE_UNITS.includes(unit)
+const isMoneyUnit = (unit) => unit === '亿元'
 
-// 通用 12 格月度网格组件
-function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, isEditing, onSave, onImport, saving, isDim, configMode, onToggleDim }) {
+// ── 三态 dim 按钮工具 ──────────────────────────────────────────────────────
+// state: true=正常显示  'dim'=灰色置底  false=完全隐藏
+function DimButton({ state, onChange }) {
+  const cfg = state === true
+    ? { label: '● 显示', bg: '#dcfce7', border: '#86efac', color: '#166534' }
+    : state === 'dim'
+      ? { label: '◑ 灰色', bg: '#fef3c7', border: '#fcd34d', color: '#92400e' }
+      : { label: '✕ 隐藏', bg: '#fee2e2', border: '#fca5a5', color: '#991b1b' }
+  const next = state === true ? 'dim' : state === 'dim' ? false : true
+  return (
+    <button onClick={() => onChange(next)}
+      style={{
+        fontSize: 10, padding: '2px 9px', borderRadius: 10, cursor: 'pointer',
+        fontWeight: 700, userSelect: 'none', transition: 'all 0.15s',
+        background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
+        outline: 'none', flexShrink: 0,
+      }}>
+      {cfg.label}
+    </button>
+  )
+}
+
+// ── 字段网格头部（MonthGrid 和 AnnualGrid 共用）───────────────────────────
+function FieldHeader({
+  field, unit, isCumulative, isAnnual,
+  isEditing, configMode, saving,
+  onSave, onImport, onToggleDim, onDelete, onToggleRequired,
+  dimState, isRequired, customField, saveLabel,
+}) {
+  const textC = isCumulative ? '#78350f' : '#1e3a8a'
+  const subC  = isCumulative ? '#92400e' : '#3730a3'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: textC }}>{field.label}</span>
+        {isAnnual  && <Tag style={{ fontSize: 10, margin: 0, color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>年度</Tag>}
+        {!isAnnual && isCumulative  && <Tag style={{ fontSize: 10, margin: 0, color: '#d97706', background: '#fef3c7', border: '1px solid #fde68a' }}>累计值</Tag>}
+        {!isAnnual && !isCumulative && <Tag style={{ fontSize: 10, margin: 0, color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>月度</Tag>}
+        {field.kpi && <Tag style={{ fontSize: 9, padding: '0 4px', margin: 0, lineHeight: '16px', color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>KPI</Tag>}
+        {isRequired
+          ? <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>必填</span>
+          : <span style={{ fontSize: 9, color: '#94a3b8' }}>选填</span>}
+        <span style={{ fontSize: 11, color: subC }}>单位：{unit}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* 配置模式操作 */}
+        {configMode && <DimButton state={dimState} onChange={onToggleDim} />}
+        {configMode && (
+          <button onClick={() => onToggleRequired(!isRequired)}
+            style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
+              outline: 'none', transition: 'all 0.15s',
+              background: isRequired ? '#fff1f2' : '#f8fafc',
+              border: `1px solid ${isRequired ? '#fca5a5' : '#e2e8f0'}`,
+              color: isRequired ? '#991b1b' : '#64748b',
+            }}>
+            {isRequired ? '必填 ✓' : '选填 —'}
+          </button>
+        )}
+        {configMode && customField && (
+          <button onClick={onDelete}
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
+              outline: 'none', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+            <DeleteOutlined style={{ marginRight: 2 }} />删除
+          </button>
+        )}
+        {/* 编辑模式操作 */}
+        {isEditing && (
+          <>
+            <Button size="small" icon={<FileExcelOutlined />} onClick={onImport}
+              style={{ borderRadius: 7, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>导入</Button>
+            <Button size="small" loading={saving} onClick={onSave}
+              style={{ borderRadius: 7, fontSize: 11, background: isCumulative ? '#d97706' : '#1d6fdb', borderColor: isCumulative ? '#d97706' : '#1d6fdb', color: '#fff' }}>
+              {saveLabel || '按月保存'}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── 通用 12 格月度网格 ────────────────────────────────────────────────────
+function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, isEditing, onSave, onImport, saving, dimState, configMode, onToggleDim, onDelete, isRequired, onToggleRequired, customField }) {
   const isMoney = isMoneyUnit(field.baseUnit)
   const prec = unit === '元' ? 0 : unit === '万元' ? 2 : 4
-  const accent = isCumulative ? '#d97706' : '#1d6fdb'
   const bg     = isCumulative ? '#fffbeb' : '#f0f7ff'
   const border = isCumulative ? '#fde68a' : '#bfdbfe'
   const textC  = isCumulative ? '#78350f' : '#1e3a8a'
@@ -99,102 +179,46 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
     return Math.round(n).toLocaleString('zh-CN')
   }
 
-  // dim 状态标签
-  const dimBtnLabel = isDim === true ? '◑ 置底' : isDim === 'dim' ? '✕ 隐藏' : '✓ 显示'
-  const dimBtnStyle = isDim === true
-    ? { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }
-    : isDim === 'dim'
-      ? { background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }
-      : { background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }
-
   return (
     <div style={{
       background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10,
-      opacity: isDim === 'dim' ? 0.45 : 1,
-      filter: isDim === 'dim' ? 'grayscale(0.6)' : 'none',
+      opacity: dimState === 'dim' ? 0.38 : 1,
+      filter: dimState === 'dim' ? 'grayscale(1) brightness(1.1)' : 'none',
       transition: 'opacity 0.2s, filter 0.2s',
-      position: 'relative',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: textC }}>{field.label}</span>
-          {isCumulative && (
-            <Tag style={{ fontSize: 10, margin: 0, color: '#d97706', background: '#fef3c7', border: '1px solid #fde68a' }}>累计值</Tag>
-          )}
-          {!isCumulative && (
-            <Tag style={{ fontSize: 10, margin: 0, color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>月度</Tag>
-          )}
-          {field.kpi && (
-            <Tag style={{ fontSize: 9, padding: '0 4px', margin: 0, lineHeight: '16px',
-              color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>KPI</Tag>
-          )}
-          {field.required
-            ? <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>必填</span>
-            : <span style={{ fontSize: 9, color: '#94a3b8' }}>选填</span>}
-          <span style={{ fontSize: 11, color: subC }}>单位：{unit}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {/* 配置模式：三态切换按钮 */}
-          {configMode && (
-            <button onClick={onToggleDim}
-              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
-                border: 'none', outline: 'none', transition: 'all 0.15s', ...dimBtnStyle }}>
-              {dimBtnLabel}
-            </button>
-          )}
-          {isEditing && (
-            <>
-              <Button size="small" icon={<FileExcelOutlined />} onClick={onImport}
-                style={{ borderRadius: 7, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>导入</Button>
-              <Button size="small" loading={saving} onClick={onSave}
-                style={{ borderRadius: 7, fontSize: 11, background: accent, borderColor: accent, color: '#fff' }}>
-                {isCumulative && field.key === 'revenue' ? '拆分按月保存' : '按月保存'}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
+      <FieldHeader field={field} unit={unit} isCumulative={isCumulative} isAnnual={false}
+        isEditing={isEditing} configMode={configMode} saving={saving}
+        onSave={onSave} onImport={onImport} onToggleDim={onToggleDim} onDelete={onDelete}
+        onToggleRequired={onToggleRequired}
+        dimState={dimState} isRequired={isRequired} customField={customField}
+        saveLabel={isCumulative && field.key === 'revenue' ? '拆分按月保存' : '按月保存'}
+      />
       <Row gutter={[6, 6]}>
         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
           const val = values[m]
           const preview = splitPreview?.[m]
           const previewDisp = preview != null ? (unit !== '亿元' ? fromBase(preview, unit) : preview) : null
-          const label = isCumulative ? `1月–${m}月` : `${m} 月`
-
           return (
             <Col key={m} xs={12} sm={8} md={4}>
               <div style={{
                 background: val != null ? (isCumulative ? '#fffbeb' : '#eff6ff') : '#fff',
                 border: `1px solid ${val != null ? border : '#e8ecf0'}`,
-                borderRadius: 8, padding: '7px 10px',
-                transition: 'all 0.15s',
+                borderRadius: 8, padding: '7px 10px', transition: 'all 0.15s',
               }}>
                 <div style={{ fontSize: 10, color: val != null ? textC : '#94a3b8', marginBottom: 4, fontWeight: 500 }}>
-                  {label}
+                  {isCumulative ? `1月–${m}月` : `${m} 月`}
                 </div>
                 {isEditing ? (
-                  <InputNumber
-                    value={val ?? null}
-                    onChange={v => onChange(m, v)}
-                    min={0} precision={prec} size="small"
-                    style={{ width: '100%' }} placeholder="—"
-                  />
+                  <InputNumber value={val ?? null} onChange={v => onChange(m, v)}
+                    min={0} precision={prec} size="small" style={{ width: '100%' }} placeholder="—" />
                 ) : (
-                  <div style={{
-                    fontSize: val != null ? 15 : 13,
-                    fontWeight: val != null ? 700 : 400,
-                    color: val != null ? textC : '#cbd5e1',
-                    lineHeight: 1.3,
-                  }}>
+                  <div style={{ fontSize: val != null ? 15 : 13, fontWeight: val != null ? 700 : 400, color: val != null ? textC : '#cbd5e1', lineHeight: 1.3 }}>
                     {fmtVal(val)}
                     {val != null && <span style={{ fontSize: 10, color: subC, marginLeft: 2 }}>{unit}</span>}
                   </div>
                 )}
                 {isCumulative && previewDisp != null && (
-                  <div style={{ fontSize: 9, color: '#059669', marginTop: 2 }}>
-                    {m}月增量：{previewDisp.toFixed(prec)}
-                  </div>
+                  <div style={{ fontSize: 9, color: '#059669', marginTop: 2 }}>{m}月增量：{previewDisp.toFixed(prec)}</div>
                 )}
               </div>
             </Col>
@@ -205,123 +229,55 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
   )
 }
 
-// 按年模式的字段卡片
-function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prevValue, inputUnit, onUnitChange, isRequired, onToggleRequired, isDim, onToggleDim, configMode }) {
-  const hasMultiUnit = field.inputUnits && field.inputUnits.length > 1
-  const currentUnit  = inputUnit || field.baseUnit
-  const displayValue = (value != null && field.baseUnit !== currentUnit && hasMultiUnit)
-    ? fromBase(value, currentUnit) : value
-  const precision = currentUnit === '元' ? 0 : currentUnit === '万元' ? 2 : 4
+// ── 按年单格卡片（与 MonthGrid 同款视觉，只有一个"全年"格）───────────────
+function AnnualGrid({ field, value, onChange, unit, isEditing, onSave, saving, dimState, configMode, onToggleDim, onDelete, isRequired, onToggleRequired, customField }) {
+  const isMoney = isMoneyUnit(field.baseUnit)
+  const prec = unit === '元' ? 0 : unit === '万元' ? 2 : 4
+  const bg = '#f0f7ff', border = '#bfdbfe', textC = '#1e3a8a', subC = '#3730a3'
 
-  const handleChange = (v) => {
-    if (v == null) { onChange(null); return }
-    onChange(hasMultiUnit && field.baseUnit !== currentUnit ? toBase(v, currentUnit) : v)
-  }
-
-  const hasChange = prevValue != null && value != null && Number(value) !== Number(prevValue)
-  const isReadonly = enabled === 'readonly'
-  const isHidden   = enabled === false
-  const dimState   = isDim  // true | 'dim' | false (same cycle as MonthGrid)
-
-  const dimBtnLabel = dimState === true ? '◑ 置底' : dimState === 'dim' ? '✕ 隐藏' : '✓ 显示'
-  const dimBtnStyle = dimState === true
-    ? { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }
-    : dimState === 'dim'
-      ? { background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }
-      : { background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }
-
-  function fmtReadonly(val) {
-    if (val == null) return '—'
-    const dispVal = (hasMultiUnit && field.baseUnit !== currentUnit) ? fromBase(val, currentUnit) : val
-    const n = Number(dispVal)
+  const fmtVal = (v) => {
+    if (v == null) return '—'
+    const n = Number(v)
     if (isNaN(n)) return '—'
-    if (isMoneyUnit(field.baseUnit)) {
-      const prec = currentUnit === '元' ? 0 : currentUnit === '万元' ? 2 : 4
-      return n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: prec })
-    }
+    if (isMoney) return n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: prec })
     return Math.round(n).toLocaleString('zh-CN')
   }
 
   return (
-    <Col xs={24} sm={12} md={8}>
-      <div style={{
-        background: isHidden ? '#f8fafc' : isReadonly ? '#fafafa' : '#fff',
-        border: `1px solid ${isHidden ? '#f1f5f9' : isReadonly ? '#eef0f4' : hasChange ? '#fbbf24' : '#e8ecf4'}`,
-        borderRadius: 10, padding: '10px 14px',
-        opacity: isDim === 'dim' ? 0.4 : isHidden ? 0.5 : 1,
-        filter: isDim === 'dim' ? 'grayscale(0.7)' : 'none',
-        transition: 'all 0.15s',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
-            <Tooltip title={field.tooltip}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{field.label}</span>
-            </Tooltip>
-            {isRequired
-              ? <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>必填</span>
-              : <span style={{ fontSize: 9, color: '#94a3b8' }}>选填</span>}
-            {field.kpi && (
-              <Tag style={{ fontSize: 9, padding: '0 4px', margin: 0, borderRadius: 4, lineHeight: '16px',
-                color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>KPI</Tag>
-            )}
-          </div>
-          {configMode && (
-            <button onClick={onToggleDim}
-              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
-                border: 'none', outline: 'none', flexShrink: 0, transition: 'all 0.15s', ...dimBtnStyle }}>
-              {dimBtnLabel}
-            </button>
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10,
+      opacity: dimState === 'dim' ? 0.38 : 1,
+      filter: dimState === 'dim' ? 'grayscale(1) brightness(1.1)' : 'none',
+      transition: 'opacity 0.2s, filter 0.2s',
+    }}>
+      <FieldHeader field={field} unit={unit} isCumulative={false} isAnnual={true}
+        isEditing={isEditing} configMode={configMode} saving={saving}
+        onSave={onSave} onImport={() => {}} onToggleDim={onToggleDim} onDelete={onDelete}
+        onToggleRequired={onToggleRequired}
+        dimState={dimState} isRequired={isRequired} customField={customField}
+        saveLabel="保存全年"
+      />
+      {/* 单格 */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{
+          flex: 1, maxWidth: 200,
+          background: value != null ? '#eff6ff' : '#fff',
+          border: `1px solid ${value != null ? border : '#e8ecf0'}`,
+          borderRadius: 8, padding: '10px 14px',
+        }}>
+          <div style={{ fontSize: 10, color: value != null ? textC : '#94a3b8', marginBottom: 6, fontWeight: 500 }}>全年合计</div>
+          {isEditing ? (
+            <InputNumber value={value ?? null} onChange={onChange}
+              min={0} precision={prec} size="middle" style={{ width: '100%' }} placeholder="请输入" />
+          ) : (
+            <div style={{ fontSize: value != null ? 22 : 16, fontWeight: value != null ? 700 : 400, color: value != null ? textC : '#cbd5e1', lineHeight: 1.2 }}>
+              {fmtVal(value)}
+              {value != null && <span style={{ fontSize: 12, color: subC, marginLeft: 4 }}>{unit}</span>}
+            </div>
           )}
         </div>
-
-        {isReadonly ? (
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, minHeight: 32, paddingTop: 2 }}>
-            <span style={{
-              fontSize: value != null ? 20 : 16,
-              fontWeight: value != null ? 700 : 400,
-              color: value != null ? '#0f172a' : '#cbd5e1',
-              letterSpacing: value != null ? '-0.3px' : 0,
-              lineHeight: 1,
-            }}>
-              {fmtReadonly(value)}
-            </span>
-            {value != null && <span style={{ fontSize: 11, color: '#94a3b8' }}>{currentUnit}</span>}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <InputNumber
-              value={displayValue ?? null}
-              onChange={handleChange}
-              placeholder={isHidden ? '已隐藏' : '请输入'}
-              disabled={isHidden}
-              min={0}
-              style={{ flex: 1 }}
-              precision={precision}
-            />
-            {hasMultiUnit ? (
-              <Select value={currentUnit} onChange={onUnitChange} size="small"
-                style={{ width: 72, flexShrink: 0 }} disabled={isHidden}
-                options={field.inputUnits.map(u => ({ value: u, label: u }))} />
-            ) : (
-              <span style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'center', flexShrink: 0 }}>
-                {field.baseUnit}
-              </span>
-            )}
-          </div>
-        )}
-
-        {!isReadonly && hasChange && !isHidden && (
-          <div style={{ fontSize: 10, color: '#d97706', marginTop: 3 }}>
-            较上期：{fmtReadonly(prevValue)} → {fmtReadonly(value)} {currentUnit}
-          </div>
-        )}
-        {!isReadonly && hasMultiUnit && currentUnit !== field.baseUnit && value != null && (
-          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
-            存储：{Number(value).toFixed(8).replace(/\.?0+$/, '')} {field.baseUnit}
-          </div>
-        )}
       </div>
-    </Col>
+    </div>
   )
 }
 
@@ -343,21 +299,81 @@ export default function DataCenterPage() {
   const [multiMonthValues, setMultiMonthValues] = useState({})
   const [monthlyGridValues, setMonthlyGridValues] = useState({ finance: {}, hr: {}, ip: {} })
 
-  const [user, setUser]         = useState(null)
+  const [user, setUser]             = useState(null)
   const [configMode, setConfigMode] = useState(false)
+
+  // 字段显示状态：true=正常, 'dim'=灰色置底, false=完全隐藏
+  const [fieldEnabled, setFieldEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('datahub_field_config')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    const init = {}
+    Object.keys(ALL_FIELDS).forEach(cat => {
+      init[cat] = {}
+      ALL_FIELDS[cat].forEach(f => { init[cat][f.key] = true })
+    })
+    return init
+  })
+
+  // 必填覆盖：{ fieldKey: bool }
   const [requiredOverride, setRequiredOverride] = useState(() => {
     try { const s = localStorage.getItem('datahub_required_config'); return s ? JSON.parse(s) : {} } catch { return {} }
   })
-  const toggleRequired = (fieldKey, val) => {
+  const getRequired = (field) => requiredOverride[field.key] !== undefined ? requiredOverride[field.key] : field.required
+  const setRequired = (fieldKey, val) => {
     setRequiredOverride(p => {
       const next = { ...p, [fieldKey]: val }
       localStorage.setItem('datahub_required_config', JSON.stringify(next))
       return next
     })
   }
-  const isRequired = (field) =>
-    requiredOverride[field.key] !== undefined ? requiredOverride[field.key] : field.required
 
+  // 自定义字段：{ finance: [...], hr: [...], ip: [...] }
+  const [customFields, setCustomFields] = useState(() => {
+    try { const s = localStorage.getItem('datahub_custom_fields'); return s ? JSON.parse(s) : { finance: [], hr: [], ip: [] } } catch { return { finance: [], hr: [], ip: [] } }
+  })
+  const saveCustomFields = (next) => {
+    setCustomFields(next)
+    localStorage.setItem('datahub_custom_fields', JSON.stringify(next))
+  }
+
+  // 添加指标弹窗
+  const [addModal, setAddModal] = useState({ open: false, cat: null })
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [newFieldUnit, setNewFieldUnit]   = useState('亿元')
+  const [newFieldRequired, setNewFieldRequired] = useState(false)
+
+  const handleAddField = () => {
+    const label = newFieldLabel.trim()
+    if (!label) return message.error('请输入指标名称')
+    const key = `custom_${Date.now()}`
+    const cat = addModal.cat
+    const inputUnits = ['亿元', '万元', '元'].includes(newFieldUnit) ? ['元', '万元', '亿元'] : [newFieldUnit]
+    const newF = { key, label, baseUnit: newFieldUnit, inputUnits, required: newFieldRequired, kpi: null, tooltip: label, custom: true }
+    const next = { ...customFields, [cat]: [...(customFields[cat] || []), newF] }
+    saveCustomFields(next)
+    // 初始化 fieldEnabled
+    setFieldEnabled(p => {
+      const ns = { ...p, [cat]: { ...p[cat], [key]: true } }
+      localStorage.setItem('datahub_field_config', JSON.stringify(ns))
+      return ns
+    })
+    setAddModal({ open: false, cat: null })
+    setNewFieldLabel(''); setNewFieldUnit('亿元'); setNewFieldRequired(false)
+    message.success(`已添加指标「${label}」`)
+  }
+
+  const deleteCustomField = (cat, key) => {
+    const next = { ...customFields, [cat]: (customFields[cat] || []).filter(f => f.key !== key) }
+    saveCustomFields(next)
+    message.success('已删除指标')
+  }
+
+  // 合并内置+自定义字段
+  const allCatFields = (cat) => [...(ALL_FIELDS[cat] || []), ...(customFields[cat] || [])]
+
+  // 每个字段的录入单位
   const [inputUnits, setInputUnits] = useState(() => {
     try { const s = localStorage.getItem('datahub_input_units'); return s ? JSON.parse(s) : {} } catch { return {} }
   })
@@ -368,14 +384,7 @@ export default function DataCenterPage() {
       return next
     })
   }
-  const [fieldEnabled, setFieldEnabled] = useState(() => {
-    const init = {}
-    Object.entries(ALL_FIELDS).forEach(([cat, fields]) => {
-      init[cat] = {}
-      fields.forEach(f => { init[cat][f.key] = true })
-    })
-    return init
-  })
+
   const [parseModal, setParseModal]     = useState({ open: false, cat: null })
   const [parsing, setParsing]           = useState(false)
   const [parseResult, setParseResult]   = useState(null)
@@ -394,10 +403,18 @@ export default function DataCenterPage() {
 
   const canEdit = user?.role === 'admin' || user?.role === 'editor'
 
-  const getPeriod = () => {
-    if (inputMode === 'annual') return String(year)
-    return `${year}-${String(month).padStart(2, '0')}`
+  // 三态循环切换
+  const toggleFieldState = (cat, key) => {
+    const cur = fieldEnabled[cat]?.[key]
+    const next = cur === true ? 'dim' : cur === 'dim' ? false : true
+    setFieldEnabled(p => {
+      const ns = { ...p, [cat]: { ...p[cat], [key]: next } }
+      localStorage.setItem('datahub_field_config', JSON.stringify(ns))
+      return ns
+    })
   }
+
+  const getPeriod = () => inputMode === 'annual' ? String(year) : `${year}-${String(month).padStart(2, '0')}`
 
   const fetchAll = useCallback((mode, y, m, currentCumUnit) => {
     const _cumUnit = currentCumUnit || cumUnit
@@ -419,26 +436,21 @@ export default function DataCenterPage() {
     )).then(results => {
       const np = {}, ns = {}, pp = {}
       results.forEach(({ cat, payload, updatedAt, prevPayload }) => {
-        np[cat] = payload
-        pp[cat] = prevPayload
+        np[cat] = payload; pp[cat] = prevPayload
         if (updatedAt) ns[cat] = updatedAt
       })
-      setPayloads(np)
-      setPrevPayloads(pp)
-      setSavedAt(ns)
+      setPayloads(np); setPrevPayloads(pp); setSavedAt(ns)
 
       if (mode === 'monthly') {
         const newGrid = { finance: {}, hr: {}, ip: {} }
         results.forEach(({ cat, allRows }) => {
-          const monthRows = allRows.filter(r => /^\d{4}-\d{2}$/.test(r.period))
-          monthRows.forEach(row => {
+          allRows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).forEach(row => {
             const mNum = parseInt(row.period.split('-')[1])
             if (!mNum) return
-            const payload = row.payload || {}
-            Object.keys(payload).forEach(fieldKey => {
-              if (fieldKey === 'inputMode' || payload[fieldKey] == null) return
-              if (!newGrid[cat][fieldKey]) newGrid[cat][fieldKey] = {}
-              newGrid[cat][fieldKey][mNum] = payload[fieldKey]
+            Object.entries(row.payload || {}).forEach(([k, v]) => {
+              if (k === 'inputMode' || v == null) return
+              if (!newGrid[cat][k]) newGrid[cat][k] = {}
+              newGrid[cat][k][mNum] = v
             })
           })
         })
@@ -446,47 +458,36 @@ export default function DataCenterPage() {
       }
 
       if (mode === 'cumulative') {
-        const newCumValues = {}
-        const newMultiMonthValues = {}
+        const newCumValues = {}, newMultiMonthValues = {}
         results.forEach(({ cat, allRows }) => {
-          const monthRows = allRows.filter(r => /^\d{4}-\d{2}$/.test(r.period))
-          monthRows.forEach(row => {
+          allRows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).forEach(row => {
             const mNum = parseInt(row.period.split('-')[1])
             if (!mNum) return
             const payload = row.payload || {}
-            if (cat === 'finance' && payload.revenue != null) {
-              if (!newCumValues[mNum]) newCumValues[mNum] = 0
-              newCumValues[mNum] = payload.revenue
-            }
-            Object.keys(payload).forEach(fieldKey => {
-              if (fieldKey === 'revenue' || fieldKey === 'inputMode') return
-              if (payload[fieldKey] == null) return
-              if (!newMultiMonthValues[fieldKey]) newMultiMonthValues[fieldKey] = {}
-              newMultiMonthValues[fieldKey][mNum] = payload[fieldKey]
+            if (cat === 'finance' && payload.revenue != null) newCumValues[mNum] = payload.revenue
+            Object.entries(payload).forEach(([k, v]) => {
+              if (k === 'revenue' || k === 'inputMode' || v == null) return
+              if (!newMultiMonthValues[k]) newMultiMonthValues[k] = {}
+              newMultiMonthValues[k][mNum] = v
             })
           })
         })
         if (Object.keys(newCumValues).length > 0) {
           const sortedMonths = Object.keys(newCumValues).map(Number).sort((a, b) => a - b)
-          let cum = 0
-          const cumRestored = {}
+          let cum = 0; const cumRestored = {}
           sortedMonths.forEach(m => {
             cum += newCumValues[m]
-            const dispVal = _cumUnit !== '亿元' ? fromBase(cum, _cumUnit) : cum
-            cumRestored[m] = parseFloat(dispVal.toPrecision(10))
+            cumRestored[m] = parseFloat((_cumUnit !== '亿元' ? fromBase(cum, _cumUnit) : cum).toPrecision(10))
           })
           setCumValues(cumRestored)
         }
-        if (Object.keys(newMultiMonthValues).length > 0) {
-          setMultiMonthValues(newMultiMonthValues)
-        }
+        if (Object.keys(newMultiMonthValues).length > 0) setMultiMonthValues(newMultiMonthValues)
       }
     }).finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    setCumValues({})
-    setMultiMonthValues({})
+    setCumValues({}); setMultiMonthValues({})
     setMonthlyGridValues({ finance: {}, hr: {}, ip: {} })
     fetchAll(inputMode, year, month)
   }, [inputMode, year, month]) // eslint-disable-line
@@ -494,18 +495,14 @@ export default function DataCenterPage() {
   useEffect(() => {
     if (inputMode !== 'cumulative') return
     const inYi = {}
-    Object.entries(cumValues).forEach(([m, v]) => {
-      if (v != null) inYi[m] = toBase(v, cumUnit)
-    })
+    Object.entries(cumValues).forEach(([m, v]) => { if (v != null) inYi[m] = toBase(v, cumUnit) })
     setSplitPreview(splitCumulativeRevenue(inYi))
   }, [cumValues, inputMode, cumUnit])
 
   const save = async (category) => {
     const enabledPayload = {}
     Object.entries(payloads[category] || {}).forEach(([k, v]) => {
-      if (fieldEnabled[category]?.[k] !== false && v !== null && v !== undefined) {
-        enabledPayload[k] = v
-      }
+      if (fieldEnabled[category]?.[k] !== false && v !== null && v !== undefined) enabledPayload[k] = v
     })
     if (inputMode === 'cumulative') enabledPayload.inputMode = 'cumulative'
     setSaving(s => ({ ...s, [category]: true }))
@@ -524,28 +521,22 @@ export default function DataCenterPage() {
 
   const saveSplitRevenue = async () => {
     const inYi = {}
-    Object.entries(cumValues).forEach(([m, v]) => {
-      if (v != null) inYi[m] = toBase(v, cumUnit)
-    })
+    Object.entries(cumValues).forEach(([m, v]) => { if (v != null) inYi[m] = toBase(v, cumUnit) })
     const split = splitCumulativeRevenue(inYi)
     if (Object.keys(split).length === 0) return message.error('请先填入累计值')
     setSaving(s => ({ ...s, finance: true }))
     try {
       await Promise.all(Object.entries(split).map(([m, val]) =>
         api.post('/api/agreement/data', {
-          period: `${year}-${String(m).padStart(2, '0')}`,
-          category: 'finance',
+          period: `${year}-${String(m).padStart(2, '0')}`, category: 'finance',
           payload: { ...payloads.finance, revenue: val },
         })
       ))
       message.success(`营业收入已按月份拆分保存（共 ${Object.keys(split).length} 个月）`)
       setSavedAt(s => ({ ...s, finance: new Date().toISOString() }))
       setEditMode(e => ({ ...e, finance: false }))
-    } catch (e) {
-      message.error('保存失败：' + e)
-    } finally {
-      setSaving(s => ({ ...s, finance: false }))
-    }
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setSaving(s => ({ ...s, finance: false })) }
   }
 
   const saveMonthlyGrid = async (cat, fieldKey, fieldLabel) => {
@@ -553,14 +544,13 @@ export default function DataCenterPage() {
     const months = Object.entries(monthMap).filter(([, v]) => v != null)
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
-    const fieldDef = ALL_FIELDS[cat]?.find(f => f.key === fieldKey)
+    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
     const needConvert = fieldDef?.baseUnit === '亿元' && inputUnits[fieldKey] && inputUnits[fieldKey] !== '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
         const storedVal = needConvert ? toBase(val, inputUnits[fieldKey]) : val
         return api.post('/api/agreement/data', {
-          period: `${year}-${String(m).padStart(2, '0')}`,
-          category: cat,
+          period: `${year}-${String(m).padStart(2, '0')}`, category: cat,
           payload: { [fieldKey]: storedVal },
         })
       }))
@@ -576,44 +566,49 @@ export default function DataCenterPage() {
     const months = Object.entries(monthMap).filter(([, v]) => v != null)
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
-    const fieldDef = ALL_FIELDS[cat]?.find(f => f.key === fieldKey)
+    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
     const needConvert = cat === 'finance' && fieldDef?.baseUnit === '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
         const storedVal = needConvert ? toBase(val, cumUnit) : val
         return api.post('/api/agreement/data', {
-          period: `${year}-${String(m).padStart(2, '0')}`,
-          category: cat,
+          period: `${year}-${String(m).padStart(2, '0')}`, category: cat,
           payload: { ...payloads[cat], [fieldKey]: storedVal },
         })
       }))
       message.success(`${fieldLabel} 已按月份保存（共 ${months.length} 个月）`)
       setSavedAt(s => ({ ...s, [cat]: new Date().toISOString() }))
       setEditMode(e => ({ ...e, [cat]: false }))
-    } catch (e) {
-      message.error('保存失败：' + e)
-    } finally {
-      setSaving(s => ({ ...s, [cat]: false }))
-    }
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setSaving(s => ({ ...s, [cat]: false })) }
   }
 
-  // 三态循环：true（正常显示） → 'dim'（灰色半透明） → false（隐藏） → true
-  const toggleField = (cat, key) => {
-    const cur = fieldEnabled[cat]?.[key]
-    const next = cur === true ? 'dim' : cur === 'dim' ? false : true
-    const nextState = { ...fieldEnabled, [cat]: { ...fieldEnabled[cat], [key]: next } }
-    setFieldEnabled(nextState)
-    localStorage.setItem('datahub_field_config', JSON.stringify(nextState))
+  const saveAnnualField = async (cat, fieldKey, fieldLabel, value) => {
+    if (value == null) return message.error(`请先填入 ${fieldLabel} 数值`)
+    setSaving(s => ({ ...s, [cat]: true }))
+    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
+    const hasMultiUnit = fieldDef?.inputUnits?.length > 1
+    const curUnit = inputUnits[fieldKey] || fieldDef?.baseUnit
+    const storedVal = hasMultiUnit && curUnit !== fieldDef.baseUnit ? toBase(value, curUnit) : value
+    try {
+      await api.post('/api/agreement/data', {
+        period: String(year), category: cat,
+        payload: { ...payloads[cat], [fieldKey]: storedVal },
+      })
+      message.success(`${fieldLabel} 全年数据已保存（${year}年）`)
+      setSavedAt(s => ({ ...s, [cat]: new Date().toISOString() }))
+      setEditMode(e => ({ ...e, [cat]: false }))
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setSaving(s => ({ ...s, [cat]: false })) }
   }
 
-  // dim 字段仍然计入 enabled（只有 false=完全隐藏 才不计）
-  const enabledCount = (cat) => ALL_FIELDS[cat].filter(f => fieldEnabled[cat]?.[f.key] !== false).length
+  const enabledCount = (cat) => allCatFields(cat).filter(f => fieldEnabled[cat]?.[f.key] !== false).length
   const filledCount  = (cat) => {
-    const fields = ALL_FIELDS[cat].filter(f => fieldEnabled[cat]?.[f.key] !== false)
+    const fields = allCatFields(cat).filter(f => fieldEnabled[cat]?.[f.key] !== false)
     return fields.filter(f => payloads[cat]?.[f.key] !== null && payloads[cat]?.[f.key] !== undefined).length
   }
 
-  const taxTotal = ((Number(payloads.finance?.vatPaidSuzhou) || 0) + (Number(payloads.finance?.citPaidSuzhou) || 0))
+  const taxTotal = (Number(payloads.finance?.vatPaidSuzhou) || 0) + (Number(payloads.finance?.citPaidSuzhou) || 0)
 
   const handleParseUpload = async ({ file, onSuccess, onError }) => {
     const cat = parseModal.cat
@@ -635,33 +630,16 @@ export default function DataCenterPage() {
   const applyParseResult = () => {
     if (!parseResult?.matched?.length) return
     const { cat, fieldKey, multiMonth } = parseModal
-
     if (multiMonth && fieldKey) {
       const monthData = parseResult.monthlyData?.[fieldKey] || {}
-      const hasMonthly = Object.keys(monthData).length > 0
-      if (hasMonthly) {
-        if (fieldKey === 'revenue') {
-          setCumValues(monthData)
-        } else {
-          setMultiMonthValues(p => ({ ...p, [fieldKey]: monthData }))
-        }
+      if (Object.keys(monthData).length > 0) {
+        if (fieldKey === 'revenue') setCumValues(monthData)
+        else setMultiMonthValues(p => ({ ...p, [fieldKey]: monthData }))
         setParseApplied(true)
         message.success(`已将 ${Object.keys(monthData).length} 个月的数据填入月度面板`)
         return
       }
-      const item = parseResult.matched.find(m => m.key === fieldKey)
-      if (item) {
-        if (fieldKey === 'revenue') {
-          setCumValues({ 12: item.value })
-        } else {
-          setMultiMonthValues(p => ({ ...p, [fieldKey]: { 12: item.value } }))
-        }
-        message.success(`已将 ${item.label} 的值填入月度面板（12月）`)
-        setParseApplied(true)
-        return
-      }
     }
-
     const updates = {}
     parseResult.matched.forEach(({ key, value }) => { updates[key] = value })
     setPayloads(p => ({ ...p, [cat]: { ...p[cat], ...updates } }))
@@ -671,17 +649,15 @@ export default function DataCenterPage() {
 
   const modeLabel = inputMode === 'annual'
     ? `${year} 年度（全年汇总）`
-    : inputMode === 'cumulative'
-      ? `${year} 年 · 累计值拆分`
-      : `${year} 年 · 按月填报`
+    : inputMode === 'cumulative' ? `${year} 年 · 累计值拆分` : `${year} 年 · 按月填报`
 
   const tabItems = ['finance', 'hr', 'ip'].map(cat => {
     const color = CAT_COLORS[cat]
     const filled = filledCount(cat)
     const total  = enabledCount(cat)
     const hasSaved = !!savedAt[cat]
-    // configMode：全部显示；普通：排除 false（隐藏），dim 正常渲染但半透明
-    const activeFields = ALL_FIELDS[cat].filter(f => configMode || fieldEnabled[cat]?.[f.key] !== false)
+    // 显示的字段：configMode 显示全部（含隐藏的方便管理），否则排除 false
+    const visibleFields = allCatFields(cat).filter(f => configMode || fieldEnabled[cat]?.[f.key] !== false)
 
     return {
       key: cat,
@@ -711,7 +687,6 @@ export default function DataCenterPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: '#94a3b8' }}>已填 {filled}/{total}</span>
-              {/* 未编辑：编辑数据 + 配置字段 */}
               {canEdit && !editMode[cat] && (
                 <Button size="small" icon={<EditOutlined />}
                   onClick={() => setEditMode(e => ({ ...e, [cat]: true }))}
@@ -719,15 +694,15 @@ export default function DataCenterPage() {
                   编辑数据
                 </Button>
               )}
-              {/* 编辑中：保存 + 关闭 + 导入 */}
               {canEdit && editMode[cat] && (
                 <>
-                  <Button size="small" type="primary" icon={<SaveOutlined />}
-                    loading={saving[cat]}
-                    onClick={() => save(cat)}
-                    style={{ borderRadius: 6, fontSize: 11, background: color, borderColor: color }}>
-                    保存
-                  </Button>
+                  {inputMode === 'annual' && (
+                    <Button size="small" type="primary" icon={<SaveOutlined />}
+                      loading={saving[cat]} onClick={() => save(cat)}
+                      style={{ borderRadius: 6, fontSize: 11, background: color, borderColor: color }}>
+                      保存全部
+                    </Button>
+                  )}
                   <Button size="small" icon={<CloseOutlined />}
                     onClick={() => setEditMode(e => ({ ...e, [cat]: false }))}
                     style={{ borderRadius: 6, fontSize: 11 }}>
@@ -740,69 +715,71 @@ export default function DataCenterPage() {
                   </Button>
                 </>
               )}
-              {/* 配置字段按钮始终可见 */}
-              {canEdit && (
-                <Button size="small" icon={<SettingOutlined />}
-                  onClick={() => setConfigMode(v => !v)}
-                  type={configMode ? 'primary' : 'default'}
-                  style={{ borderRadius: 6, fontSize: 11 }}>
-                  {configMode ? '完成配置' : '配置字段'}
-                </Button>
-              )}
+              <Button size="small" icon={configMode ? <CheckCircleOutlined /> : <SettingOutlined />}
+                onClick={() => setConfigMode(v => !v)}
+                type={configMode ? 'primary' : 'default'}
+                style={{ borderRadius: 6, fontSize: 11 }}>
+                {configMode ? '完成配置' : '配置字段'}
+              </Button>
             </div>
           </div>
 
+          {/* 配置模式说明条 */}
           {configMode && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, padding: '8px 14px', background: '#fefce8', border: '1px solid #fde047', borderRadius: 8 }}>
-              <SettingOutlined style={{ color: '#ca8a04', fontSize: 14 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 14px', background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, flexWrap: 'wrap' }}>
+              <SettingOutlined style={{ color: '#ca8a04' }} />
               <span style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>字段配置模式</span>
-              <span style={{ fontSize: 11, color: '#a16207' }}>点击每个字段右上角按钮切换状态：</span>
-              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>✓ 正常显示</span>
-              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }}>◑ 灰色置底</span>
-              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }}>✕ 完全隐藏</span>
-              <span style={{ fontSize: 11, color: '#a16207', marginLeft: 'auto' }}>配置保存在本地浏览器</span>
+              <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, background: '#dcfce7', border: '1px solid #86efac', color: '#166534', fontWeight: 700 }}>● 显示</span>
+              <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', fontWeight: 700 }}>◑ 灰色</span>
+              <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', fontWeight: 700 }}>✕ 隐藏</span>
+              <span style={{ fontSize: 11, color: '#a16207', marginLeft: 4 }}>· 可切换必填/选填 · 自定义指标可删除</span>
+              <Button size="small" type="primary" icon={<PlusOutlined />}
+                onClick={() => { setAddModal({ open: true, cat }); setNewFieldLabel(''); setNewFieldUnit('亿元'); setNewFieldRequired(false) }}
+                style={{ marginLeft: 'auto', borderRadius: 8, background: color, borderColor: color, fontSize: 11 }}>
+                添加指标
+              </Button>
             </div>
           )}
 
           {/* 只读提示 */}
           {canEdit && !editMode[cat] && !configMode && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12,
-              padding: '7px 12px', background: '#f8fafc', borderRadius: 8,
-              border: '1px solid #e2e8f0', fontSize: 12, color: '#64748b',
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, padding: '7px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#64748b' }}>
               <LockOutlined style={{ color: '#94a3b8' }} />
               只读模式 · 点击右上角「编辑数据」按钮修改数据，防止误触
             </div>
           )}
 
-          {/* 按月填报：每个字段一个 12 格月度网格 */}
+          {/* ── 按月填报 ── */}
           {inputMode === 'monthly' && (
             <div>
-              {activeFields.map(field => (
-                <MonthGrid
-                  key={field.key}
-                  field={field}
-                  values={monthlyGridValues[cat]?.[field.key] || {}}
-                  onChange={(m, v) => setMonthlyGridValues(p => ({
-                    ...p,
-                    [cat]: { ...p[cat], [field.key]: { ...(p[cat]?.[field.key] || {}), [m]: v } }
-                  }))}
-                  isCumulative={false}
-                  unit={inputUnits[field.key] || field.baseUnit}
-                  isEditing={editMode[cat]}
-                  onSave={() => saveMonthlyGrid(cat, field.key, field.label)}
-                  onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
-                  saving={saving[cat]}
-                  isDim={fieldEnabled[cat]?.[field.key]}
-                  configMode={configMode}
-                  onToggleDim={() => toggleField(cat, field.key)}
-                />
-              ))}
+              {visibleFields.map(field => {
+                const fUnit = inputUnits[field.key] || field.baseUnit
+                const ds = fieldEnabled[cat]?.[field.key]
+                return (
+                  <MonthGrid
+                    key={field.key} field={field}
+                    values={monthlyGridValues[cat]?.[field.key] || {}}
+                    onChange={(m, v) => setMonthlyGridValues(p => ({
+                      ...p, [cat]: { ...p[cat], [field.key]: { ...(p[cat]?.[field.key] || {}), [m]: v } }
+                    }))}
+                    isCumulative={false} unit={fUnit}
+                    isEditing={editMode[cat]}
+                    onSave={() => saveMonthlyGrid(cat, field.key, field.label)}
+                    onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
+                    saving={saving[cat]}
+                    dimState={ds} configMode={configMode}
+                    onToggleDim={() => toggleFieldState(cat, field.key)}
+                    onDelete={field.custom ? () => deleteCustomField(cat, field.key) : undefined}
+                    isRequired={getRequired(field)}
+                    onToggleRequired={v => setRequired(field.key, v)}
+                    customField={!!field.custom}
+                  />
+                )
+              })}
             </div>
           )}
 
-          {/* 累计值拆分：每个字段一个 12 格橙色网格 */}
+          {/* ── 累计值拆分 ── */}
           {inputMode === 'cumulative' && (
             <div>
               {cat === 'finance' && (
@@ -816,64 +793,69 @@ export default function DataCenterPage() {
                   </div>
                 </div>
               )}
-              {activeFields.map(field => {
+              {visibleFields.map(field => {
                 const isRevenue = cat === 'finance' && field.key === 'revenue'
                 const isFinance = cat === 'finance'
                 const mv = isRevenue ? cumValues : (multiMonthValues[field.key] || {})
                 const setMv = isRevenue
                   ? (m, v) => setCumValues(p => ({ ...p, [m]: v }))
                   : (m, v) => setMultiMonthValues(p => ({ ...p, [field.key]: { ...(p[field.key] || {}), [m]: v } }))
+                const ds = fieldEnabled[cat]?.[field.key]
                 return (
                   <MonthGrid
-                    key={field.key}
-                    field={field}
-                    values={mv}
-                    onChange={setMv}
-                    isCumulative={true}
+                    key={field.key} field={field}
+                    values={mv} onChange={setMv} isCumulative={true}
                     unit={isFinance ? cumUnit : field.baseUnit}
                     splitPreview={isRevenue ? splitPreview : undefined}
                     isEditing={editMode[cat]}
                     onSave={isRevenue ? saveSplitRevenue : () => saveMultiMonthField(cat, field.key, field.label)}
                     onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
                     saving={saving[cat]}
-                    isDim={fieldEnabled[cat]?.[field.key]}
-                    configMode={configMode}
-                    onToggleDim={() => toggleField(cat, field.key)}
+                    dimState={ds} configMode={configMode}
+                    onToggleDim={() => toggleFieldState(cat, field.key)}
+                    onDelete={field.custom ? () => deleteCustomField(cat, field.key) : undefined}
+                    isRequired={getRequired(field)}
+                    onToggleRequired={v => setRequired(field.key, v)}
+                    customField={!!field.custom}
                   />
                 )
               })}
             </div>
           )}
 
-          {/* 按年汇总：字段卡片网格 */}
+          {/* ── 按年汇总 ── */}
           {inputMode === 'annual' && (
             <div>
-              <Row gutter={[10, 10]}>
-                {activeFields.map(field => (
-                  <FieldCard
-                    key={field.key}
-                    field={field}
-                    value={payloads[cat]?.[field.key]}
-                    onChange={editMode[cat] ? (v => setPayloads(p => ({ ...p, [cat]: { ...p[cat], [field.key]: v } }))) : () => {}}
-                    showToggle={configMode}
-                    enabled={editMode[cat] ? (fieldEnabled[cat]?.[field.key] === false ? false : true) : (fieldEnabled[cat]?.[field.key] === false ? false : 'readonly')}
-                    onToggle={v => toggleField(cat, field.key)}
-                    prevValue={prevPayloads[cat]?.[field.key]}
-                    inputUnit={inputUnits[field.key] || field.baseUnit}
-                    onUnitChange={editMode[cat] ? (u => setFieldUnit(field.key, u)) : () => {}}
-                    isRequired={isRequired(field)}
-                    onToggleRequired={v => toggleRequired(field.key, v)}
-                    isDim={fieldEnabled[cat]?.[field.key]}
-                    configMode={configMode}
-                    onToggleDim={() => toggleField(cat, field.key)}
+              {visibleFields.map(field => {
+                const hasMulti = field.inputUnits?.length > 1
+                const curUnit = inputUnits[field.key] || field.baseUnit
+                const storedVal = payloads[cat]?.[field.key]
+                const dispVal = storedVal != null && hasMulti && curUnit !== field.baseUnit ? fromBase(storedVal, curUnit) : storedVal
+                const ds = fieldEnabled[cat]?.[field.key]
+                return (
+                  <AnnualGrid
+                    key={field.key} field={field}
+                    value={dispVal}
+                    onChange={v => setPayloads(p => ({
+                      ...p, [cat]: { ...p[cat], [field.key]: hasMulti && curUnit !== field.baseUnit ? toBase(v, curUnit) : v }
+                    }))}
+                    unit={curUnit}
+                    isEditing={editMode[cat]}
+                    onSave={() => saveAnnualField(cat, field.key, field.label, dispVal)}
+                    saving={saving[cat]}
+                    dimState={ds} configMode={configMode}
+                    onToggleDim={() => toggleFieldState(cat, field.key)}
+                    onDelete={field.custom ? () => deleteCustomField(cat, field.key) : undefined}
+                    isRequired={getRequired(field)}
+                    onToggleRequired={v => setRequired(field.key, v)}
+                    customField={!!field.custom}
                   />
-                ))}
-              </Row>
+                )
+              })}
               {cat === 'finance' && (payloads.finance?.vatPaidSuzhou || payloads.finance?.citPaidSuzhou) && (
-                <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 14px' }}>
+                <div style={{ marginTop: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 14px' }}>
                   <CheckCircleOutlined style={{ color: '#10b981', marginRight: 6 }} />
-                  <span style={{ fontSize: 13 }}>
-                    综合税收 = 增值税实缴苏州 + 企业所得税实缴苏州 =
+                  <span style={{ fontSize: 13 }}>综合税收 = 增值税实缴苏州 + 企业所得税实缴苏州 =
                     <strong style={{ color: '#0f172a', marginLeft: 6 }}>{taxTotal.toFixed(4)} 亿元</strong>
                   </span>
                 </div>
@@ -881,8 +863,7 @@ export default function DataCenterPage() {
               {canEdit && editMode[cat] && (
                 <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
                   <Button type="primary" icon={<SaveOutlined />} onClick={() => save(cat)}
-                    loading={saving[cat]}
-                    style={{ background: color, borderColor: color, borderRadius: 8 }}>
+                    loading={saving[cat]} style={{ background: color, borderColor: color, borderRadius: 8 }}>
                     保存 {year} 年 · {CAT_LABELS[cat]}
                   </Button>
                   <Button icon={<ArrowRightOutlined />} onClick={() => router.push('/landing')} style={{ borderRadius: 8 }}>
@@ -915,41 +896,27 @@ export default function DataCenterPage() {
               <CalendarOutlined style={{ color: '#1d6fdb' }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>填报模式</span>
             </div>
-
             <Radio.Group value={inputMode} onChange={e => setInputMode(e.target.value)} buttonStyle="solid" size="small">
-              <Radio.Button value="monthly">
-                <FieldTimeOutlined style={{ marginRight: 4 }} />按月填报
-              </Radio.Button>
-              <Radio.Button value="annual">
-                <CalendarOutlined style={{ marginRight: 4 }} />按年汇总
-              </Radio.Button>
-              <Radio.Button value="cumulative">
-                📊 累计值拆分
-              </Radio.Button>
+              <Radio.Button value="monthly"><FieldTimeOutlined style={{ marginRight: 4 }} />按月填报</Radio.Button>
+              <Radio.Button value="annual"><CalendarOutlined style={{ marginRight: 4 }} />按年汇总</Radio.Button>
+              <Radio.Button value="cumulative">📊 累计值拆分</Radio.Button>
             </Radio.Group>
-
-            {/* 年份选择（所有模式） */}
             <Select value={year} onChange={setYear} size="small" style={{ width: 100 }}
               options={[2024,2025,2026,2027,2028].map(y => ({ value: y, label: `${y} 年` }))} />
-
             <Tag color={inputMode === 'annual' ? 'blue' : inputMode === 'cumulative' ? 'orange' : 'green'}
-              style={{ fontSize: 12, padding: '3px 10px' }}>
-              {modeLabel}
-            </Tag>
-
+              style={{ fontSize: 12, padding: '3px 10px' }}>{modeLabel}</Tag>
             <Tooltip title={
-              inputMode === 'monthly' ? '每月填入当月实际发生值（增量），系统累加为年度总值' :
-              inputMode === 'annual'  ? '直接填入全年汇总数据（如2024/2025年只有年度数据时使用）' :
-              '填入各月末累计值（如1-6月累计），系统自动计算每月增量后分别存储'
+              inputMode === 'monthly' ? '每月填入当月实际发生值，12格网格覆盖全年' :
+              inputMode === 'annual'  ? '直接填入全年汇总数据，适合历史年份' :
+              '填入各月末累计值，系统自动算出每月增量并分月存储'
             }>
               <InfoCircleOutlined style={{ color: '#94a3b8', cursor: 'help' }} />
             </Tooltip>
           </div>
-
           <div style={{ marginTop: 10, fontSize: 12, color: '#64748b', background: '#f8fafc', borderRadius: 8, padding: '6px 12px' }}>
-            {inputMode === 'monthly' && '📌 按月填报：每个月填当月发生的数值，12格网格覆盖全年。财务数据为月度增量，人才/知产数据填截至当月末的累计总数。'}
+            {inputMode === 'monthly' && '📌 按月填报：每个月填当月发生的数值，12格网格覆盖全年。财务为月度增量，人才/知产填截至当月末的累计总数。'}
             {inputMode === 'annual'  && '📌 按年汇总：适合2024/2025等历史年份，直接填全年汇总数据，系统以年度记录存储，不区分月份。'}
-            {inputMode === 'cumulative' && '📌 累计值拆分：填入各月末累计值（如1-6月累计），系统自动算出每月增量并分月存储，保持月度折线图完整性。'}
+            {inputMode === 'cumulative' && '📌 累计值拆分：填入各月末累计值，系统自动算出每月增量并分月存储，保持月度折线图完整性。'}
           </div>
         </Card>
 
@@ -957,9 +924,7 @@ export default function DataCenterPage() {
         <Row gutter={12} style={{ marginBottom: 16 }}>
           {['finance', 'hr', 'ip'].map(cat => {
             const hasSaved = !!savedAt[cat]
-            const filled = filledCount(cat)
-            const total  = enabledCount(cat)
-            const color  = CAT_COLORS[cat]
+            const color = CAT_COLORS[cat]
             return (
               <Col key={cat} xs={24} sm={8}>
                 <div style={{
@@ -977,7 +942,7 @@ export default function DataCenterPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{CAT_LABELS[cat]}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                      {hasSaved ? `${modeLabel} · 已保存 ${filled}/${total} 项` : `${modeLabel} · 暂无数据`}
+                      {hasSaved ? `${modeLabel} · 已保存 ${filledCount(cat)}/${enabledCount(cat)} 项` : `${modeLabel} · 暂无数据`}
                     </div>
                   </div>
                   {hasSaved && <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />}
@@ -994,21 +959,50 @@ export default function DataCenterPage() {
                 <span style={{ fontSize: 15, fontWeight: 600, color: '#1a2d5a' }}>{modeLabel} · 数据录入</span>
                 {!canEdit && <Tag color="default" style={{ fontSize: 11, margin: 0 }}>只读</Tag>}
               </div>
-            }
-          >
+            }>
             <Tabs items={tabItems} size="large" tabBarStyle={{ marginBottom: 0 }} />
           </Card>
         </Spin>
 
         <div style={{ marginTop: 14, padding: '10px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e8ecf0' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            💡 <strong>历史年份建议：</strong>
-            2024/2025年若只有年度汇总数据，选「按年汇总」直接填全年总数；
+            💡 <strong>历史年份建议：</strong>2024/2025年若只有年度汇总数据，选「按年汇总」直接填全年总数；
             若有分月累计报告，选「累计值拆分」一次性还原月度数据。
             <strong style={{ color: '#ef4444' }}> 红色"必填"</strong>字段直接关联协议 KPI。
           </Text>
         </div>
       </div>
+
+      {/* 添加指标 Modal */}
+      <Modal
+        title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <PlusOutlined style={{ color: CAT_COLORS[addModal.cat] || '#1d6fdb' }} />
+          <span>添加自定义指标 · {CAT_LABELS[addModal.cat] || ''}</span>
+        </div>}
+        open={addModal.open}
+        onCancel={() => setAddModal({ open: false, cat: null })}
+        onOk={handleAddField}
+        okText="确认添加" cancelText="取消"
+        width={420}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '8px 0' }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#374151', fontWeight: 600, marginBottom: 6 }}>指标名称 *</div>
+            <Input value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)}
+              placeholder="如：苏州办公室面积" maxLength={20} showCount />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#374151', fontWeight: 600, marginBottom: 6 }}>单位</div>
+            <Select value={newFieldUnit} onChange={setNewFieldUnit} style={{ width: '100%' }}
+              options={ALL_UNITS.map(u => ({ value: u, label: u }))} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Switch checked={newFieldRequired} onChange={setNewFieldRequired} size="small" />
+            <span style={{ fontSize: 13, color: '#374151' }}>设为必填项</span>
+            {newFieldRequired && <span style={{ fontSize: 11, color: '#ef4444' }}>关联考核</span>}
+          </div>
+        </div>
+      </Modal>
 
       {/* 文件解析 Modal */}
       <Modal
@@ -1047,12 +1041,9 @@ export default function DataCenterPage() {
                   ? `成功解析 ${parseResult.totalMatchedFields} 个字段（${parseResult.fileName}，${parseResult.parseMode} 模式）`
                   : `未匹配到字段（${parseResult.fileName}）`}
                 style={{ marginBottom: 12, borderRadius: 8 }} />
-
               {parseResult.hasMonthly && Object.keys(parseResult.monthlyData || {}).length > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 600, marginBottom: 6 }}>
-                    📅 检测到月度数据（将填入月度面板）
-                  </div>
+                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 600, marginBottom: 6 }}>📅 检测到月度数据</div>
                   {Object.entries(parseResult.monthlyData).map(([fieldKey, monthMap]) => (
                     <div key={fieldKey} style={{ marginBottom: 8 }}>
                       <div style={{ fontSize: 11, color: '#475569', marginBottom: 4 }}>
@@ -1069,35 +1060,20 @@ export default function DataCenterPage() {
                   ))}
                 </div>
               )}
-
               {parseResult.matched?.length > 0 && !parseResult.hasMonthly && (
                 <div style={{ marginBottom: 10 }}>
-                  <Input.Search
-                    value={parseSearch}
-                    onChange={e => setParseSearch(e.target.value)}
-                    placeholder="搜索字段名..."
-                    allowClear size="small"
-                    style={{ marginBottom: 10, borderRadius: 8 }}
-                  />
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
-                    已识别 {filteredMatched.length}{parseSearch ? `（筛选自 ${parseResult.matched.length}）` : ''} 个字段：
-                  </div>
+                  <Input.Search value={parseSearch} onChange={e => setParseSearch(e.target.value)}
+                    placeholder="搜索字段名..." allowClear size="small" style={{ marginBottom: 10, borderRadius: 8 }} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
                     {filteredMatched.map(({ key, value, label }) => (
                       <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
                         <span style={{ fontSize: 12, color: '#064e3b' }}>{label}</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#10b981', marginLeft: 8, flexShrink: 0 }}>{value}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#10b981', marginLeft: 8 }}>{value}</span>
                       </div>
                     ))}
-                    {filteredMatched.length === 0 && (
-                      <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: '12px 0', fontSize: 13 }}>
-                        没有匹配「{parseSearch}」的字段
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
-
               {parseResult.unmatched?.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>未识别的列名：</div>
@@ -1108,7 +1084,6 @@ export default function DataCenterPage() {
                   </div>
                 </div>
               )}
-
               <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
                 {parseResult.matched?.length > 0 && !parseApplied && (
                   <Button type="primary" icon={<ArrowRightOutlined />}
