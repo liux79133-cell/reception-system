@@ -10,7 +10,8 @@ import {
   DollarOutlined, TeamOutlined, BulbOutlined,
   FileExcelOutlined, SettingOutlined, EditOutlined,
   ArrowRightOutlined, HistoryOutlined, InfoCircleOutlined,
-  CalendarOutlined, FieldTimeOutlined, LockOutlined,
+  CalendarOutlined, FieldTimeOutlined, LockOutlined, CloseOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
@@ -81,7 +82,7 @@ const MONEY_BASE_UNITS = ['亿元']
 const isMoneyUnit = (unit) => MONEY_BASE_UNITS.includes(unit)
 
 // 通用 12 格月度网格组件
-function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, isEditing, onSave, onImport, saving }) {
+function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, isEditing, onSave, onImport, saving, isDim, configMode, onToggleDim }) {
   const isMoney = isMoneyUnit(field.baseUnit)
   const prec = unit === '元' ? 0 : unit === '万元' ? 2 : 4
   const accent = isCumulative ? '#d97706' : '#1d6fdb'
@@ -98,8 +99,22 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
     return Math.round(n).toLocaleString('zh-CN')
   }
 
+  // dim 状态标签
+  const dimBtnLabel = isDim === true ? '◑ 置底' : isDim === 'dim' ? '✕ 隐藏' : '✓ 显示'
+  const dimBtnStyle = isDim === true
+    ? { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }
+    : isDim === 'dim'
+      ? { background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }
+      : { background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }
+
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10,
+      opacity: isDim === 'dim' ? 0.45 : 1,
+      filter: isDim === 'dim' ? 'grayscale(0.6)' : 'none',
+      transition: 'opacity 0.2s, filter 0.2s',
+      position: 'relative',
+    }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: textC }}>{field.label}</span>
@@ -118,16 +133,26 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
             : <span style={{ fontSize: 9, color: '#94a3b8' }}>选填</span>}
           <span style={{ fontSize: 11, color: subC }}>单位：{unit}</span>
         </div>
-        {isEditing && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Button size="small" icon={<FileExcelOutlined />} onClick={onImport}
-              style={{ borderRadius: 7, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>导入</Button>
-            <Button size="small" loading={saving} onClick={onSave}
-              style={{ borderRadius: 7, fontSize: 11, background: accent, borderColor: accent, color: '#fff' }}>
-              {isCumulative && field.key === 'revenue' ? '拆分按月保存' : '按月保存'}
-            </Button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* 配置模式：三态切换按钮 */}
+          {configMode && (
+            <button onClick={onToggleDim}
+              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
+                border: 'none', outline: 'none', transition: 'all 0.15s', ...dimBtnStyle }}>
+              {dimBtnLabel}
+            </button>
+          )}
+          {isEditing && (
+            <>
+              <Button size="small" icon={<FileExcelOutlined />} onClick={onImport}
+                style={{ borderRadius: 7, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>导入</Button>
+              <Button size="small" loading={saving} onClick={onSave}
+                style={{ borderRadius: 7, fontSize: 11, background: accent, borderColor: accent, color: '#fff' }}>
+                {isCumulative && field.key === 'revenue' ? '拆分按月保存' : '按月保存'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <Row gutter={[6, 6]}>
@@ -181,7 +206,7 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
 }
 
 // 按年模式的字段卡片
-function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prevValue, inputUnit, onUnitChange, isRequired, onToggleRequired }) {
+function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prevValue, inputUnit, onUnitChange, isRequired, onToggleRequired, isDim, onToggleDim, configMode }) {
   const hasMultiUnit = field.inputUnits && field.inputUnits.length > 1
   const currentUnit  = inputUnit || field.baseUnit
   const displayValue = (value != null && field.baseUnit !== currentUnit && hasMultiUnit)
@@ -196,6 +221,14 @@ function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prev
   const hasChange = prevValue != null && value != null && Number(value) !== Number(prevValue)
   const isReadonly = enabled === 'readonly'
   const isHidden   = enabled === false
+  const dimState   = isDim  // true | 'dim' | false (same cycle as MonthGrid)
+
+  const dimBtnLabel = dimState === true ? '◑ 置底' : dimState === 'dim' ? '✕ 隐藏' : '✓ 显示'
+  const dimBtnStyle = dimState === true
+    ? { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }
+    : dimState === 'dim'
+      ? { background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }
+      : { background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }
 
   function fmtReadonly(val) {
     if (val == null) return '—'
@@ -215,7 +248,8 @@ function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prev
         background: isHidden ? '#f8fafc' : isReadonly ? '#fafafa' : '#fff',
         border: `1px solid ${isHidden ? '#f1f5f9' : isReadonly ? '#eef0f4' : hasChange ? '#fbbf24' : '#e8ecf4'}`,
         borderRadius: 10, padding: '10px 14px',
-        opacity: isHidden ? 0.5 : 1,
+        opacity: isDim === 'dim' ? 0.4 : isHidden ? 0.5 : 1,
+        filter: isDim === 'dim' ? 'grayscale(0.7)' : 'none',
         transition: 'all 0.15s',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -231,20 +265,12 @@ function FieldCard({ field, value, onChange, showToggle, enabled, onToggle, prev
                 color: '#1d6fdb', background: '#eff6ff', border: '1px solid #bfdbfe' }}>KPI</Tag>
             )}
           </div>
-          {showToggle && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <Tooltip title="切换必填/选填">
-                <div onClick={e => { e.stopPropagation(); onToggleRequired?.(!isRequired) }}
-                  style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, cursor: 'pointer',
-                    fontWeight: 700, userSelect: 'none', transition: 'all 0.15s',
-                    color: isRequired ? '#ef4444' : '#94a3b8',
-                    background: isRequired ? '#fff1f2' : '#f8fafc',
-                    border: `1px solid ${isRequired ? '#fecaca' : '#e2e8f0'}` }}>
-                  {isRequired ? '必填 ✕' : '选填 +'}
-                </div>
-              </Tooltip>
-              <Switch size="small" checked={enabled !== false} onChange={onToggle} />
-            </div>
+          {configMode && (
+            <button onClick={onToggleDim}
+              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', fontWeight: 600,
+                border: 'none', outline: 'none', flexShrink: 0, transition: 'all 0.15s', ...dimBtnStyle }}>
+              {dimBtnLabel}
+            </button>
           )}
         </div>
 
@@ -571,12 +597,16 @@ export default function DataCenterPage() {
     }
   }
 
-  const toggleField = (cat, key, val) => {
-    const next = { ...fieldEnabled, [cat]: { ...fieldEnabled[cat], [key]: val } }
-    setFieldEnabled(next)
-    localStorage.setItem('datahub_field_config', JSON.stringify(next))
+  // 三态循环：true（正常显示） → 'dim'（灰色半透明） → false（隐藏） → true
+  const toggleField = (cat, key) => {
+    const cur = fieldEnabled[cat]?.[key]
+    const next = cur === true ? 'dim' : cur === 'dim' ? false : true
+    const nextState = { ...fieldEnabled, [cat]: { ...fieldEnabled[cat], [key]: next } }
+    setFieldEnabled(nextState)
+    localStorage.setItem('datahub_field_config', JSON.stringify(nextState))
   }
 
+  // dim 字段仍然计入 enabled（只有 false=完全隐藏 才不计）
   const enabledCount = (cat) => ALL_FIELDS[cat].filter(f => fieldEnabled[cat]?.[f.key] !== false).length
   const filledCount  = (cat) => {
     const fields = ALL_FIELDS[cat].filter(f => fieldEnabled[cat]?.[f.key] !== false)
@@ -650,7 +680,8 @@ export default function DataCenterPage() {
     const filled = filledCount(cat)
     const total  = enabledCount(cat)
     const hasSaved = !!savedAt[cat]
-    const activeFields = ALL_FIELDS[cat].filter(f => fieldEnabled[cat]?.[f.key] !== false || configMode)
+    // configMode：全部显示；普通：排除 false（隐藏），dim 正常渲染但半透明
+    const activeFields = ALL_FIELDS[cat].filter(f => configMode || fieldEnabled[cat]?.[f.key] !== false)
 
     return {
       key: cat,
@@ -680,6 +711,7 @@ export default function DataCenterPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: '#94a3b8' }}>已填 {filled}/{total}</span>
+              {/* 未编辑：编辑数据 + 配置字段 */}
               {canEdit && !editMode[cat] && (
                 <Button size="small" icon={<EditOutlined />}
                   onClick={() => setEditMode(e => ({ ...e, [cat]: true }))}
@@ -687,34 +719,49 @@ export default function DataCenterPage() {
                   编辑数据
                 </Button>
               )}
-              {canEdit && editMode[cat] && inputMode === 'annual' && (
-                <Button size="small" type="primary" icon={<SaveOutlined />}
-                  loading={saving[cat]}
-                  onClick={() => save(cat)}
-                  style={{ borderRadius: 6, fontSize: 11, background: color, borderColor: color }}>
-                  保存
-                </Button>
-              )}
+              {/* 编辑中：保存 + 关闭 + 导入 */}
               {canEdit && editMode[cat] && (
-                <Button size="small" icon={<FileExcelOutlined />}
-                  onClick={() => { setParseModal({ open: true, cat }); setParseResult(null); setParseApplied(false) }}
-                  style={{ borderRadius: 6, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>
-                  导入文件
-                </Button>
+                <>
+                  <Button size="small" type="primary" icon={<SaveOutlined />}
+                    loading={saving[cat]}
+                    onClick={() => save(cat)}
+                    style={{ borderRadius: 6, fontSize: 11, background: color, borderColor: color }}>
+                    保存
+                  </Button>
+                  <Button size="small" icon={<CloseOutlined />}
+                    onClick={() => setEditMode(e => ({ ...e, [cat]: false }))}
+                    style={{ borderRadius: 6, fontSize: 11 }}>
+                    关闭
+                  </Button>
+                  <Button size="small" icon={<FileExcelOutlined />}
+                    onClick={() => { setParseModal({ open: true, cat }); setParseResult(null); setParseApplied(false) }}
+                    style={{ borderRadius: 6, fontSize: 11, borderColor: '#10b981', color: '#10b981' }}>
+                    导入
+                  </Button>
+                </>
               )}
+              {/* 配置字段按钮始终可见 */}
               {canEdit && (
                 <Button size="small" icon={<SettingOutlined />}
                   onClick={() => setConfigMode(v => !v)}
                   type={configMode ? 'primary' : 'default'}
                   style={{ borderRadius: 6, fontSize: 11 }}>
-                  {configMode ? '完成' : '配置字段'}
+                  {configMode ? '完成配置' : '配置字段'}
                 </Button>
               )}
             </div>
           </div>
 
           {configMode && (
-            <Alert type="warning" showIcon message="字段配置模式：用右侧开关显示/隐藏字段，配置保存在本地浏览器" style={{ marginBottom: 12, borderRadius: 8 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, padding: '8px 14px', background: '#fefce8', border: '1px solid #fde047', borderRadius: 8 }}>
+              <SettingOutlined style={{ color: '#ca8a04', fontSize: 14 }} />
+              <span style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>字段配置模式</span>
+              <span style={{ fontSize: 11, color: '#a16207' }}>点击每个字段右上角按钮切换状态：</span>
+              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>✓ 正常显示</span>
+              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }}>◑ 灰色置底</span>
+              <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' }}>✕ 完全隐藏</span>
+              <span style={{ fontSize: 11, color: '#a16207', marginLeft: 'auto' }}>配置保存在本地浏览器</span>
+            </div>
           )}
 
           {/* 只读提示 */}
@@ -747,6 +794,9 @@ export default function DataCenterPage() {
                   onSave={() => saveMonthlyGrid(cat, field.key, field.label)}
                   onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
                   saving={saving[cat]}
+                  isDim={fieldEnabled[cat]?.[field.key]}
+                  configMode={configMode}
+                  onToggleDim={() => toggleField(cat, field.key)}
                 />
               ))}
             </div>
@@ -786,6 +836,9 @@ export default function DataCenterPage() {
                     onSave={isRevenue ? saveSplitRevenue : () => saveMultiMonthField(cat, field.key, field.label)}
                     onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
                     saving={saving[cat]}
+                    isDim={fieldEnabled[cat]?.[field.key]}
+                    configMode={configMode}
+                    onToggleDim={() => toggleField(cat, field.key)}
                   />
                 )
               })}
@@ -803,13 +856,16 @@ export default function DataCenterPage() {
                     value={payloads[cat]?.[field.key]}
                     onChange={editMode[cat] ? (v => setPayloads(p => ({ ...p, [cat]: { ...p[cat], [field.key]: v } }))) : () => {}}
                     showToggle={configMode}
-                    enabled={editMode[cat] ? fieldEnabled[cat]?.[field.key] : (fieldEnabled[cat]?.[field.key] === false ? false : 'readonly')}
-                    onToggle={v => toggleField(cat, field.key, v)}
+                    enabled={editMode[cat] ? (fieldEnabled[cat]?.[field.key] === false ? false : true) : (fieldEnabled[cat]?.[field.key] === false ? false : 'readonly')}
+                    onToggle={v => toggleField(cat, field.key)}
                     prevValue={prevPayloads[cat]?.[field.key]}
                     inputUnit={inputUnits[field.key] || field.baseUnit}
                     onUnitChange={editMode[cat] ? (u => setFieldUnit(field.key, u)) : () => {}}
                     isRequired={isRequired(field)}
                     onToggleRequired={v => toggleRequired(field.key, v)}
+                    isDim={fieldEnabled[cat]?.[field.key]}
+                    configMode={configMode}
+                    onToggleDim={() => toggleField(cat, field.key)}
                   />
                 ))}
               </Row>
