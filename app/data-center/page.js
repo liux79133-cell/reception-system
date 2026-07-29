@@ -355,10 +355,10 @@ export default function DataCenterPage() {
     // 累计模式下同步 cumUnit
     if (['元', '万元', '亿元'].includes(unit)) setCumUnit(unit)
   }
-  // 对某字段取当前显示单位：有单独设置用单独的，否则用全局
+  // 金额字段统一用全局单位，不再读字段级 localStorage 旧值
   const getFieldUnit = (field) => {
     if (field.baseUnit !== '亿元') return field.baseUnit
-    return inputUnits[field.key] || globalMoneyUnit
+    return globalMoneyUnit
   }
 
   const [parseModal, setParseModal]     = useState({ open: false, cat: null })
