@@ -95,32 +95,40 @@ let _chartId = 0
 function LineChart({ series, height = 90, yMax, showArea = true }) {
   const [tip, setTip] = useState(null)
   const containerRef = useRef(null)
-  const [width, setWidth] = useState(280)
-  const clipId = useRef(`lc${++_chartId}`).current
+  const [width, setWidth] = useState(300)
+  const uid = useRef(`lc${++_chartId}`).current
 
   useEffect(() => {
     if (!containerRef.current) return
-    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width || 280))
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(e.contentRect.width, 80) || 300))
     ro.observe(containerRef.current)
     return () => ro.disconnect()
   }, [])
 
-  const pad = { t: 10, r: 8, b: 24, l: 36 }
+  const pad = { t: 14, r: 12, b: 26, l: 40 }
   const W = Math.max(width - pad.l - pad.r, 10)
   const H = height - pad.t - pad.b
 
   const allVals = series.flatMap(s => s.data.map(d => d.value)).filter(v => v !== null)
   const dataMax = allVals.length ? Math.max(...allVals) : 0
-  const maxVal  = yMax ? Math.max(yMax, dataMax * 1.05) : (dataMax ? dataMax * 1.15 : 1)
+  const maxVal  = yMax ? Math.max(yMax, dataMax * 1.05) : (dataMax ? dataMax * 1.2 : 1)
   const months  = 12
 
   const xPos = (m) => ((m - 1) / (months - 1)) * W + pad.l
   const yPos = (v) => pad.t + H - Math.min(v / maxVal, 1) * H
 
+  const fmtTick = (v) => {
+    if (v === 0) return '0'
+    if (v >= 1e8) return `${(v / 1e8).toFixed(1)}亿`
+    if (v >= 1e4) return `${(v / 1e4).toFixed(0)}万`
+    if (v >= 1) return v.toFixed(v >= 10 ? 0 : 1)
+    if (v >= 0.01) return v.toFixed(2)
+    return v.toExponential(1)
+  }
   const fmtTip = (v) => {
     if (v === null || v === undefined) return '—'
     if (v >= 1) return v.toFixed(2)
-    if (v >= 0.01) return v.toFixed(4)
+    if (v >= 0.001) return v.toFixed(4)
     return v.toExponential(2)
   }
 
@@ -130,102 +138,132 @@ function LineChart({ series, height = 90, yMax, showArea = true }) {
       return { label: s.label, value: pt?.value ?? null, color: s.color }
     }).filter(i => i.value !== null)
     if (!items.length) { setTip(null); return }
-    const x = xPos(month)
-    const firstVal = items[0].value
-    setTip({ x, y: yPos(firstVal), month, items })
+    setTip({ x: xPos(month), month, items })
   }
 
-  const polyline = (data, color, filled) => {
+  // 贝塞尔平滑曲线
+  const smoothPath = (pts) => {
+    if (pts.length < 2) return ''
+    let d = `M${xPos(pts[0].month)},${yPos(pts[0].value)}`
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1], cur = pts[i]
+      const cpx = (xPos(prev.month) + xPos(cur.month)) / 2
+      d += ` C${cpx},${yPos(prev.value)} ${cpx},${yPos(cur.value)} ${xPos(cur.month)},${yPos(cur.value)}`
+    }
+    return d
+  }
+
+  const renderSeries = (data, color, filled, idx) => {
     const pts = data.filter(d => d.value !== null)
-    if (pts.length < 2) return null
-    const points = pts.map(d => `${xPos(d.month)},${yPos(d.value)}`).join(' ')
-    const areaPath = `M${xPos(pts[0].month)},${pad.t + H} ` +
-      pts.map(d => `L${xPos(d.month)},${yPos(d.value)}`).join(' ') +
-      ` L${xPos(pts[pts.length - 1].month)},${pad.t + H} Z`
+    if (pts.length < 1) return null
+    const pathD = pts.length >= 2 ? smoothPath(pts) : null
+    const gradId = `${uid}-g${idx}`
+    const firstX = xPos(pts[0].month), lastX = xPos(pts[pts.length - 1].month)
+    const areaD = pathD
+      ? `M${firstX},${pad.t + H} L${firstX},${yPos(pts[0].value)} ` +
+        pathD.replace(/^M[^ ]+ /, '') +
+        ` L${lastX},${pad.t + H} Z`
+      : null
     return (
-      <g key={color}>
-        {filled && <path d={areaPath} fill={color} fillOpacity="0.1" />}
-        <polyline points={points} fill="none" stroke={color} strokeWidth={2}
-          strokeLinejoin="round" strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 1px 3px ${color}55)` }} />
+      <g key={idx}>
+        {filled && areaD && (
+          <>
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            <path d={areaD} fill={`url(#${gradId})`} />
+          </>
+        )}
+        {pathD && (
+          <path d={pathD} fill="none" stroke={color} strokeWidth={2.2}
+            strokeLinejoin="round" strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 1px 4px ${color}66)` }} />
+        )}
         {pts.map((d, i) => (
-          <circle key={i} cx={xPos(d.month)} cy={yPos(d.value)} r={3}
-            fill={color} stroke="white" strokeWidth={1.5} />
+          <circle key={i} cx={xPos(d.month)} cy={yPos(d.value)} r={tip?.month === d.month ? 5 : 3.5}
+            fill={color} stroke="white" strokeWidth={1.5}
+            style={{ transition: 'r 0.15s' }} />
         ))}
       </g>
     )
   }
 
   const xLabels = [1, 3, 5, 7, 9, 11, 12]
-  const yTicks = [0, 0.5, 1].map(f => ({ v: maxVal * f, y: yPos(maxVal * f) }))
+  const yTicks  = [0, 0.25, 0.5, 0.75, 1].map(f => ({ v: maxVal * f, y: yPos(maxVal * f) }))
 
-  // tooltip 位置：避免超出右侧
-  const tipW = 90, tipH = tip ? tip.items.length * 16 + 18 : 0
-  const tipX = tip ? (tip.x + tipW + 10 > width ? tip.x - tipW - 6 : tip.x + 8) : 0
-  const tipY = tip ? Math.max(pad.t, tip.y - tipH / 2) : 0
+  const tipW = 100, tipH = tip ? tip.items.length * 17 + 22 : 0
+  const tipX = tip ? (tip.x + tipW + 14 > width ? tip.x - tipW - 8 : tip.x + 10) : 0
+  const tipY = tip ? Math.max(pad.t, Math.min(pad.t + H - tipH, yPos(tip.items[0]?.value ?? maxVal / 2) - tipH / 2)) : 0
 
   return (
     <div ref={containerRef} style={{ width: '100%' }}>
-    <svg width={width} height={height} style={{ overflow: 'visible', display: 'block' }}
-      onMouseLeave={() => setTip(null)}>
-      <defs>
-        <clipPath id={clipId}>
-          <rect x={pad.l} y={pad.t} width={W} height={H} />
-        </clipPath>
-      </defs>
-      {/* 网格线 */}
-      {yTicks.map((t, i) => (
-        <g key={i}>
-          <line x1={pad.l} y1={t.y} x2={pad.l + W} y2={t.y}
-            stroke={C.border} strokeWidth={1} strokeDasharray="3,3" />
-          <text x={pad.l - 4} y={t.y + 4} textAnchor="end"
-            fill={C.muted} fontSize={9} fontFamily="system-ui">
-            {t.v >= 10000 ? `${(t.v / 10000).toFixed(1)}w` : t.v.toFixed(t.v >= 1 ? 1 : 2)}
-          </text>
+      <svg width={width} height={height} style={{ overflow: 'visible', display: 'block' }}
+        onMouseLeave={() => setTip(null)}>
+        <defs>
+          <clipPath id={`${uid}-clip`}>
+            <rect x={pad.l} y={pad.t - 4} width={W} height={H + 8} />
+          </clipPath>
+        </defs>
+
+        {/* 网格线 */}
+        {yTicks.map((t, i) => (
+          <g key={i}>
+            <line x1={pad.l} y1={t.y} x2={pad.l + W} y2={t.y}
+              stroke={i === 0 ? 'rgba(30,64,175,0.15)' : C.border}
+              strokeWidth={i === 0 ? 1 : 0.7} strokeDasharray={i === 0 ? 'none' : '4,4'} />
+            <text x={pad.l - 5} y={t.y + 3.5} textAnchor="end"
+              fill={C.muted} fontSize={9} fontFamily="system-ui">{fmtTick(t.v)}</text>
+          </g>
+        ))}
+
+        {/* 折线（裁剪在绘图区内） */}
+        <g clipPath={`url(#${uid}-clip)`}>
+          {series.map((s, i) => renderSeries(s.data, s.color, showArea && i === 0, i))}
         </g>
-      ))}
-      {/* 折线（裁剪在绘图区内） */}
-      <g clipPath={`url(#${clipId})`}>
-        {series.map(s => polyline(s.data, s.color, showArea))}
-      </g>
-      {/* 透明悬浮区：每个月一条竖带 */}
-      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-        <rect key={m}
-          x={xPos(m) - (W / (months - 1)) / 2} y={pad.t}
-          width={W / (months - 1)} height={H}
-          fill="transparent"
-          onMouseEnter={() => handleHover(m)}
-        />
-      ))}
-      {/* X 轴 */}
-      {xLabels.map(m => (
-        <text key={m} x={xPos(m)} y={height - 6} textAnchor="middle"
-          fill={C.muted} fontSize={9} fontFamily="system-ui">{m}月</text>
-      ))}
-      {/* hover 竖线 */}
-      {tip && (
-        <line x1={tip.x} y1={pad.t} x2={tip.x} y2={pad.t + H}
-          stroke="rgba(30,64,175,0.25)" strokeWidth={1} strokeDasharray="3,2" />
-      )}
-      {/* tooltip 气泡 */}
-      {tip && (
-        <g>
-          <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={5}
-            fill="rgba(15,23,42,0.88)" />
-          <text x={tipX + 7} y={tipY + 12} fill="#94a3b8" fontSize={9} fontFamily="system-ui">
-            {tip.month} 月
-          </text>
-          {tip.items.map((it, i) => (
-            <g key={i}>
-              <rect x={tipX + 7} y={tipY + 18 + i * 16 + 2} width={6} height={6} rx={2} fill={it.color} />
-              <text x={tipX + 17} y={tipY + 18 + i * 16 + 9} fill="#e2e8f0" fontSize={9} fontFamily="system-ui">
-                {it.label}  {fmtTip(it.value)}
-              </text>
-            </g>
-          ))}
-        </g>
-      )}
-    </svg>
+
+        {/* hover 竖带 */}
+        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+          <rect key={m}
+            x={xPos(m) - W / (months - 1) / 2} y={pad.t}
+            width={W / (months - 1)} height={H}
+            fill={tip?.month === m ? 'rgba(30,64,175,0.04)' : 'transparent'}
+            onMouseEnter={() => handleHover(m)} />
+        ))}
+
+        {/* X 轴标签 */}
+        {xLabels.map(m => (
+          <text key={m} x={xPos(m)} y={height - 7} textAnchor="middle"
+            fill={C.muted} fontSize={9} fontFamily="system-ui">{m}月</text>
+        ))}
+
+        {/* hover 竖线 */}
+        {tip && (
+          <line x1={tip.x} y1={pad.t} x2={tip.x} y2={pad.t + H}
+            stroke={`${C.blue}40`} strokeWidth={1.5} strokeDasharray="4,3" />
+        )}
+
+        {/* tooltip */}
+        {tip && (
+          <g>
+            <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6}
+              fill="rgba(10,18,36,0.90)" stroke="rgba(99,132,255,0.25)" strokeWidth={0.8} />
+            <text x={tipX + 8} y={tipY + 13} fill="rgba(148,163,184,0.9)" fontSize={9} fontFamily="system-ui" fontWeight="600">
+              {tip.month} 月
+            </text>
+            {tip.items.map((it, i) => (
+              <g key={i}>
+                <circle cx={tipX + 12} cy={tipY + 22 + i * 17} r={3.5} fill={it.color} />
+                <text x={tipX + 20} y={tipY + 26 + i * 17} fill="#e2e8f0" fontSize={9.5} fontFamily="system-ui">
+                  {it.label}  {fmtTip(it.value)}
+                </text>
+              </g>
+            ))}
+          </g>
+        )}
+      </svg>
     </div>
   )
 }

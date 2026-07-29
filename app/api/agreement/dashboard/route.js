@@ -44,8 +44,6 @@ export async function GET(request) {
       return all.length ? Number(all[all.length - 1][field]) || 0 : 0
     }
 
-    const hasAny = (rows) => rows.length > 0
-
     // 财务字段：存储单位已统一为亿元（data-center 填报时已换算）
     const revenueYi   = calcFinanceField(financeRows, 'revenue')
     const vatPaidYi   = calcFinanceField(financeRows, 'vatPaidSuzhou')
@@ -71,14 +69,18 @@ export async function GET(request) {
       INDUSTRY_CHAIN:   latestSnapshot(hrRows, 'industryChainCount'),
     }
 
+    // hasData：精确检查该字段是否真有非零值，避免"有空行但无数据"时误显示 0%
+    const hasFieldValue = (rows, ...fields) =>
+      rows.some(r => fields.some(f => r[f] != null && Number(r[f]) !== 0))
+
     const hasData = {
-      REVENUE:          hasAny(financeRows),
-      TAX_TOTAL:        hasAny(financeRows),
-      PERSONAL_TAX:     hasAny(financeRows),
-      SOCIAL_INSURANCE: hasAny(hrRows),
-      NATIONAL_TALENT:  hasAny(hrRows),
-      INVENTION_PATENT: hasAny(ipRows),
-      INDUSTRY_CHAIN:   hasAny(hrRows),
+      REVENUE:          hasFieldValue(financeRows, 'revenue'),
+      TAX_TOTAL:        hasFieldValue(financeRows, 'vatPaidSuzhou', 'citPaidSuzhou'),
+      PERSONAL_TAX:     hasFieldValue(financeRows, 'pitSuzhou'),
+      SOCIAL_INSURANCE: hasFieldValue(hrRows, 'socialInsuranceCount'),
+      NATIONAL_TALENT:  hasFieldValue(hrRows, 'nationalTalentNew', 'nationalTalentCount'),
+      INVENTION_PATENT: hasFieldValue(ipRows, 'inventionPatentNew', 'inventionPatentApplied'),
+      INDUSTRY_CHAIN:   hasFieldValue(hrRows, 'industryChainCount'),
     }
 
     const kpis = KPI_KEYS.map(key => {
