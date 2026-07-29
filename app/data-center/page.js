@@ -551,10 +551,11 @@ export default function DataCenterPage() {
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
     const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
-    const needConvert = fieldDef?.baseUnit === '亿元' && inputUnits[fieldKey] && inputUnits[fieldKey] !== '亿元'
+    const displayUnit = fieldDef ? getFieldUnit(fieldDef) : (inputUnits[fieldKey] || 'unknown')
+    const needConvert = fieldDef?.baseUnit === '亿元' && displayUnit !== '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
-        const storedVal = needConvert ? toBase(val, inputUnits[fieldKey]) : val
+        const storedVal = needConvert ? toBase(val, displayUnit) : val
         return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { [fieldKey]: storedVal } })
       }))
       notifySaved(`${fieldLabel} 月度数据（${months.length} 个月）`)
@@ -570,10 +571,11 @@ export default function DataCenterPage() {
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
     const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
-    const needConvert = cat === 'finance' && fieldDef?.baseUnit === '亿元'
+    const multiUnit = fieldDef ? getFieldUnit(fieldDef) : cumUnit
+    const needConvert = fieldDef?.baseUnit === '亿元' && multiUnit !== '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
-        const storedVal = needConvert ? toBase(val, cumUnit) : val
+        const storedVal = needConvert ? toBase(val, multiUnit) : val
         return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { ...payloads[cat], [fieldKey]: storedVal } })
       }))
       notifySaved(`${fieldLabel} 已保存（共 ${months.length} 个月）`)
@@ -591,7 +593,7 @@ export default function DataCenterPage() {
     setSaving(s => ({ ...s, [cat]: true }))
     const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
     const hasMulti = fieldDef?.inputUnits?.length > 1
-    const curUnit = inputUnits[fieldKey] || fieldDef?.baseUnit
+    const curUnit = fieldDef ? getFieldUnit(fieldDef) : (inputUnits[fieldKey] || '亿元')
     try {
       await Promise.all(years.map(([yr, val]) => {
         const storedVal = hasMulti && curUnit !== fieldDef.baseUnit ? toBase(val, curUnit) : val
