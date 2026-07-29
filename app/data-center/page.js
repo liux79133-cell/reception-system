@@ -11,7 +11,7 @@ import {
   FileExcelOutlined, SettingOutlined, EditOutlined,
   ArrowRightOutlined, HistoryOutlined, InfoCircleOutlined,
   CalendarOutlined, FieldTimeOutlined, LockOutlined, CloseOutlined,
-  PlusOutlined, DeleteOutlined, BarChartOutlined, TableOutlined,
+  PlusOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
@@ -248,213 +248,7 @@ function AnnualGrid({ field, values, onChange, unit, isEditing, onSave, saving, 
   )
 }
 
-// ── SVG 折线图（月度趋势 + 同期对比）─────────────────────────────────────
-function SvgLineChart({ data, prevData, label, unit, color, width = 340, height = 100 }) {
-  const months = Array.from({ length: 12 }, (_, i) => i + 1)
-  const allVals = [...Object.values(data || {}), ...Object.values(prevData || {})].filter(v => v != null)
-  if (allVals.length === 0) return (
-    <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: 12 }}>暂无数据</div>
-  )
-  const maxV = Math.max(...allVals) * 1.15 || 1
-  const px = (12 - 1)
-  const toX = (m) => 28 + ((m - 1) / px) * (width - 40)
-  const toY = (v) => height - 18 - (v / maxV) * (height - 30)
 
-  const makePath = (d) => {
-    const pts = months.map(m => d[m] != null ? [toX(m), toY(d[m])] : null).filter(Boolean)
-    if (pts.length < 2) return ''
-    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
-  }
-
-  const fmtV = (v) => {
-    if (v == null) return ''
-    if (v >= 1) return v.toFixed(2)
-    return v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
-  }
-
-  // 当月最新值
-  const latestM = Math.max(...Object.keys(data || {}).map(Number).filter(Boolean))
-  const latestV = data[latestM]
-  const prevV   = prevData?.[latestM]
-  const pct     = latestV != null && prevV != null && prevV !== 0 ? ((latestV - prevV) / prevV * 100) : null
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{label}</span>
-        {pct != null && (
-          <span style={{ fontSize: 10, color: pct >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>
-            {pct >= 0 ? '▲' : '▼'}{Math.abs(pct).toFixed(1)}% 同期
-          </span>
-        )}
-      </div>
-      <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
-        {/* 网格 */}
-        {[0.25, 0.5, 0.75, 1].map(r => (
-          <line key={r} x1={28} x2={width - 12} y1={toY(maxV * r)} y2={toY(maxV * r)}
-            stroke="#f1f5f9" strokeWidth={1} />
-        ))}
-        {/* 月份刻度 */}
-        {months.filter(m => m % 3 === 0 || m === 1).map(m => (
-          <text key={m} x={toX(m)} y={height - 4} textAnchor="middle" fontSize={8} fill="#94a3b8">{m}月</text>
-        ))}
-        {/* 去年线（灰色虚线） */}
-        {prevData && makePath(prevData) && (
-          <path d={makePath(prevData)} fill="none" stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="4,3" />
-        )}
-        {/* 今年线 */}
-        {makePath(data) && (
-          <path d={makePath(data)} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        )}
-        {/* 数据点 + 节点数值标签 */}
-        {months.map(m => {
-          if (data[m] == null) return null
-          const cx = toX(m), cy = toY(data[m])
-          const labelAbove = cy > 18  // 节点太靠顶时标签放下方
-          return (
-            <g key={m}>
-              <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#fff" strokeWidth={1.5} />
-              <text x={cx} y={labelAbove ? cy - 6 : cy + 13}
-                textAnchor="middle" fontSize={8.5} fontWeight={600} fill={color}
-                style={{ pointerEvents: 'none' }}>
-                {fmtV(data[m])}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
-    </div>
-  )
-}
-
-// ── 年度环形图（完成率）──────────────────────────────────────────────────
-function SvgDonut({ rate, label, color, size = 72 }) {
-  const r = size / 2 - 8
-  const circ = 2 * Math.PI * r
-  const dash = rate != null ? Math.min(rate, 1) * circ : 0
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      <svg width={size} height={size}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={7} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={rate == null ? '#e2e8f0' : color} strokeWidth={7}
-          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-          transform={`rotate(-90 ${size/2} ${size/2})`} />
-        <text x={size/2} y={size/2 + 1} textAnchor="middle" dominantBaseline="middle"
-          fontSize={rate != null ? 13 : 10} fontWeight={700} fill={rate != null ? color : '#94a3b8'}>
-          {rate != null ? `${Math.round(rate * 100)}%` : '—'}
-        </text>
-      </svg>
-      <span style={{ fontSize: 10, color: '#64748b', textAlign: 'center', maxWidth: size + 12 }}>{label}</span>
-    </div>
-  )
-}
-
-// ── 看板视图（放在录入区上方，切换显示）────────────────────────────────
-function DashboardView({ monthlyGridValues, annualAllValues, year }) {
-  // 今年月度数据 vs 去年月度数据（用 annualAllValues 按年对比，月度用 monthlyGridValues）
-  const prevYear = year - 1
-  const COLOR = { finance: '#1d6fdb', hr: '#7c3aed', ip: '#059669' }
-
-  // 关键财务指标月度折线
-  const financeCharts = [
-    { key: 'revenue',       label: '营业收入',          unit: '亿元' },
-    { key: 'vatPaidSuzhou', label: '增值税实缴苏州',     unit: '亿元' },
-    { key: 'citPaidSuzhou', label: '企业所得税实缴苏州', unit: '亿元' },
-    { key: 'pitSuzhou',     label: '个税苏州代扣',       unit: '亿元' },
-    { key: 'rdExpense',     label: '研发投入',           unit: '亿元' },
-  ]
-  const hrCharts = [
-    { key: 'socialInsuranceCount', label: '社保参保人数',     unit: '人' },
-    { key: 'nationalTalentNew',    label: '国家级人才申报',   unit: '人' },
-  ]
-  const ipCharts = [
-    { key: 'inventionPatentNew', label: '发明专利（本年新增）', unit: '项' },
-  ]
-
-  // 年度走势（2022-2028，用 annualAllValues）
-  const kpiAnnual = [
-    { cat: 'finance', key: 'revenue',            label: '营业收入',     unit: '亿元', color: '#1d6fdb' },
-    { cat: 'finance', key: 'pitSuzhou',           label: '个税',         unit: '亿元', color: '#7c3aed' },
-    { cat: 'hr',      key: 'socialInsuranceCount',label: '社保人数',     unit: '人',   color: '#059669' },
-    { cat: 'ip',      key: 'inventionPatentNew',  label: '发明专利新增', unit: '项',   color: '#f59e0b' },
-  ]
-
-  // 获取月度数据（summing monthly rows for each field per year）
-  const getMonthly = (cat, key, yr) => {
-    // monthlyGridValues is for current year only; for prev year we have nothing
-    // We use what's available
-    if (yr === year) return monthlyGridValues[cat]?.[key] || {}
-    return {}
-  }
-
-  // 年度汇总值（亿元存储）
-  const getAnnualVal = (cat, key, yr) => annualAllValues[cat]?.[key]?.[yr] ?? null
-
-  const W = 300, H = 90
-
-  return (
-    <div>
-      {/* 年度 KPI 趋势 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d5a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <BarChartOutlined style={{ color: '#1d6fdb' }} /> 年度走势（2024–2028）
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          {kpiAnnual.map(({ cat, key, label, unit, color }) => {
-            const vals = ANNUAL_YEARS.map(yr => getAnnualVal(cat, key, yr))
-            const maxV = Math.max(...vals.filter(v => v != null)) * 1.2 || 1
-            const bw = 28, gap = 16, chartW = ANNUAL_YEARS.length * (bw + gap) + 20
-            return (
-              <div key={key} style={{ background: '#f8fafc', border: '1px solid #e8ecf4', borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', marginBottom: 8 }}>{label}（{unit}）</div>
-                <svg width={chartW} height={70} style={{ overflow: 'visible', display: 'block' }}>
-                  {ANNUAL_YEARS.map((yr, i) => {
-                    const v = getAnnualVal(cat, key, yr)
-                    const barH = v != null ? Math.max(4, (v / maxV) * 52) : 0
-                    const x = 10 + i * (bw + gap)
-                    const isCur = yr === year
-                    return (
-                      <g key={yr}>
-                        <rect x={x} y={52 - barH} width={bw} height={barH} rx={4}
-                          fill={isCur ? color : `${color}66`} />
-                        {v != null && (
-                          <text x={x + bw/2} y={52 - barH - 3} textAnchor="middle" fontSize={8} fill={color} fontWeight={600}>
-                            {v >= 1 ? v.toFixed(1) : v.toFixed(3)}
-                          </text>
-                        )}
-                        <text x={x + bw/2} y={65} textAnchor="middle" fontSize={8} fill={isCur ? '#1e3a8a' : '#94a3b8'} fontWeight={isCur ? 700 : 400}>{yr}</text>
-                      </g>
-                    )
-                  })}
-                </svg>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 月度趋势（当年 vs 去年，仅展示当前年月度数据） */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d5a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <BarChartOutlined style={{ color: '#059669' }} /> 月度趋势（{year} 年）
-        <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8', marginLeft: 4 }}>灰色虚线 = 去年同期</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-        {[...financeCharts, ...hrCharts, ...ipCharts].map(({ key, label, unit }) => {
-          const cat = financeCharts.find(c => c.key === key) ? 'finance' : hrCharts.find(c => c.key === key) ? 'hr' : 'ip'
-          const thisYear = getMonthly(cat, key, year)
-          const lastYear = getMonthly(cat, key, prevYear)
-          const color = COLOR[cat]
-          const hasData = Object.keys(thisYear).length > 0
-          return (
-            <div key={key} style={{ background: '#f8fafc', border: '1px solid #e8ecf4', borderRadius: 10, padding: '10px 14px', opacity: hasData ? 1 : 0.6 }}>
-              <SvgLineChart data={thisYear} prevData={lastYear} label={label} unit={unit} color={color} width={W} height={H} />
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 export default function DataCenterPage() {
   const router = useRouter()
@@ -479,15 +273,6 @@ export default function DataCenterPage() {
 
   const [user, setUser]             = useState(null)
   const [configMode, setConfigMode] = useState(false)
-  const [viewMode, setViewMode]     = useState('entry')  // 'entry' | 'dashboard'
-  const handleViewToggle = () => {
-    const next = viewMode === 'entry' ? 'dashboard' : 'entry'
-    setViewMode(next)
-    // 切到看板时确保月度数据已加载（如果当前是按年模式，也补充月度数据）
-    if (next === 'dashboard' && Object.values(monthlyGridValues.finance).length === 0) {
-      fetchAll('monthly', year, month)
-    }
-  }
   const [notifApi, notifHolder]     = notification.useNotification()
 
   const [fieldEnabled, setFieldEnabled] = useState(() => {
@@ -1027,16 +812,7 @@ export default function DataCenterPage() {
             <Title level={4} style={{ margin: 0, color: '#1a2d5a' }}>数据中台 · 协议数据录入</Title>
             <Text type="secondary" style={{ fontSize: 13 }}>支持按月/按年/累计三种填报模式，录入后 KPI 进度 T+0 更新</Text>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button icon={<HistoryOutlined />} onClick={() => inputMode === 'annual' ? fetchAllAnnual() : fetchAll(inputMode, year, month)} style={{ borderRadius: 8 }}>刷新</Button>
-            <Button
-              icon={viewMode === 'entry' ? <BarChartOutlined /> : <TableOutlined />}
-              onClick={handleViewToggle}
-              type={viewMode === 'dashboard' ? 'primary' : 'default'}
-              style={{ borderRadius: 8 }}>
-              {viewMode === 'entry' ? '看板视图' : '录入视图'}
-            </Button>
-          </div>
+          <Button icon={<HistoryOutlined />} onClick={() => inputMode === 'annual' ? fetchAllAnnual() : fetchAll(inputMode, year, month)} style={{ borderRadius: 8 }}>刷新</Button>
         </div>
 
         <Card style={{ borderRadius: 14, border: '1px solid #e8ecf4', marginBottom: 16 }} styles={{ body: { padding: '16px 20px' } }}>
@@ -1101,33 +877,16 @@ export default function DataCenterPage() {
           })}
         </Row>
 
-        {/* 看板视图 */}
-        {viewMode === 'dashboard' && (
-          <Spin spinning={loading}>
-            <Card style={{ borderRadius: 14, border: '1px solid #e8ecf4', marginBottom: 16 }} styles={{ body: { padding: '20px 24px' } }}
-              title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <BarChartOutlined style={{ color: '#1d6fdb' }} />
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#1a2d5a' }}>数据看板</span>
-                <Tag style={{ fontSize: 11, margin: 0, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe' }}>趋势分析 · 同期对比</Tag>
-              </div>}>
-              <DashboardView monthlyGridValues={monthlyGridValues} annualAllValues={annualAllValues} year={year} />
-            </Card>
-          </Spin>
-        )}
-
-        {/* 录入视图 */}
-        {viewMode === 'entry' && (
-          <Spin spinning={loading}>
-            <Card style={{ borderRadius: 14, border: '1px solid #e8ecf4' }} styles={{ body: { padding: '0 24px 24px' } }}
-              title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#1a2d5a' }}>{modeLabel} · 数据录入</span>
-                {!canEdit && <Tag color="default" style={{ fontSize: 11, margin: 0 }}>只读</Tag>}
-                {inputMode === 'annual' && <Tag style={{ fontSize: 11, margin: 0, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe' }}>展示 2024–2028 全部年份</Tag>}
-              </div>}>
-              <Tabs items={tabItems} size="large" tabBarStyle={{ marginBottom: 0 }} />
-            </Card>
-          </Spin>
-        )}
+        <Spin spinning={loading}>
+          <Card style={{ borderRadius: 14, border: '1px solid #e8ecf4' }} styles={{ body: { padding: '0 24px 24px' } }}
+            title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#1a2d5a' }}>{modeLabel} · 数据录入</span>
+              {!canEdit && <Tag color="default" style={{ fontSize: 11, margin: 0 }}>只读</Tag>}
+              {inputMode === 'annual' && <Tag style={{ fontSize: 11, margin: 0, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe' }}>展示 2024–2028 全部年份</Tag>}
+            </div>}>
+            <Tabs items={tabItems} size="large" tabBarStyle={{ marginBottom: 0 }} />
+          </Card>
+        </Spin>
 
         <div style={{ marginTop: 14, padding: '10px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e8ecf0' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
