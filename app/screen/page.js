@@ -247,12 +247,12 @@ export default function ScreenPage() {
 
   return (
     <div style={{
-      height: '100vh', background: BG, overflow: 'hidden',
+      position: 'fixed', inset: 0, background: BG, overflow: 'hidden',
       fontFamily: '"PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
       padding: '10px 16px 8px', boxSizing: 'border-box', color: C.text,
       display: 'flex', flexDirection: 'column',
     }}>
-      <style>{`* { box-sizing: border-box } html,body { overflow: hidden; height: 100% }
+      <style>{`* { box-sizing: border-box }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }`}
       </style>
 
