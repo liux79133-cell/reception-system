@@ -148,12 +148,60 @@ export async function GET(request) {
       evidenceUrls: q.evidenceUrls ? JSON.parse(q.evidenceUrls) : [],
     }))
 
-    // 五年所有目标（供前端渲染阶梯视图）
+    // 五年所有目标 + 各年实绩（供前端渲染阶梯视图）
+    // 查询所有年份的数据
+    const allYearsData = await prisma.agreementData.findMany({
+      where: { OR: [2024,2025,2026,2027,2028].flatMap(y => ([
+        { period: { startsWith: `${y}-` } },
+        { period: String(y) },
+      ])) },
+      orderBy: { period: 'asc' },
+    })
+    const parseRowAny = (r) => ({ period: r.period, category: r.category, ...JSON.parse(r.payload) })
+    const allYearsRows = allYearsData.map(parseRowAny)
+
+    // 每年每个 KPI 的实绩
+    const calcActualForYear = (y) => {
+      const fRows = allYearsRows.filter(r => r.category === 'finance' && (r.period.startsWith(`${y}-`) || r.period === String(y)))
+      const hRows = allYearsRows.filter(r => r.category === 'hr'      && (r.period.startsWith(`${y}-`) || r.period === String(y)))
+      const iRows = allYearsRows.filter(r => r.category === 'ip'      && (r.period.startsWith(`${y}-`) || r.period === String(y)))
+      const cf = (rows, field) => {
+        const yr = rows.find(r => r.period === String(y))
+        if (yr?.[field] != null) return Number(yr[field]) || 0
+        return rows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).reduce((s, r) => s + (Number(r[field]) || 0), 0)
+      }
+      const ls = (rows, ...fields) => {
+        const yr = rows.find(r => r.period === String(y))
+        for (const f of fields) { if (yr?.[f] != null) return Number(yr[f]) || 0 }
+        for (const f of fields) {
+          const all = rows.filter(r => r[f] != null)
+          if (all.length) return Number(all[all.length - 1][f]) || 0
+        }
+        return 0
+      }
+      const hasF = (rows, ...fields) => rows.some(r => fields.some(f => r[f] != null && Number(r[f]) !== 0))
+      return {
+        REVENUE:          hasF(fRows,'revenue')           ? cf(fRows,'revenue') : null,
+        TAX_TOTAL:        hasF(fRows,'vatPaidSuzhou','citPaidSuzhou') ? cf(fRows,'vatPaidSuzhou') + cf(fRows,'citPaidSuzhou') : null,
+        PERSONAL_TAX:     hasF(fRows,'pitSuzhou')         ? cf(fRows,'pitSuzhou') : null,
+        SOCIAL_INSURANCE: hasF(hRows,'socialInsuranceCount') ? ls(hRows,'socialInsuranceCount') : null,
+        NATIONAL_TALENT:  hasF(hRows,'nationalTalentNew','nationalTalentCount') ? ls(hRows,'nationalTalentNew','nationalTalentCount') : null,
+        INVENTION_PATENT: hasF(iRows,'inventionPatentNew','inventionPatentApplied') ? ls(iRows,'inventionPatentNew','inventionPatentApplied') : null,
+        INDUSTRY_CHAIN:   hasF(hRows,'industryChainCount') ? ls(hRows,'industryChainCount') : null,
+      }
+    }
+
     const allYearTargets = {}
+    const allYearActuals = {}
+    ;[2024,2025,2026,2027,2028].forEach(y => {
+      const yActuals = calcActualForYear(y)
+      allYearActuals[y] = yActuals
+    })
     KPI_KEYS.forEach(key => {
       allYearTargets[key] = [2024, 2025, 2026, 2027, 2028].map(y => ({
         year: y,
         target: KPI_TARGETS[key][y] || 0,
+        actual: allYearActuals[y][key],
       }))
     })
 

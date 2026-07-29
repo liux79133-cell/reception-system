@@ -255,11 +255,11 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
 
       {/* 五年行 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {targets.map(({ year, target }) => {
+        {targets.map(({ year, target, actual: yearActual }) => {
           const isCur    = year === currentYear
           const isPast   = year < currentYear
           const isFuture = year > currentYear
-          const actual   = isCur ? kpi.actual : null
+          const actual   = isCur ? kpi.actual : (yearActual ?? null)
           const rate     = (actual !== null && target > 0) ? actual / target : null
           const pct      = rate !== null ? Math.min(rate * 100, 100) : 0
           const ys       = rate !== null ? KPI_STATUS[rate >= 0.9 ? 'compliant' : rate >= 0.7 ? 'warning' : 'risk'] : KPI_STATUS.no_data
@@ -313,21 +313,46 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
           }
 
           if (isPast) {
-            // ── 历史年：紧凑灰色小行 ──
+            // ── 历史年：有数据显示完成情况，无数据显示灰色 ──
+            const hasActual = actual !== null
+            const ys = hasActual && rate !== null
+              ? KPI_STATUS[rate >= 0.9 ? 'compliant' : rate >= 0.7 ? 'warning' : 'risk']
+              : KPI_STATUS.no_data
             return (
               <div key={year} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '7px 14px', borderRadius: 8,
-                background: '#f8fafc', border: '1px solid #f1f5f9',
-                opacity: 0.7,
+                padding: '8px 14px', borderRadius: 8,
+                background: hasActual ? `${ys.bg}` : '#f8fafc',
+                border: `1px solid ${hasActual ? ys.border : '#f1f5f9'}`,
+                opacity: 0.85,
               }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', minWidth: 44 }}>{year}</span>
-                <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: '0%', background: '#cbd5e1', borderRadius: 2 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: hasActual ? 6 : 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: hasActual ? '#475569' : '#94a3b8', minWidth: 44 }}>{year}</span>
+                  {hasActual && rate !== null && (
+                    <Tag style={{ margin: 0, fontSize: 10, padding: '0 7px', borderRadius: 20, fontWeight: 700,
+                      color: ys.color, background: '#fff', border: `1px solid ${ys.border}` }}>
+                      {ys.label}
+                    </Tag>
+                  )}
+                  <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                    实际 <strong style={{ color: hasActual ? ys.color : '#94a3b8' }}>
+                      {hasActual ? fmtVal(actual, kpi.precision) : '—'}
+                    </strong>
+                    <span style={{ color: '#94a3b8', margin: '0 3px' }}>/</span>
+                    目标 <strong style={{ color: '#475569' }}>{target} {kpi.unit}</strong>
+                    {hasActual && rate !== null && (
+                      <span style={{ marginLeft: 6, color: ys.color, fontWeight: 700 }}>
+                        {(rate * 100).toFixed(1)}%
+                      </span>
+                    )}
+                  </span>
                 </div>
-                <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                  实际 — / 目标 <strong style={{ color: '#64748b' }}>{target} {kpi.unit}</strong>
-                </span>
+                {hasActual && (
+                  <div style={{ height: 5, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(0,0,0,0.1)', zIndex: 1 }} />
+                    <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.8s ease',
+                      width: `${Math.min(pct, 100)}%`, background: ys.bar }} />
+                  </div>
+                )}
               </div>
             )
           }
