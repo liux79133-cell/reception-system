@@ -12,7 +12,7 @@ import {
   TrophyOutlined, WarningOutlined, FireOutlined, FolderOpenOutlined,
   FileTextOutlined, FileExcelOutlined, FileWordOutlined, FileImageOutlined,
   EyeOutlined, DownloadOutlined, DatabaseOutlined, BarChartOutlined,
-  CheckOutlined, ExclamationCircleOutlined, CalendarOutlined,
+  CheckOutlined, ExclamationCircleOutlined, CalendarOutlined, PlusOutlined,
 } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
@@ -395,6 +395,10 @@ export default function LandingPage() {
   const [editForm, setEditForm]   = useState({ status: '', description: '', evidenceUrls: [] })
   const [saving, setSaving]       = useState(false)
   const [uploading, setUploading] = useState(false)
+  // 定性义务新增
+  const [addQualModal, setAddQualModal] = useState(false)
+  const [addQualForm, setAddQualForm]   = useState({ name: '', articleRef: '', requirement: '', status: 'pending' })
+  const [addQualSaving, setAddQualSaving] = useState(false)
   // 协议文件
   const [files, setFiles]         = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -443,6 +447,32 @@ export default function LandingPage() {
       fetchDashboard(year)
     } catch (e) { message.error('保存失败：' + e) }
     finally { setSaving(false) }
+  }
+  const saveAddQual = async () => {
+    if (!addQualForm.name.trim()) return message.error('请填写义务名称')
+    setAddQualSaving(true)
+    try {
+      await api.post('/api/agreement/qualitative', addQualForm)
+      message.success('已添加定性义务')
+      setAddQualModal(false)
+      setAddQualForm({ name: '', articleRef: '', requirement: '', status: 'pending' })
+      fetchDashboard(year)
+    } catch (e) { message.error('添加失败：' + e) }
+    finally { setAddQualSaving(false) }
+  }
+  const deleteQual = (item) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: <span>确定删除义务「<strong>{item.name}</strong>」？此操作不可恢复。</span>,
+      okText: '删除', okType: 'danger', cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/api/agreement/qualitative/${item.id}`)
+          message.success('已删除')
+          fetchDashboard(year)
+        } catch (e) { message.error('删除失败：' + e) }
+      },
+    })
   }
   const handleUpload = async ({ file, onSuccess, onError }) => {
     if (file.size > 50 * 1024 * 1024) { message.error('文件超过 50MB'); onError(new Error('too large')); return }
@@ -806,6 +836,13 @@ export default function LandingPage() {
                             合规率 {((qualCompliant / data.qualitative.length) * 100).toFixed(0)}%
                           </span>
                         </div>
+                        {canEdit && (
+                          <Button size="small" type="primary" icon={<PlusOutlined />}
+                            onClick={() => { setAddQualForm({ name: '', articleRef: '', requirement: '', status: 'pending' }); setAddQualModal(true) }}
+                            style={{ borderRadius: 20, background: '#3b82f6', borderColor: '#3b82f6', flexShrink: 0 }}>
+                            添加义务
+                          </Button>
+                        )}
                       </div>
 
                       <List
@@ -816,7 +853,8 @@ export default function LandingPage() {
                             <List.Item
                               style={{ padding: '14px 20px', borderBottom: idx < data.qualitative.length - 1 ? '1px solid #f8fafc' : 'none' }}
                               actions={canEdit ? [
-                                <Button key="e" size="small" icon={<EditOutlined />} onClick={() => openEdit(item)} style={{ borderRadius: 7 }}>编辑</Button>
+                                <Button key="e" size="small" icon={<EditOutlined />} onClick={() => openEdit(item)} style={{ borderRadius: 7 }}>编辑</Button>,
+                                <Button key="d" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteQual(item)} style={{ borderRadius: 7 }} />,
                               ] : []}
                             >
                               <List.Item.Meta
@@ -1018,6 +1056,69 @@ export default function LandingPage() {
               {uploading ? '上传中...' : '点击上传支撑材料（10MB 以内）'}
             </Button>
           </Upload>
+        </div>
+      </Modal>
+
+      {/* ── 新增定性义务 Modal ─────────────────────────────────────── */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PlusOutlined style={{ color: '#fff', fontSize: 13 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>新增定性义务</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>添加协议约定的定性履约义务</div>
+            </div>
+          </div>
+        }
+        open={addQualModal}
+        onCancel={() => setAddQualModal(false)}
+        onOk={saveAddQual}
+        confirmLoading={addQualSaving}
+        okText="确认添加" cancelText="取消"
+        width={500}
+        styles={{ body: { paddingTop: 16 } }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+              义务名称 <span style={{ color: '#ef4444' }}>*</span>
+            </div>
+            <Input
+              value={addQualForm.name}
+              onChange={e => setAddQualForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="如：按时缴纳社会保险" maxLength={50} showCount
+              style={{ borderRadius: 8 }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>条款引用</div>
+            <Input
+              value={addQualForm.articleRef}
+              onChange={e => setAddQualForm(p => ({ ...p, articleRef: e.target.value }))}
+              placeholder="如：第五条第2款" maxLength={30}
+              style={{ borderRadius: 8 }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>义务要求描述</div>
+            <Input.TextArea
+              value={addQualForm.requirement}
+              onChange={e => setAddQualForm(p => ({ ...p, requirement: e.target.value }))}
+              placeholder="描述具体的履约要求…" rows={3} maxLength={200} showCount
+              style={{ borderRadius: 8 }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>初始状态</div>
+            <Select
+              value={addQualForm.status}
+              onChange={v => setAddQualForm(p => ({ ...p, status: v }))}
+              style={{ width: '100%', borderRadius: 8 }}
+              options={Object.entries(QUAL_STATUS).map(([k, v]) => ({ value: k, label: v.label }))}
+            />
+          </div>
         </div>
       </Modal>
     </AppLayout>
