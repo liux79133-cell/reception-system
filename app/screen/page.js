@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 
@@ -90,9 +90,9 @@ function SegmentDonut({ segments, size = 100, strokeW = 9 }) {
   )
 }
 
-// ── SVG 折线图 ────────────────────────────────────────────────────────────────
+// ── SVG 折线图（含 hover tooltip）───────────────────────────────────────────
 function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) {
-  // series: [{ data: [{month, value}], color, label }]
+  const [tip, setTip] = useState(null) // { x, y, month, items: [{label,value,color}] }
   const pad = { t: 10, r: 8, b: 24, l: 36 }
   const W = width - pad.l - pad.r
   const H = height - pad.t - pad.b
@@ -103,6 +103,24 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
 
   const xPos = (m) => ((m - 1) / (months - 1)) * W + pad.l
   const yPos = (v) => pad.t + H - (v / maxVal) * H
+
+  const fmtTip = (v) => {
+    if (v === null || v === undefined) return '—'
+    if (v >= 1) return v.toFixed(2)
+    if (v >= 0.01) return v.toFixed(4)
+    return v.toExponential(2)
+  }
+
+  const handleHover = (month) => {
+    const items = series.map(s => {
+      const pt = s.data.find(d => d.month === month)
+      return { label: s.label, value: pt?.value ?? null, color: s.color }
+    }).filter(i => i.value !== null)
+    if (!items.length) { setTip(null); return }
+    const x = xPos(month)
+    const firstVal = items[0].value
+    setTip({ x, y: yPos(firstVal), month, items })
+  }
 
   const polyline = (data, color, filled) => {
     const pts = data.filter(d => d.value !== null)
@@ -125,14 +143,17 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
     )
   }
 
-  // X 轴月份
   const xLabels = [1, 3, 5, 7, 9, 11, 12]
-
-  // Y 轴刻度
   const yTicks = [0, 0.5, 1].map(f => ({ v: maxVal * f, y: yPos(maxVal * f) }))
 
+  // tooltip 位置：避免超出右侧
+  const tipW = 90, tipH = tip ? tip.items.length * 16 + 18 : 0
+  const tipX = tip ? (tip.x + tipW + 10 > width ? tip.x - tipW - 6 : tip.x + 8) : 0
+  const tipY = tip ? Math.max(pad.t, tip.y - tipH / 2) : 0
+
   return (
-    <svg width={width} height={height} style={{ overflow: 'visible' }}>
+    <svg width={width} height={height} style={{ overflow: 'visible' }}
+      onMouseLeave={() => setTip(null)}>
       {/* 网格线 */}
       {yTicks.map((t, i) => (
         <g key={i}>
@@ -146,11 +167,43 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
       ))}
       {/* 折线 */}
       {series.map(s => polyline(s.data, s.color, showArea))}
+      {/* 透明悬浮区：每个月一条竖带 */}
+      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+        <rect key={m}
+          x={xPos(m) - (W / (months - 1)) / 2} y={pad.t}
+          width={W / (months - 1)} height={H}
+          fill="transparent"
+          onMouseEnter={() => handleHover(m)}
+        />
+      ))}
       {/* X 轴 */}
       {xLabels.map(m => (
         <text key={m} x={xPos(m)} y={height - 6} textAnchor="middle"
           fill={C.muted} fontSize={9} fontFamily="system-ui">{m}月</text>
       ))}
+      {/* hover 竖线 */}
+      {tip && (
+        <line x1={tip.x} y1={pad.t} x2={tip.x} y2={pad.t + H}
+          stroke="rgba(30,64,175,0.25)" strokeWidth={1} strokeDasharray="3,2" />
+      )}
+      {/* tooltip 气泡 */}
+      {tip && (
+        <g>
+          <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={5}
+            fill="rgba(15,23,42,0.88)" />
+          <text x={tipX + 7} y={tipY + 12} fill="#94a3b8" fontSize={9} fontFamily="system-ui">
+            {tip.month} 月
+          </text>
+          {tip.items.map((it, i) => (
+            <g key={i}>
+              <rect x={tipX + 7} y={tipY + 18 + i * 16 + 2} width={6} height={6} rx={2} fill={it.color} />
+              <text x={tipX + 17} y={tipY + 18 + i * 16 + 9} fill="#e2e8f0" fontSize={9} fontFamily="system-ui">
+                {it.label}  {fmtTip(it.value)}
+              </text>
+            </g>
+          ))}
+        </g>
+      )}
     </svg>
   )
 }
@@ -211,6 +264,17 @@ export default function ScreenPage() {
   const load = useCallback(() => {
     api.get('/api/agreement/dashboard', { year }).then(setData).catch(() => {})
   }, [year])
+
+  // 锁住 body/html 滚动，防止大屏溢出
+  useLayoutEffect(() => {
+    const prev = { html: document.documentElement.style.overflow, body: document.body.style.overflow }
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.documentElement.style.overflow = prev.html
+      document.body.style.overflow = prev.body
+    }
+  }, [])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
