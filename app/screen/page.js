@@ -313,8 +313,8 @@ export default function ScreenPage() {
     <div style={{
       position: 'fixed', inset: 0, background: BG, overflow: 'hidden',
       fontFamily: '"PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
-      padding: '10px 16px 8px', boxSizing: 'border-box', color: C.text,
-      display: 'flex', flexDirection: 'column',
+      padding: '8px 14px 6px', boxSizing: 'border-box', color: C.text,
+      display: 'flex', flexDirection: 'column', gap: 0,
     }}>
       <style>{`* { box-sizing: border-box }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }`}
@@ -376,85 +376,78 @@ export default function ScreenPage() {
       </div>
 
       {/* ── 主内容：三列 ──────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 240px', gap: 10, flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '210px 1fr 210px', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
         {/* ══ 左列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* 综合履约分大环 */}
-          <Panel title="综合履约健康度" icon="◎" accent={scoreColor}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <DonutChart percent={data.overallScore} color={scoreColor} size={96} strokeW={9}
+          {/* 履约分 + 倒计时 합치기 */}
+          <Panel accent={scoreColor} style={{ flexShrink: 0, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <DonutChart percent={data.overallScore} color={scoreColor} size={76} strokeW={7}
                 label={data.overallScore.toFixed(0)} sublabel="分" />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: scoreColor }}>{scoreLabel}</div>
-                <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{year} 年度</div>
-                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: scoreColor }}>{scoreLabel}</div>
+                <div style={{ fontSize: 9, color: C.sub }}>{year} 年综合履约</div>
+                <div style={{ marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {[
-                    { label: '全额达标', n: data.kpis.filter(k=>k.status==='compliant').length, c: C.green },
-                    { label: '打折区',   n: data.kpis.filter(k=>k.status==='warning').length,   c: C.yellow },
-                    { label: '风险',     n: data.kpis.filter(k=>k.status==='risk').length,      c: C.red },
+                    { label: '达标', n: data.kpis.filter(k=>k.status==='compliant').length, c: C.green },
+                    { label: '预警', n: data.kpis.filter(k=>k.status==='warning').length,   c: C.yellow },
+                    { label: '风险', n: data.kpis.filter(k=>k.status==='risk').length,      c: C.red },
                   ].map(s => (
-                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.c, flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, color: C.sub }}>{s.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: s.c, marginLeft: 'auto' }}>{s.n}</span>
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: s.c, flexShrink: 0 }} />
+                      <span style={{ fontSize: 10, color: C.sub }}>{s.label}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: s.c, marginLeft: 'auto' }}>{s.n}</span>
                     </div>
                   ))}
                 </div>
               </div>
+              <div style={{ textAlign: 'center', paddingLeft: 8, borderLeft: `1px solid ${C.border}`, flexShrink: 0 }}>
+                <div style={{ fontSize: 8, color: C.sub }}>距截止</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: data.daysToDeadline < 90 ? C.red : C.blue, lineHeight: 1.1 }}>
+                  {data.daysToDeadline}
+                </div>
+                <div style={{ fontSize: 8, color: C.sub }}>天</div>
+              </div>
             </div>
           </Panel>
 
-          {/* 定性义务分布环 */}
-          <Panel title="定性义务合规分布" icon="◎">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <SegmentDonut segments={qualSeg} size={88} strokeW={9} />
+          {/* 定性义务 */}
+          <Panel title="定性义务" icon="◎" style={{ flexShrink: 0, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SegmentDonut segments={qualSeg} size={64} strokeW={7} />
               <div style={{ flex: 1 }}>
                 {qualSeg.map(s => (
-                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: C.sub, flex: 1 }}>{s.label}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</span>
+                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: C.sub, flex: 1 }}>{s.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{s.value}</span>
                   </div>
                 ))}
               </div>
             </div>
           </Panel>
 
-          {/* 倒计时 */}
-          <div style={{
-            background: `${data.daysToDeadline < 90 ? C.red : C.blue}0c`,
-            borderRadius: 14, padding: '12px 16px',
-            border: `1px solid ${data.daysToDeadline < 90 ? C.red : C.blue}25`,
-            textAlign: 'center', boxShadow: C.shadow,
-          }}>
-            <div style={{ fontSize: 11, color: C.sub, marginBottom: 4 }}>⏰ 距 {year} 年考核截止</div>
-            <div style={{ fontSize: 46, fontWeight: 900, color: data.daysToDeadline < 90 ? C.red : C.blue, lineHeight: 1 }}>
-              {data.daysToDeadline}
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>天</div>
-          </div>
-
           {/* 关键节点 */}
-          <Panel title="协议关键节点" icon="📌" style={{ flex: 1, overflow: 'hidden' }}>
+          <Panel title="协议关键节点" icon="📌" style={{ flex: 1, overflow: 'hidden', padding: '10px 12px' }}>
             {[
               { date: '2024-12-31', label: '2024 年度考核', active: true },
               { date: '2027-12-31', label: 'IPO 目标截止' },
               { date: '2028-12-31', label: '五年协议到期' },
               { date: '2029-12-31', label: '总部大楼建设' },
             ].map((n, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start',
-                paddingBottom: 8, marginBottom: 8, borderBottom: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start',
+                paddingBottom: 6, marginBottom: 6, borderBottom: i < 3 ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{
-                  width: 7, height: 7, borderRadius: '50%', marginTop: 3, flexShrink: 0,
+                  width: 6, height: 6, borderRadius: '50%', marginTop: 2, flexShrink: 0,
                   background: n.active ? C.yellow : C.blue,
-                  boxShadow: `0 0 6px ${n.active ? C.yellow : C.blue}88`,
+                  boxShadow: `0 0 5px ${n.active ? C.yellow : C.blue}88`,
                   animation: n.active ? 'pulse 2s ease-in-out infinite' : 'none',
                 }} />
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{n.label}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>{n.date}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.text }}>{n.label}</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{n.date}</div>
                 </div>
               </div>
             ))}
@@ -462,62 +455,48 @@ export default function ScreenPage() {
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* 7个 KPI 环形进度图 */}
-          <Panel title={`${year} 年度 KPI 完成率一览`} icon="◎" accent={C.blue}>
+          {/* KPI 环形 */}
+          <Panel title={`${year} 年度 KPI 完成率`} icon="◎" accent={C.blue} style={{ flexShrink: 0, padding: '10px 12px' }}>
             <KpiRingRow kpis={data.kpis} />
           </Panel>
 
-          {/* 营业收入月度折线 + YTD 累计 */}
-          <Panel title="营业收入月度趋势" icon="📈" accent={C.blue} style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              {[
-                { color: C.blue,  label: '月度收入（亿元）' },
-                { color: C.indigo, label: '年度累计（亿元）' },
-              ].map(s => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 16, height: 2.5, background: s.color, borderRadius: 2 }} />
-                  <span style={{ fontSize: 11, color: C.sub }}>{s.label}</span>
+          {/* 营业收入折线 */}
+          <Panel title="营业收入月度趋势" icon="📈" accent={C.blue} style={{ flex: 2, overflow: 'hidden', padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+              {[{ color: C.blue, label: '月度（亿元）' }, { color: C.indigo, label: '年度累计' }].map(s => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <div style={{ width: 12, height: 2, background: s.color, borderRadius: 2 }} />
+                  <span style={{ fontSize: 10, color: C.sub }}>{s.label}</span>
                 </div>
               ))}
-              <div style={{ marginLeft: 'auto', fontSize: 11, color: C.sub }}>
-                目标：{data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
-              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 10, color: C.sub }}>
+                目标 {data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
+              </span>
             </div>
-            <LineChart
-              width={520} height={100}
+            <LineChart width={480} height={88}
               series={[
                 { data: monthly.revenue    || [], color: C.blue,   label: '月度' },
-                { data: monthly.revenueYTD || [], color: C.indigo,  label: '年度累计' },
+                { data: monthly.revenueYTD || [], color: C.indigo,  label: '累计' },
               ]}
               yMax={data.kpis.find(k => k.key === 'REVENUE')?.target || undefined}
             />
           </Panel>
 
-          {/* 综合税收 + 社保人数 并排折线 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1 }}>
-            <Panel title="综合税收月度趋势" icon="💰" accent={C.green}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                <div style={{ width: 14, height: 2.5, background: C.green, borderRadius: 2 }} />
-                <span style={{ fontSize: 11, color: C.sub }}>月度税收（亿元）</span>
-              </div>
-              <LineChart
-                width={240} height={90}
-                series={[{ data: monthly.tax || [], color: C.green, label: '税收' }]}
+          {/* 税收 + 社保 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <Panel title="综合税收趋势" icon="💰" accent={C.green} style={{ overflow: 'hidden', padding: '10px 12px' }}>
+              <LineChart width={190} height={72}
+                series={[{ data: monthly.tax || [], color: C.green, label: '税收（亿）' }]}
               />
             </Panel>
-            <Panel title="社保人数月度变化" icon="👥" accent={C.indigo}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                <div style={{ width: 14, height: 2.5, background: C.indigo, borderRadius: 2 }} />
-                <span style={{ fontSize: 11, color: C.sub }}>参保人数（人）</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: C.sub }}>
-                  目标：{data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target}人
-                </span>
+            <Panel title="社保人数变化" icon="👥" accent={C.indigo} style={{ overflow: 'hidden', padding: '10px 12px' }}>
+              <div style={{ fontSize: 9, color: C.sub, textAlign: 'right', marginBottom: 2 }}>
+                目标 {data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target} 人
               </div>
-              <LineChart
-                width={240} height={90}
-                series={[{ data: monthly.social || [], color: C.indigo, label: '社保' }]}
+              <LineChart width={190} height={64}
+                series={[{ data: monthly.social || [], color: C.indigo, label: '人数' }]}
                 yMax={data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target || undefined}
               />
             </Panel>
@@ -525,64 +504,57 @@ export default function ScreenPage() {
         </div>
 
         {/* ══ 右列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* 7项 KPI 进度条 */}
-          <Panel title="KPI 完成进度详情" icon="◎" style={{ flex: 1, overflow: 'auto' }}>
+          {/* KPI 进度条 */}
+          <Panel title="KPI 完成进度" icon="◎" style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
             {data.kpis.map(kpi => {
               const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
               const color = sc(kpi.status)
               return (
-                <div key={kpi.key} style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{kpi.label}</span>
-                    <span style={{ fontSize: 11, color, fontWeight: 700 }}>
-                      {kpi.status === 'no_data' ? '待录入' : `${pct.toFixed(1)}%`}
+                <div key={kpi.key} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: C.text }}>{kpi.label}</span>
+                    <span style={{ fontSize: 10, color, fontWeight: 700 }}>
+                      {kpi.status === 'no_data' || kpi.status === 'no_target' ? '—' : `${pct.toFixed(1)}%`}
                     </span>
                   </div>
-                  <div style={{ height: 7, background: C.track, borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-                    {/* 90% 参考线 */}
+                  <div style={{ height: 6, background: C.track, borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
                     <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(15,23,42,0.2)', zIndex: 2 }} />
-                    <div style={{
-                      height: '100%', width: `${pct}%`, borderRadius: 4,
-                      background: `linear-gradient(90deg, ${color}88, ${color})`,
-                      transition: 'width 1s ease',
-                    }} />
+                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4,
+                      background: `linear-gradient(90deg, ${color}88, ${color})`, transition: 'width 1s ease' }} />
                   </div>
-                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 9, color: C.muted, marginTop: 1, display: 'flex', justifyContent: 'space-between' }}>
                     <span>{fmt(kpi.actual, kpi.precision)} {kpi.unit}</span>
-                    <span>目标 {kpi.target} {kpi.unit}</span>
+                    <span>目标 {kpi.target ?? '—'} {kpi.unit}</span>
                   </div>
                 </div>
               )
             })}
           </Panel>
 
-          {/* 五年收入目标对赌柱 */}
-          <Panel title="五年营收目标对赌" icon="📅">
+          {/* 五年营收对赌 */}
+          <Panel title="五年营收目标" icon="📅" style={{ flexShrink: 0, padding: '10px 12px' }}>
             {(() => {
               const targets = data.allYearTargets?.REVENUE || []
               const maxT = Math.max(...targets.map(t => t.target), 1)
               return (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 64, paddingBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 52, paddingBottom: 16 }}>
                   {targets.map(({ year: y, target }) => {
                     const isCur = y === year
                     const curKpi = isCur ? data.kpis.find(k => k.key === 'REVENUE') : null
-                    const barH = Math.max((target / maxT) * 58, 4)
+                    const barH = Math.max((target / maxT) * 42, 3)
                     const actH = curKpi?.actual ? Math.min((curKpi.actual / target), 1) * barH : 0
                     const color = isCur ? sc(curKpi?.status || 'no_data') : C.blue
                     return (
-                      <div key={y} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <div key={y} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                         <div style={{ width: '100%', height: barH, position: 'relative', borderRadius: '3px 3px 0 0', overflow: 'hidden' }}>
-                          <div style={{ position: 'absolute', inset: 0, background: C.track, borderRadius: '3px 3px 0 0' }} />
-                          {actH > 0 && (
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: actH,
-                              background: color, borderRadius: '3px 3px 0 0',
-                              boxShadow: `0 0 6px ${color}66`, transition: 'height 1s ease' }} />
-                          )}
+                          <div style={{ position: 'absolute', inset: 0, background: C.track }} />
+                          {actH > 0 && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: actH,
+                            background: color, boxShadow: `0 0 4px ${color}66`, transition: 'height 1s ease' }} />}
                         </div>
-                        <div style={{ fontSize: 9.5, color: isCur ? C.text : C.muted, fontWeight: isCur ? 700 : 400 }}>{y}</div>
-                        <div style={{ fontSize: 9, color: C.muted }}>{target}亿</div>
+                        <div style={{ fontSize: 8, color: isCur ? C.text : C.muted, fontWeight: isCur ? 700 : 400 }}>{y}</div>
+                        <div style={{ fontSize: 8, color: C.muted }}>{target}亿</div>
                       </div>
                     )
                   })}
@@ -592,7 +564,7 @@ export default function ScreenPage() {
           </Panel>
 
           {/* 补贴预测 */}
-          <Panel title="补贴获取预测" icon="💡" accent={C.indigo}>
+          <Panel title="补贴预测" icon="💡" accent={C.indigo} style={{ flexShrink: 0, padding: '10px 12px' }}>
             {(() => {
               const s = data.overallScore
               const tiers = [
@@ -602,21 +574,19 @@ export default function ScreenPage() {
               ]
               const mx = Math.max(...tiers.map(t => t.val), 1)
               return tiers.map(t => (
-                <div key={t.label} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontSize: 11, color: C.sub }}>{t.label}估算</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: t.color }}>~{t.val} 万元</span>
+                <div key={t.label} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, color: C.sub }}>{t.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: t.color }}>~{t.val} 万元</span>
                   </div>
-                  <div style={{ height: 5, background: C.track, borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: 4, background: C.track, borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${(t.val / mx) * 100}%`,
                       background: t.color, borderRadius: 3, transition: 'width 1s ease' }} />
                   </div>
                 </div>
               ))
             })()}
-            <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>
-              * 基于综合履约分 {data.overallScore.toFixed(1)} 分估算，仅供参考
-            </div>
+            <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>* {data.overallScore.toFixed(1)} 分估算</div>
           </Panel>
         </div>
       </div>
