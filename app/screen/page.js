@@ -247,18 +247,19 @@ export default function ScreenPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: BG,
+      height: '100vh', background: BG, overflow: 'hidden',
       fontFamily: '"PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
-      padding: '14px 18px', boxSizing: 'border-box', color: C.text,
+      padding: '10px 16px 8px', boxSizing: 'border-box', color: C.text,
+      display: 'flex', flexDirection: 'column',
     }}>
-      <style>{`* { box-sizing: border-box } body { overflow: hidden }
+      <style>{`* { box-sizing: border-box } html,body { overflow: hidden; height: 100% }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }`}
       </style>
 
       {/* ── 顶部标题栏 ─────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 14, paddingBottom: 12,
+        marginBottom: 8, paddingBottom: 8, flexShrink: 0,
         borderBottom: `1px solid ${C.border}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -311,10 +312,10 @@ export default function ScreenPage() {
       </div>
 
       {/* ── 主内容：三列 ──────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 240px', gap: 12, height: 'calc(100vh - 112px)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 240px', gap: 10, flex: 1, minHeight: 0 }}>
 
         {/* ══ 左列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
 
           {/* 综合履约分大环 */}
           <Panel title="综合履约健康度" icon="◎" accent={scoreColor}>
@@ -372,7 +373,7 @@ export default function ScreenPage() {
           </div>
 
           {/* 关键节点 */}
-          <Panel title="协议关键节点" icon="📌" style={{ flex: 1 }}>
+          <Panel title="协议关键节点" icon="📌" style={{ flex: 1, overflow: 'hidden' }}>
             {[
               { date: '2024-12-31', label: '2024 年度考核', active: true },
               { date: '2027-12-31', label: 'IPO 目标截止' },
@@ -397,7 +398,7 @@ export default function ScreenPage() {
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
 
           {/* 7个 KPI 环形进度图 */}
           <Panel title={`${year} 年度 KPI 完成率一览`} icon="◎" accent={C.blue}>
@@ -421,7 +422,7 @@ export default function ScreenPage() {
               </div>
             </div>
             <LineChart
-              width={560} height={110}
+              width={520} height={100}
               series={[
                 { data: monthly.revenue    || [], color: C.blue,   label: '月度' },
                 { data: monthly.revenueYTD || [], color: C.indigo,  label: '年度累计' },
@@ -460,10 +461,10 @@ export default function ScreenPage() {
         </div>
 
         {/* ══ 右列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
 
           {/* 7项 KPI 进度条 */}
-          <Panel title="KPI 完成进度详情" icon="◎" style={{ flex: 1 }}>
+          <Panel title="KPI 完成进度详情" icon="◎" style={{ flex: 1, overflow: 'auto' }}>
             {data.kpis.map(kpi => {
               const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
               const color = sc(kpi.status)
@@ -558,9 +559,9 @@ export default function ScreenPage() {
 
       {/* ── 底栏 ─────────────────────────────────────────────────── */}
       <div style={{
-        marginTop: 10, display: 'flex', justifyContent: 'space-between',
-        fontSize: 10, color: C.muted,
-        paddingTop: 8, borderTop: `1px solid ${C.border}`,
+        marginTop: 6, display: 'flex', justifyContent: 'space-between',
+        fontSize: 10, color: C.muted, flexShrink: 0,
+        paddingTop: 6, borderTop: `1px solid ${C.border}`,
       }}>
         <span>数据来源：苏州高铁新城产线落地协议 · 魔门塔数据中台</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
