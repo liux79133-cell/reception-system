@@ -23,10 +23,28 @@ const { Text, Title } = Typography
 
 // ── 状态系统 ──────────────────────────────────────────────────────────────────
 const KPI_STATUS = {
-  compliant: { label: '全额达标',  color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0', bar: '#10b981' },
-  warning:   { label: '打折拨付区', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', bar: '#f59e0b' },
-  risk:      { label: '零补贴风险', color: '#ef4444', bg: '#fff1f2', border: '#fecdd3', bar: '#ef4444' },
-  no_data:   { label: '待录入',    color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0', bar: '#cbd5e1' },
+  compliant:  { label: '全额达标',  color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0', bar: '#10b981' },
+  warning:    { label: '打折拨付区', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', bar: '#f59e0b' },
+  risk:       { label: '零补贴风险', color: '#ef4444', bg: '#fff1f2', border: '#fecdd3', bar: '#ef4444' },
+  no_data:    { label: '待录入',    color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0', bar: '#cbd5e1' },
+  no_target:  { label: '本年无目标', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0', bar: '#e2e8f0' },
+}
+
+// 单位换算（展示用）
+const DISPLAY_UNITS = { '亿元': ['亿元', '万元', '元'], '人': ['人'], '项': ['项'], '家': ['家'] }
+function cvtDisplay(val, baseUnit, dispUnit) {
+  if (val == null) return null
+  if (baseUnit === '亿元') {
+    if (dispUnit === '万元') return val * 10000
+    if (dispUnit === '元')   return val * 1e8
+  }
+  return val
+}
+function fmtDisplay(val, baseUnit, dispUnit, precision) {
+  const v = cvtDisplay(val, baseUnit, dispUnit)
+  if (v == null) return '—'
+  if (precision === 0) return Number(v).toLocaleString()
+  return Number(v).toFixed(precision).replace(/\.?0+$/, '')
 }
 const QUAL_STATUS = {
   compliant:   { label: '已合规',  color: '#10b981', bg: '#f0fdf4', icon: <CheckCircleFilled /> },
@@ -87,48 +105,127 @@ function ScoreRing({ score }) {
   )
 }
 
+// KPI 状态对应的渐变配置
+const KPI_GRADIENTS = {
+  compliant: { from: '#059669', to: '#10b981', glow: 'rgba(16,185,129,0.25)' },
+  warning:   { from: '#d97706', to: '#f59e0b', glow: 'rgba(245,158,11,0.25)' },
+  risk:      { from: '#dc2626', to: '#ef4444', glow: 'rgba(239,68,68,0.25)' },
+  no_data:   { from: '#94a3b8', to: '#cbd5e1', glow: 'rgba(148,163,184,0.15)' },
+  no_target: { from: '#64748b', to: '#94a3b8', glow: 'rgba(100,116,139,0.15)' },
+}
+
 // ── KPI 摘要卡 ─────────────────────────────────────────────────────────────────
-function KpiCard({ kpi, isActive, onClick }) {
-  const s = KPI_STATUS[kpi.status]
+function KpiCard({ kpi, isActive, onClick, displayUnit }) {
+  const s  = KPI_STATUS[kpi.status] || KPI_STATUS.no_data
+  const g  = KPI_GRADIENTS[kpi.status] || KPI_GRADIENTS.no_data
   const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
-  const gap = fmtGap(kpi.gap90, kpi.unit, kpi.precision)
+  const isNoTarget = kpi.status === 'no_target'
+  const hasVal = kpi.status !== 'no_data' && kpi.status !== 'no_target'
+  const dispUnit = (kpi.unit === '亿元' && displayUnit) ? displayUnit : kpi.unit
+  const dispActual = fmtDisplay(kpi.actual, kpi.unit, dispUnit, kpi.precision)
+  const dispTarget = kpi.target != null ? fmtDisplay(kpi.target, kpi.unit, dispUnit, kpi.precision) : null
+  const gap = kpi.gap90 != null ? fmtGap(cvtDisplay(kpi.gap90, kpi.unit, dispUnit), dispUnit, kpi.precision) : null
+
   return (
     <div onClick={onClick} style={{
-      background: isActive ? s.bg : '#fff',
-      border: `1.5px solid ${isActive ? s.border : '#e8ecf4'}`,
-      borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
-      transition: 'all 0.15s',
-      boxShadow: isActive ? `0 4px 16px ${s.bar}22` : '0 1px 4px rgba(0,0,0,0.04)',
+      background: isActive
+        ? `linear-gradient(145deg, ${g.from}18 0%, ${g.to}10 100%)`
+        : '#fff',
+      border: `1.5px solid ${isActive ? s.color + '55' : '#e8ecf4'}`,
+      borderRadius: 16, padding: '14px 16px', cursor: 'pointer',
+      transition: 'all 0.18s',
+      boxShadow: isActive
+        ? `0 6px 24px ${g.glow}, 0 2px 8px rgba(0,0,0,0.06)`
+        : '0 1px 4px rgba(0,0,0,0.04)',
+      position: 'relative', overflow: 'hidden',
     }}
-      onMouseEnter={e => { if (!isActive) e.currentTarget.style.borderColor = s.border }}
-      onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = '#e8ecf4' }}
+      onMouseEnter={e => {
+        if (!isActive) {
+          e.currentTarget.style.borderColor = s.color + '60'
+          e.currentTarget.style.boxShadow = `0 4px 16px ${g.glow}`
+          e.currentTarget.style.transform = 'translateY(-1px)'
+        }
+      }}
+      onMouseLeave={e => {
+        if (!isActive) {
+          e.currentTarget.style.borderColor = '#e8ecf4'
+          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'
+          e.currentTarget.style.transform = 'translateY(0)'
+        }
+      }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>{kpi.label}</span>
-        <Tag style={{ margin: 0, fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 700,
-          color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
-          {kpi.status === 'no_data' ? '待录入' : `${pct.toFixed(0)}%`}
-        </Tag>
+      {/* 背景装饰圆 */}
+      {hasVal && (
+        <div style={{
+          position: 'absolute', right: -20, top: -20, width: 80, height: 80,
+          borderRadius: '50%', background: `${s.color}10`, pointerEvents: 'none',
+        }} />
+      )}
+
+      {/* 顶部：指标名 + 状态标签 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, position: 'relative' }}>
+        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.3 }}>{kpi.label}</span>
+        <div style={{
+          fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 800,
+          color: '#fff',
+          background: hasVal
+            ? `linear-gradient(135deg, ${g.from}, ${g.to})`
+            : '#e2e8f0',
+          ...(hasVal ? {} : { color: '#94a3b8' }),
+          flexShrink: 0, marginLeft: 4,
+          boxShadow: hasVal ? `0 2px 6px ${g.glow}` : 'none',
+        }}>
+          {kpi.status === 'no_data' ? '待录入' : kpi.status === 'no_target' ? '无目标' : `${pct.toFixed(0)}%`}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 8 }}>
-        <span style={{ fontSize: 28, fontWeight: 800, color: kpi.status === 'no_data' ? '#cbd5e1' : s.color, lineHeight: 1 }}>
-          {fmtVal(kpi.actual, kpi.precision)}
+
+      {/* 实绩数字 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 10, position: 'relative' }}>
+        <span style={{
+          fontSize: 30, fontWeight: 900, lineHeight: 1,
+          background: hasVal ? `linear-gradient(135deg, ${g.from}, ${g.to})` : 'none',
+          WebkitBackgroundClip: hasVal ? 'text' : 'unset',
+          WebkitTextFillColor: hasVal ? 'transparent' : '#cbd5e1',
+          color: hasVal ? 'transparent' : '#cbd5e1',
+        }}>
+          {dispActual}
         </span>
-        <span style={{ fontSize: 11, color: '#94a3b8' }}>{kpi.unit}</span>
-        <span style={{ fontSize: 11, color: '#cbd5e1', marginLeft: 2 }}>/ {kpi.target}</span>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>{dispUnit}</span>
+        {dispTarget && (
+          <span style={{ fontSize: 11, color: '#c0c7d4', marginLeft: 2 }}>/ {dispTarget}</span>
+        )}
       </div>
-      <div style={{ height: 5, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: s.bar, borderRadius: 3, transition: 'width 0.8s ease' }} />
+
+      {/* 进度条 */}
+      <div style={{ height: 6, background: '#f0f2f7', borderRadius: 3, overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
+        {/* 90% 参考线 */}
+        <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(0,0,0,0.12)', zIndex: 2 }} />
+        <div style={{
+          height: '100%', width: `${pct}%`, borderRadius: 3,
+          background: hasVal ? `linear-gradient(90deg, ${g.from}cc, ${g.to})` : '#e2e8f0',
+          transition: 'width 0.8s ease',
+          boxShadow: hasVal ? `0 0 6px ${g.glow}` : 'none',
+        }} />
       </div>
-      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14 }}>
-        {kpi.status === 'compliant' && <span style={{ color: '#10b981' }}>✓ 已达全额补贴线</span>}
+
+      {/* 底部提示 */}
+      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14, position: 'relative' }}>
+        {kpi.status === 'compliant' && (
+          <span style={{ color: '#059669', fontWeight: 600 }}>✓ 已达全额补贴线</span>
+        )}
         {(kpi.status === 'warning' || kpi.status === 'risk') && gap && (
           <span>还需 <strong style={{ color: s.color }}>{gap}</strong> 解锁全额</span>
         )}
-        {kpi.status === 'no_data' && <span style={{ color: '#cbd5e1' }}>前往数据中台录入</span>}
+        {kpi.status === 'no_data' && (
+          <span style={{ color: '#c0c7d4' }}>前往数据中台录入</span>
+        )}
+        {kpi.status === 'no_target' && kpi.note && (
+          <span style={{ color: '#94a3b8' }}>{kpi.note}</span>
+        )}
       </div>
+
       {isActive && (
-        <div style={{ marginTop: 6, fontSize: 11, color: s.color, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{ marginTop: 8, fontSize: 11, color: s.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
           五年对赌详情 <RightOutlined style={{ fontSize: 9 }} />
         </div>
       )}
@@ -157,9 +254,10 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
       </div>
 
       {/* 五年行 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {targets.map(({ year, target }) => {
           const isCur    = year === currentYear
+          const isPast   = year < currentYear
           const isFuture = year > currentYear
           const actual   = isCur ? kpi.actual : null
           const rate     = (actual !== null && target > 0) ? actual / target : null
@@ -167,49 +265,86 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
           const ys       = rate !== null ? KPI_STATUS[rate >= 0.9 ? 'compliant' : rate >= 0.7 ? 'warning' : 'risk'] : KPI_STATUS.no_data
           const gap      = isCur && kpi.gap90 > 0 ? fmtGap(kpi.gap90, kpi.unit, kpi.precision) : null
 
+          // 三种视觉层级
+          if (isCur) {
+            // ── 当前年：全尺寸高亮卡片 ──
+            return (
+              <div key={year} style={{
+                background: 'linear-gradient(135deg, #f0f7ff 0%, #f8faff 100%)',
+                border: `2px solid ${s.color}40`,
+                borderRadius: 12, padding: '14px 18px',
+                boxShadow: `0 4px 16px ${s.color}12`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: '#1e40af' }}>{year} 年</span>
+                    <span style={{ fontSize: 10, background: '#1d4ed8', color: '#fff', padding: '2px 9px', borderRadius: 20, fontWeight: 700 }}>当前年度</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {rate !== null && (
+                      <Tag style={{ margin: 0, fontSize: 11, padding: '2px 12px', borderRadius: 20, fontWeight: 700,
+                        color: ys.color, background: ys.bg, border: `1px solid ${ys.border}` }}>
+                        {ys.label}
+                      </Tag>
+                    )}
+                    <span style={{ fontSize: 13, color: '#475569' }}>
+                      实际 <strong style={{ fontSize: 15, color: s.color }}>{fmtVal(actual, kpi.precision)}</strong>
+                      <span style={{ color: '#94a3b8', margin: '0 4px' }}>/</span>
+                      目标 <strong style={{ color: '#0f172a' }}>{target} {kpi.unit}</strong>
+                    </span>
+                  </div>
+                </div>
+                <div style={{ height: 12, background: '#e8f0fe', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 2, background: 'rgba(0,0,0,0.15)', zIndex: 1 }} />
+                  <div style={{
+                    height: '100%', borderRadius: 6, transition: 'width 0.8s ease',
+                    width: `${pct}%`,
+                    background: `linear-gradient(90deg, ${s.bar}cc, ${s.bar})`,
+                    boxShadow: `0 0 8px ${s.bar}66`,
+                  }} />
+                </div>
+                {gap && (
+                  <div style={{ fontSize: 11, color: s.color, marginTop: 6, fontWeight: 500 }}>
+                    还需 <strong>{gap}</strong> 才能解锁全额补贴
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          if (isPast) {
+            // ── 历史年：紧凑灰色小行 ──
+            return (
+              <div key={year} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '7px 14px', borderRadius: 8,
+                background: '#f8fafc', border: '1px solid #f1f5f9',
+                opacity: 0.7,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', minWidth: 44 }}>{year}</span>
+                <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: '0%', background: '#cbd5e1', borderRadius: 2 }} />
+                </div>
+                <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                  实际 — / 目标 <strong style={{ color: '#64748b' }}>{target} {kpi.unit}</strong>
+                </span>
+              </div>
+            )
+          }
+
+          // ── 未来年：更淡的虚线边框小行 ──
           return (
             <div key={year} style={{
-              background: isCur ? '#f8faff' : '#fff',
-              border: `1px solid ${isCur ? '#c7d7ff' : '#f1f5f9'}`,
-              borderRadius: 10, padding: '10px 16px',
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '7px 14px', borderRadius: 8,
+              background: '#fafafa', border: '1px dashed #e2e8f0',
+              opacity: 0.5,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isCur ? 8 : 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: isCur ? 700 : 500, color: isCur ? '#1e40af' : '#475569', minWidth: 50 }}>
-                    {year} 年
-                  </span>
-                  {isCur && <span style={{ fontSize: 10, background: '#dbeafe', color: '#1d4ed8', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>当前年度</span>}
-                  {isFuture && <span style={{ fontSize: 11, color: '#cbd5e1' }}>未开始</span>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {rate !== null && !isFuture && (
-                    <Tag style={{ margin: 0, fontSize: 10, padding: '0 8px', borderRadius: 20, fontWeight: 700,
-                      color: ys.color, background: ys.bg, border: `1px solid ${ys.border}` }}>
-                      {ys.label}
-                    </Tag>
-                  )}
-                  <span style={{ fontSize: 12, color: '#64748b' }}>
-                    实际 <strong style={{ color: isFuture ? '#cbd5e1' : '#0f172a' }}>
-                      {isFuture ? '—' : fmtVal(actual, kpi.precision)}
-                    </strong>
-                    <span style={{ color: '#94a3b8' }}> / 目标 </span>
-                    <strong style={{ color: '#0f172a' }}>{target} {kpi.unit}</strong>
-                  </span>
-                </div>
-              </div>
-              <div style={{ height: isCur ? 10 : 5, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(0,0,0,0.12)', zIndex: 1 }} />
-                <div style={{
-                  height: '100%', borderRadius: 4, transition: 'width 0.8s ease',
-                  width: isFuture ? '0%' : `${pct}%`,
-                  background: isCur ? s.bar : (rate !== null ? ys.bar : '#e2e8f0'),
-                }} />
-              </div>
-              {gap && isCur && (
-                <div style={{ fontSize: 11, color: s.color, marginTop: 5 }}>
-                  💡 还需 <strong>{gap}</strong> 才能解锁100%全额补贴
-                </div>
-              )}
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', minWidth: 44 }}>{year}</span>
+              <div style={{ flex: 1, height: 4, background: '#f1f5f9', borderRadius: 2 }} />
+              <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>
+                未开始 / 目标 <strong style={{ color: '#94a3b8' }}>{target} {kpi.unit}</strong>
+              </span>
             </div>
           )
         })}
@@ -228,6 +363,8 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState('kpi')
   const [token, setToken]       = useState('')
   const [user, setUser]         = useState(null)
+  // 展示单位：默认亿元，可切换为万元
+  const [displayUnit, setDisplayUnit] = useState('亿元')
   // 定性义务编辑
   const [editModal, setEditModal] = useState({ open: false, item: null })
   const [editForm, setEditForm]   = useState({ status: '', description: '', evidenceUrls: [] })
@@ -283,11 +420,27 @@ export default function LandingPage() {
     finally { setSaving(false) }
   }
   const handleUpload = async ({ file, onSuccess, onError }) => {
-    if (file.size > 10 * 1024 * 1024) { message.error('文件超过 10MB'); onError(new Error('too large')); return }
+    if (file.size > 50 * 1024 * 1024) { message.error('文件超过 50MB'); onError(new Error('too large')); return }
     setUploading(true)
     try {
+      const tkn = localStorage.getItem('token')
       const base64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file) })
-      const result = await api.post('/api/agreement/upload', { name: file.name, data: base64, size: file.size, mimeType: file.type, category: 'other' })
+      const CHUNK = 900 * 1024
+      const totalChunks = Math.ceil(base64.length / CHUNK)
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+      const meta = { name: file.name, size: file.size, mimeType: file.type, category: 'other' }
+      let result
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = base64.slice(i * CHUNK, (i + 1) * CHUNK)
+        const res = await fetch('/api/agreement/upload-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+          body: JSON.stringify({ uploadId, chunkIndex: i, totalChunks, chunk, meta: i === 0 ? meta : undefined }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || '上传失败')
+        if (data.complete) result = data
+      }
       setEditForm(f => ({ ...f, evidenceUrls: [...f.evidenceUrls, { url: `/api/agreement/files/${result.id}/view`, name: file.name, size: file.size }] }))
       message.success(`${file.name} 上传成功`)
       onSuccess(result)
@@ -296,16 +449,32 @@ export default function LandingPage() {
   }
   const removeEvidence = (idx) => setEditForm(f => ({ ...f, evidenceUrls: f.evidenceUrls.filter((_, i) => i !== idx) }))
 
-  // ── 协议文件操作 ──
+  // ── 协议文件操作（分块上传，绕开 Vercel 4.5MB 限制） ──
   const handleFileUpload = async ({ file, onSuccess, onError }) => {
-    if (file.size > 10 * 1024 * 1024) { message.error('文件超过 10MB'); onError(new Error('too large')); return }
+    if (file.size > 50 * 1024 * 1024) { message.error('文件超过 50MB'); onError(new Error('too large')); return }
     setFileUploading(true)
     try {
+      const tkn = localStorage.getItem('token')
       const base64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file) })
-      await api.post('/api/agreement/upload', { name: file.name, data: base64, size: file.size, mimeType: file.type, category: fileCat === 'all' ? 'contract' : fileCat })
+      const CHUNK = 900 * 1024
+      const totalChunks = Math.ceil(base64.length / CHUNK)
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+      const meta = { name: file.name, size: file.size, mimeType: file.type, category: fileCat === 'all' ? 'contract' : fileCat }
+      let result
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = base64.slice(i * CHUNK, (i + 1) * CHUNK)
+        const res = await fetch('/api/agreement/upload-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+          body: JSON.stringify({ uploadId, chunkIndex: i, totalChunks, chunk, meta: i === 0 ? meta : undefined }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || `上传失败`)
+        if (data.complete) result = data
+      }
       message.success(`${file.name} 上传成功`)
       fetchFiles()
-      onSuccess()
+      onSuccess(result)
     } catch (e) { message.error('上传失败：' + e.message); onError(e) }
     finally { setFileUploading(false) }
   }
@@ -444,38 +613,57 @@ export default function LandingPage() {
               </Col>
             )}
 
-            {/* 右：年份 + 倒计时 + 操作 */}
+            {/* 右：所有控件一行横排 */}
             <Col style={{ flexShrink: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <Select
-                    value={year}
-                    onChange={y => { setYear(y); setActiveKpi(null) }}
-                    options={YEARS.map(y => ({ value: y, label: `${y} 年度` }))}
-                    style={{ width: 120 }}
-                  />
-                  <Button onClick={() => router.push('/screen')} style={{
-                    background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
-                    color: '#fff', borderRadius: 8, fontWeight: 600,
-                  }}>
-                    📊 数据大屏
-                  </Button>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {/* 年份 */}
+                <Select
+                  value={year}
+                  onChange={y => { setYear(y); setActiveKpi(null) }}
+                  options={YEARS.map(y => ({ value: y, label: `${y} 年度` }))}
+                  style={{ width: 110 }}
+                />
+                {/* 展示单位 */}
+                <Select
+                  value={displayUnit}
+                  onChange={setDisplayUnit}
+                  style={{ width: 76 }}
+                  options={[
+                    { value: '亿元', label: '亿元' },
+                    { value: '万元', label: '万元' },
+                  ]}
+                />
+                {/* 倒计时小胶囊 */}
                 {data && (
-                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>距 {year} 年考核截止</div>
-                    <div style={{ fontSize: 36, fontWeight: 900, color: data.daysToDeadline < 90 ? '#f87171' : '#60a5fa', lineHeight: 1 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'rgba(255,255,255,0.08)', borderRadius: 10,
+                    padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)',
+                  }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>距考核截止</span>
+                    <span style={{
+                      fontSize: 22, fontWeight: 900, lineHeight: 1,
+                      color: data.daysToDeadline < 90 ? '#f87171' : '#60a5fa',
+                    }}>
                       {data.daysToDeadline}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>天</div>
+                    </span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>天</span>
                   </div>
                 )}
+                {/* 录入数据 */}
                 <Button
                   onClick={() => router.push('/data-center')}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', borderRadius: 8 }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.85)', borderRadius: 8 }}
                   icon={<DatabaseOutlined />}
                 >
                   录入数据
+                </Button>
+                {/* 数据大屏 */}
+                <Button onClick={() => router.push('/screen')} style={{
+                  background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#fff', borderRadius: 8, fontWeight: 600,
+                }}>
+                  📊 数据大屏
                 </Button>
               </div>
             </Col>
@@ -510,6 +698,7 @@ export default function LandingPage() {
                               kpi={kpi}
                               isActive={activeKpi === kpi.key}
                               onClick={() => setActiveKpi(kpi.key === activeKpi ? null : kpi.key)}
+                              displayUnit={displayUnit}
                             />
                           </div>
                         ))}
