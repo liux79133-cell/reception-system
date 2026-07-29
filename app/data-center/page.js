@@ -153,7 +153,7 @@ function FieldHeader({ field, unit, isCumulative, isAnnual, isEditing, configMod
 // ── 12 格月度网格 ─────────────────────────────────────────────────────────
 function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, isEditing, onSave, onImport, saving, dimState, configMode, onToggleDim, onDelete, isRequired, onToggleRequired, customField }) {
   const isMoney = isMoneyUnit(field.baseUnit)
-  const prec = unit === '元' ? 0 : unit === '万元' ? 2 : 4
+  const prec = unit === '元' ? 2 : unit === '万元' ? 4 : 4
   const bg = isCumulative ? '#fffbeb' : '#f0f7ff'
   const border = isCumulative ? '#fde68a' : '#bfdbfe'
   const textC = isCumulative ? '#78350f' : '#1e3a8a'
@@ -161,7 +161,8 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
   const fmtVal = (v) => {
     if (v == null) return '—'
     const n = Number(v); if (isNaN(n)) return '—'
-    return isMoney ? n.toLocaleString('zh-CN', { maximumFractionDigits: prec }) : Math.round(n).toLocaleString('zh-CN')
+    const isCount = ['人', '家', '项', '个', '辆'].includes(unit)
+    return isCount ? Math.round(n).toLocaleString('zh-CN') : n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: prec })
   }
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10, opacity: dimState === 'dim' ? 0.38 : 1, filter: dimState === 'dim' ? 'grayscale(1) brightness(1.1)' : 'none', transition: 'opacity 0.2s, filter 0.2s' }}>
@@ -202,12 +203,13 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
 // ── 5 格年度网格（2024-2028 横向排列）────────────────────────────────────
 function AnnualGrid({ field, values, onChange, unit, isEditing, onSave, saving, dimState, configMode, onToggleDim, onDelete, isRequired, onToggleRequired, customField, currentYear }) {
   const isMoney = isMoneyUnit(field.baseUnit)
-  const prec = unit === '元' ? 0 : unit === '万元' ? 2 : 4
+  const prec = unit === '元' ? 2 : unit === '万元' ? 4 : 4
   const bg = '#f0f7ff', border = '#bfdbfe', textC = '#1e3a8a', subC = '#3730a3'
   const fmtVal = (v) => {
     if (v == null) return '—'
     const n = Number(v); if (isNaN(n)) return '—'
-    return isMoney ? n.toLocaleString('zh-CN', { maximumFractionDigits: prec }) : Math.round(n).toLocaleString('zh-CN')
+    const isCount = ['人', '家', '项', '个', '辆'].includes(unit)
+    return isCount ? Math.round(n).toLocaleString('zh-CN') : n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: prec })
   }
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10, opacity: dimState === 'dim' ? 0.38 : 1, filter: dimState === 'dim' ? 'grayscale(1) brightness(1.1)' : 'none', transition: 'opacity 0.2s, filter 0.2s' }}>
