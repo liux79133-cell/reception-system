@@ -236,11 +236,12 @@ function AnnualGrid({ field, values, onChange, unit, isEditing, onSave, saving, 
                 {yr} 年
                 {isCur && <span style={{ fontSize: 8, background: '#3b82f6', color: '#fff', borderRadius: 4, padding: '0 3px', lineHeight: '14px' }}>当前</span>}
               </div>
-              {isEditing ? (
+              {isEditing && !isCur ? (
                 <InputNumber value={val ?? null} onChange={v => onChange(yr, v)} min={0} precision={prec} size="small" style={{ width: '100%' }} placeholder="—" />
               ) : (
                 <div style={{ fontSize: val != null ? 16 : 14, fontWeight: val != null ? 700 : 400, color: val != null ? textC : '#cbd5e1', lineHeight: 1.2 }}>
                   {fmtVal(val)}{val != null && <span style={{ fontSize: 10, color: subC, marginLeft: 2 }}>{unit}</span>}
+                  {isCur && val != null && <div style={{ fontSize: 9, color: '#3b82f6', marginTop: 2 }}>YTD 自动累计</div>}
                 </div>
               )}
             </div>
@@ -469,18 +470,39 @@ export default function DataCenterPage() {
   // 按年汇总：拉取 2024-2028 所有年度记录
   const fetchAllAnnual = useCallback(() => {
     setLoading(true)
+    const currentYr = dayjs().year()
     Promise.all(['finance', 'hr', 'ip'].map(cat =>
       Promise.all(ANNUAL_YEARS.map(y =>
         api.get('/api/agreement/data', { year: y, category: cat }).catch(() => [])
       )).then(results => {
-        // results[i] = 该年所有 records
-        const catData = {} // { fieldKey: { year: value } }
+        const catData = {}
         results.forEach((rows, i) => {
           const yr = ANNUAL_YEARS[i]
+          // 优先取年度汇总记录
           const annualRow = rows.find(r => r.period === String(yr))
           if (annualRow?.payload) {
             Object.entries(annualRow.payload).forEach(([k, v]) => {
               if (v == null) return
+              if (!catData[k]) catData[k] = {}
+              catData[k][yr] = v
+            })
+          } else if (yr === currentYr) {
+            // 当前年无年度汇总时，从月度数据自动累计 YTD
+            const monthRows = rows.filter(r => /^\d{4}-\d{2}$/.test(r.period))
+            const ytd = {}
+            monthRows.forEach(row => {
+              Object.entries(row.payload || {}).forEach(([k, v]) => {
+                if (k === 'inputMode' || v == null) return
+                // 财务字段（baseUnit=亿元）累加，人/项等取最后一条快照
+                const fieldDef = Object.values(ALL_FIELDS).flat().find(f => f.key === k)
+                if (fieldDef?.baseUnit === '亿元') {
+                  ytd[k] = (ytd[k] || 0) + Number(v)
+                } else {
+                  ytd[k] = Number(v) // 取最新值
+                }
+              })
+            })
+            Object.entries(ytd).forEach(([k, v]) => {
               if (!catData[k]) catData[k] = {}
               catData[k][yr] = v
             })
