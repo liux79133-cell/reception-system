@@ -282,7 +282,6 @@ function SvgLineChart({ data, prevData, label, unit, color, width = 340, height 
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{label}</span>
-        {latestV != null && <span style={{ fontSize: 16, fontWeight: 700, color }}>{fmtV(latestV)}<span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 2 }}>{unit}</span></span>}
         {pct != null && (
           <span style={{ fontSize: 10, color: pct >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>
             {pct >= 0 ? '▲' : '▼'}{Math.abs(pct).toFixed(1)}% 同期
@@ -307,10 +306,22 @@ function SvgLineChart({ data, prevData, label, unit, color, width = 340, height 
         {makePath(data) && (
           <path d={makePath(data)} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         )}
-        {/* 数据点 */}
-        {months.map(m => data[m] != null && (
-          <circle key={m} cx={toX(m)} cy={toY(data[m])} r={3} fill={color} stroke="#fff" strokeWidth={1.5} />
-        ))}
+        {/* 数据点 + 节点数值标签 */}
+        {months.map(m => {
+          if (data[m] == null) return null
+          const cx = toX(m), cy = toY(data[m])
+          const labelAbove = cy > 18  // 节点太靠顶时标签放下方
+          return (
+            <g key={m}>
+              <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#fff" strokeWidth={1.5} />
+              <text x={cx} y={labelAbove ? cy - 6 : cy + 13}
+                textAnchor="middle" fontSize={8.5} fontWeight={600} fill={color}
+                style={{ pointerEvents: 'none' }}>
+                {fmtV(data[m])}
+              </text>
+            </g>
+          )
+        })}
       </svg>
     </div>
   )
