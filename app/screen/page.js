@@ -441,35 +441,40 @@ export default function ScreenPage() {
         {/* ══ 左列 ══════════════════════════════════════════════════ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* 履约分 + 倒计时 합치기 */}
-          <Panel accent={scoreColor} style={{ flexShrink: 0, padding: '10px 12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <DonutChart percent={data.overallScore} color={scoreColor} size={76} strokeW={7}
-                label={data.overallScore.toFixed(0)} sublabel="分" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: scoreColor }}>{scoreLabel}</div>
-                <div style={{ fontSize: 9, color: C.sub }}>{year} 年综合履约</div>
-                <div style={{ marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {[
-                    { label: '达标', n: data.kpis.filter(k=>k.status==='compliant').length, c: C.green },
-                    { label: '预警', n: data.kpis.filter(k=>k.status==='warning').length,   c: C.yellow },
-                    { label: '风险', n: data.kpis.filter(k=>k.status==='risk').length,      c: C.red },
-                  ].map(s => (
-                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: s.c, flexShrink: 0 }} />
-                      <span style={{ fontSize: 10, color: C.sub }}>{s.label}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: s.c, marginLeft: 'auto' }}>{s.n}</span>
-                    </div>
-                  ))}
-                </div>
+          {/* 履约分 + 倒计时 */}
+          <Panel accent={scoreColor} style={{ flexShrink: 0, padding: '12px 14px' }}>
+            {/* 顶部：状态标签 + 年份 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: scoreColor, background: `${scoreColor}15`, border: `1px solid ${scoreColor}30`, borderRadius: 20, padding: '2px 10px' }}>
+                {scoreLabel}
               </div>
-              <div style={{ textAlign: 'center', paddingLeft: 8, borderLeft: `1px solid ${C.border}`, flexShrink: 0 }}>
-                <div style={{ fontSize: 8, color: C.sub }}>距截止</div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: data.daysToDeadline < 90 ? C.red : C.blue, lineHeight: 1.1 }}>
+              <div style={{ fontSize: 10, color: C.muted }}>{year} 年综合履约</div>
+            </div>
+            {/* 中部：环形图 + 倒计时并排 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <DonutChart percent={data.overallScore} color={scoreColor} size={80} strokeW={8}
+                label={data.overallScore.toFixed(0)} sublabel="分" />
+              <div style={{ textAlign: 'center', flex: 1 }}>
+                <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>距年度截止</div>
+                <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1, color: data.daysToDeadline < 90 ? C.red : C.blue, letterSpacing: -1 }}>
                   {data.daysToDeadline}
                 </div>
-                <div style={{ fontSize: 8, color: C.sub }}>天</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>天</div>
               </div>
+            </div>
+            {/* 底部：KPI 状态统计横排 */}
+            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+              {[
+                { label: '达标', n: data.kpis.filter(k=>k.status==='compliant').length, c: C.green },
+                { label: '预警', n: data.kpis.filter(k=>k.status==='warning').length,   c: C.yellow },
+                { label: '风险', n: data.kpis.filter(k=>k.status==='risk').length,      c: C.red },
+                { label: '待录入', n: data.kpis.filter(k=>k.status==='no_data').length, c: '#94a3b8' },
+              ].map(s => (
+                <div key={s.label} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: s.c, lineHeight: 1 }}>{s.n}</div>
+                  <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
             </div>
           </Panel>
 
