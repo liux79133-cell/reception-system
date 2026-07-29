@@ -236,7 +236,7 @@ function AnnualGrid({ field, values, onChange, unit, isEditing, onSave, saving, 
                 {yr} 年
                 {isCur && <span style={{ fontSize: 8, background: '#3b82f6', color: '#fff', borderRadius: 4, padding: '0 3px', lineHeight: '14px' }}>当前</span>}
               </div>
-              {isEditing && !isCur ? (
+              {isEditing ? (
                 <InputNumber value={val ?? null} onChange={v => onChange(yr, v)} min={0} precision={prec} size="small" style={{ width: '100%' }} placeholder="—" />
               ) : (
                 <div style={{ fontSize: val != null ? 16 : 14, fontWeight: val != null ? 700 : 400, color: val != null ? textC : '#cbd5e1', lineHeight: 1.2 }}>
