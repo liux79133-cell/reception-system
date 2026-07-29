@@ -329,8 +329,34 @@ export default function DataCenterPage() {
   const [inputUnits, setInputUnits] = useState(() => {
     try { const s = localStorage.getItem('datahub_input_units'); return s ? JSON.parse(s) : {} } catch { return {} }
   })
+  const [globalMoneyUnit, setGlobalMoneyUnit] = useState(() => {
+    try { return localStorage.getItem('datahub_global_money_unit') || '元' } catch { return '元' }
+  })
   const setFieldUnit = (fieldKey, unit) => {
     setInputUnits(p => { const next = { ...p, [fieldKey]: unit }; localStorage.setItem('datahub_input_units', JSON.stringify(next)); return next })
+  }
+  // 切换全局单位时，把所有金额字段（baseUnit=亿元）统一换成新单位
+  const handleGlobalMoneyUnitChange = (unit) => {
+    setGlobalMoneyUnit(unit)
+    localStorage.setItem('datahub_global_money_unit', unit)
+    setInputUnits(prev => {
+      const next = { ...prev }
+      Object.values(ALL_FIELDS).flat().forEach(f => {
+        if (f.baseUnit === '亿元') next[f.key] = unit
+      })
+      Object.values(customFields).flat().forEach(f => {
+        if (f.baseUnit === '亿元') next[f.key] = unit
+      })
+      localStorage.setItem('datahub_input_units', JSON.stringify(next))
+      return next
+    })
+    // 累计模式下同步 cumUnit
+    if (['元', '万元', '亿元'].includes(unit)) setCumUnit(unit)
+  }
+  // 对某字段取当前显示单位：有单独设置用单独的，否则用全局
+  const getFieldUnit = (field) => {
+    if (field.baseUnit !== '亿元') return field.baseUnit
+    return inputUnits[field.key] || globalMoneyUnit
   }
 
   const [parseModal, setParseModal]     = useState({ open: false, cat: null })
@@ -705,7 +731,7 @@ export default function DataCenterPage() {
 
           {/* ── 按月填报 ── */}
           {inputMode === 'monthly' && visibleFields.map(field => {
-            const fUnit = inputUnits[field.key] || field.baseUnit
+            const fUnit = getFieldUnit(field)
             return (
               <MonthGrid key={field.key} field={field}
                 values={monthlyGridValues[cat]?.[field.key] || {}}
@@ -765,7 +791,7 @@ export default function DataCenterPage() {
               {visibleFields.map(field => {
                 const fieldDef = allCatFields(cat).find(f => f.key === field.key) || field
                 const hasMulti = fieldDef.inputUnits?.length > 1
-                const curUnit = inputUnits[field.key] || fieldDef.baseUnit
+                const curUnit = getFieldUnit(fieldDef)
                 // 从 annualAllValues 取数据；如果有单位换算，转换为显示值
                 const rawValues = annualAllValues[cat]?.[field.key] || {}
                 const dispValues = {}
@@ -848,6 +874,15 @@ export default function DataCenterPage() {
               '填入各月末累计值，系统自动算出每月增量并分月存储'}>
               <InfoCircleOutlined style={{ color: '#94a3b8', cursor: 'help' }} />
             </Tooltip>
+            {/* 全局金额单位切换 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '4px 10px' }}>
+              <span style={{ fontSize: 12, color: '#1d6fdb', fontWeight: 600 }}>金额单位：</span>
+              <Radio.Group value={globalMoneyUnit} onChange={e => handleGlobalMoneyUnitChange(e.target.value)} buttonStyle="solid" size="small">
+                <Radio.Button value="元">元</Radio.Button>
+                <Radio.Button value="万元">万元</Radio.Button>
+                <Radio.Button value="亿元">亿元</Radio.Button>
+              </Radio.Group>
+            </div>
           </div>
           <div style={{ marginTop: 10, fontSize: 12, color: '#64748b', background: '#f8fafc', borderRadius: 8, padding: '6px 12px' }}>
             {inputMode === 'monthly' && '📌 按月填报：每个月填当月发生的数值，12格网格覆盖全年。财务为月度增量，人才/知产填截至当月末的累计总数。'}

@@ -47,17 +47,23 @@ export async function POST(request) {
       return Response.json({ error: 'period、category、payload 必填' }, { status: 400 })
     }
 
+    // 先读取已有 payload，再 merge，防止逐字段保存时互相覆盖
+    const existing = await prisma.agreementData.findUnique({
+      where: { period_category: { period, category } },
+    })
+    const merged = existing ? { ...JSON.parse(existing.payload), ...payload } : payload
+
     const record = await prisma.agreementData.upsert({
       where: { period_category: { period, category } },
       update: {
-        payload: JSON.stringify(payload),
+        payload: JSON.stringify(merged),
         submittedBy: user.id,
         updatedAt: new Date(),
       },
       create: {
         period,
         category,
-        payload: JSON.stringify(payload),
+        payload: JSON.stringify(merged),
         submittedBy: user.id,
       },
     })
