@@ -176,7 +176,8 @@ function MonthGrid({ field, values, onChange, isCumulative, unit, splitPreview, 
         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
           const val = values[m]
           const preview = splitPreview?.[m]
-          const previewDisp = preview != null ? (unit !== '亿元' ? fromBase(preview, unit) : preview) : null
+          // splitPreview は渡された時点で表示単位換算済み
+          const previewDisp = preview != null ? preview : null
           return (
             <Col key={m} xs={12} sm={8} md={4}>
               <div style={{ background: val != null ? (isCumulative ? '#fffbeb' : '#eff6ff') : '#fff', border: `1px solid ${val != null ? border : '#e8ecf0'}`, borderRadius: 8, padding: '7px 10px', transition: 'all 0.15s' }}>
@@ -453,14 +454,13 @@ export default function DataCenterPage() {
           })
         })
         if (Object.keys(newCumValues).length > 0) {
+          // newCumValues[m] 是月增量（亿元），还原为各月末累计值（亿元）存入 state
           const sortedMonths = Object.keys(newCumValues).map(Number).sort((a, b) => a - b)
           let cum = 0; const cumRestored = {}
-          sortedMonths.forEach(m => {
-            cum += newCumValues[m]
-            cumRestored[m] = parseFloat((_cumUnit !== '亿元' ? fromBase(cum, _cumUnit) : cum).toPrecision(10))
-          })
+          sortedMonths.forEach(m => { cum += newCumValues[m]; cumRestored[m] = cum })
           setCumValues(cumRestored)
         }
+        // multiMonthValues state 也统一存亿元
         if (Object.keys(newMultiMonthValues).length > 0) setMultiMonthValues(newMultiMonthValues)
       }
     }).finally(() => setLoading(false))
@@ -507,10 +507,9 @@ export default function DataCenterPage() {
 
   useEffect(() => {
     if (inputMode !== 'cumulative') return
-    const inYi = {}
-    Object.entries(cumValues).forEach(([m, v]) => { if (v != null) inYi[m] = toBase(v, cumUnit) })
-    setSplitPreview(splitCumulativeRevenue(inYi))
-  }, [cumValues, inputMode, cumUnit])
+    // cumValues state 已是亿元，直接拆分
+    setSplitPreview(splitCumulativeRevenue(cumValues))
+  }, [cumValues, inputMode])
 
   const save = async (category) => {
     const enabledPayload = {}
@@ -529,9 +528,8 @@ export default function DataCenterPage() {
   }
 
   const saveSplitRevenue = async () => {
-    const inYi = {}
-    Object.entries(cumValues).forEach(([m, v]) => { if (v != null) inYi[m] = toBase(v, cumUnit) })
-    const split = splitCumulativeRevenue(inYi)
+    // cumValues state 已是亿元，直接拆分
+    const split = splitCumulativeRevenue(cumValues)
     if (Object.keys(split).length === 0) return message.error('请先填入累计值')
     setSaving(s => ({ ...s, finance: true }))
     try {
@@ -569,10 +567,8 @@ export default function DataCenterPage() {
     setSaving(s => ({ ...s, [cat]: true }))
     try {
       await Promise.all(months.map(([m, val]) => {
-        // cumulative 模式：cumValues/multiMonthValues 用 cumUnit 输入，toBase 在 saveSplitRevenue 中已处理
-        // 这里 val 是用户输入的 cumUnit 值，需转为亿元
-        const storedVal = cumUnit !== '亿元' ? toBase(val, cumUnit) : val
-        return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { ...payloads[cat], [fieldKey]: storedVal } })
+        // state 已统一存亿元，直接保存
+        return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { ...payloads[cat], [fieldKey]: val } })
       }))
       notifySaved(`${fieldLabel} 已保存（共 ${months.length} 个月）`)
       setSavedAt(s => ({ ...s, [cat]: new Date().toISOString() }))
@@ -771,14 +767,31 @@ export default function DataCenterPage() {
               {visibleFields.map(field => {
                 const isRevenue = cat === 'finance' && field.key === 'revenue'
                 const isFinance = cat === 'finance'
-                const mv = isRevenue ? cumValues : (multiMonthValues[field.key] || {})
+                const fieldUnit = isFinance ? cumUnit : field.baseUnit
+                const isMoneyCum = field.baseUnit === '亿元'
+                // state 存亿元，显示时换算
+                const rawMv = isRevenue ? cumValues : (multiMonthValues[field.key] || {})
+                const dispMv = {}
+                Object.entries(rawMv).forEach(([m, v]) => {
+                  dispMv[m] = (v != null && isMoneyCum && fieldUnit !== '亿元') ? fromBase(v, fieldUnit) : v
+                })
                 const setMv = isRevenue
-                  ? (m, v) => setCumValues(p => ({ ...p, [m]: v }))
-                  : (m, v) => setMultiMonthValues(p => ({ ...p, [field.key]: { ...(p[field.key] || {}), [m]: v } }))
+                  ? (m, v) => {
+                      const stored = (v != null && isMoneyCum && fieldUnit !== '亿元') ? toBase(v, fieldUnit) : v
+                      setCumValues(p => ({ ...p, [m]: stored }))
+                    }
+                  : (m, v) => {
+                      const stored = (v != null && isMoneyCum && fieldUnit !== '亿元') ? toBase(v, fieldUnit) : v
+                      setMultiMonthValues(p => ({ ...p, [field.key]: { ...(p[field.key] || {}), [m]: stored } }))
+                    }
+                // splitPreview 也是亿元，显示时需换算
+                const dispSplitPreview = isRevenue && splitPreview
+                  ? Object.fromEntries(Object.entries(splitPreview).map(([m, v]) => [m, fieldUnit !== '亿元' ? fromBase(v, fieldUnit) : v]))
+                  : undefined
                 return (
-                  <MonthGrid key={field.key} field={field} values={mv} onChange={setMv}
-                    isCumulative={true} unit={isFinance ? cumUnit : field.baseUnit}
-                    splitPreview={isRevenue ? splitPreview : undefined}
+                  <MonthGrid key={field.key} field={field} values={dispMv} onChange={setMv}
+                    isCumulative={true} unit={fieldUnit}
+                    splitPreview={dispSplitPreview}
                     isEditing={editMode[cat]}
                     onSave={isRevenue ? saveSplitRevenue : () => saveMultiMonthField(cat, field.key, field.label)}
                     onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
