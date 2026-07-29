@@ -29,17 +29,13 @@ export async function GET(request) {
 
     // 计算 YTD 实绩：
     // 规则1：若存在年度记录（period="YYYY"），直接用年度值（优先）
-    // 规则2：若存在累计标记（inputMode="cumulative"），取最后一条的累计值
-    // 规则3：否则累加所有月度值
+    // 规则2：累加所有月度增量（累计模式已在前端拆分为月度增量存储，不再带 inputMode 标记）
     const calcFinanceField = (rows, field) => {
       const yearRow = rows.find(r => r.period === String(year))
       if (yearRow && yearRow[field] != null) return Number(yearRow[field]) || 0
-      const cumRows = rows.filter(r => r.inputMode === 'cumulative' && r.period !== String(year))
-      if (cumRows.length > 0) {
-        const last = cumRows[cumRows.length - 1]
-        return Number(last[field]) || 0
-      }
-      return rows.filter(r => r.period !== String(year)).reduce((s, r) => s + (Number(r[field]) || 0), 0)
+      return rows
+        .filter(r => /^\d{4}-\d{2}$/.test(r.period))
+        .reduce((s, r) => s + (Number(r[field]) || 0), 0)
     }
     const latestSnapshot = (rows, field) => {
       const yearRow = rows.find(r => r.period === String(year))

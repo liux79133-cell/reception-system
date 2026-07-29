@@ -533,8 +533,10 @@ export default function DataCenterPage() {
     if (Object.keys(split).length === 0) return message.error('请先填入累计值')
     setSaving(s => ({ ...s, finance: true }))
     try {
+      // 拆分后存的是月度增量，不能带 inputMode:'cumulative'，否则 dashboard 会错误取最后一条当 YTD
+      const { inputMode: _omit, ...basePayload } = payloads.finance || {}
       await Promise.all(Object.entries(split).map(([m, val]) =>
-        api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: 'finance', payload: { ...payloads.finance, revenue: val } })
+        api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: 'finance', payload: { ...basePayload, revenue: val } })
       ))
       notifySaved(`营业收入已拆分保存（共 ${Object.keys(split).length} 个月）`)
       setSavedAt(s => ({ ...s, finance: new Date().toISOString() }))
