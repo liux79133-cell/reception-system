@@ -83,9 +83,8 @@ export async function GET(request) {
       INDUSTRY_CHAIN:   hasFieldValue(hrRows, 'industryChainCount'),
     }
 
-    const kpis = KPI_KEYS.map(key => {
+    const builtinKpis = KPI_KEYS.map(key => {
       const targetRaw = KPI_TARGETS[key][year]
-      // target 为 null 表示该年无考核目标（如综合税收2024年）
       const hasTarget = targetRaw !== null && targetRaw !== undefined
       const target    = hasTarget ? Number(targetRaw) : null
       const actual    = actuals[key]
@@ -107,21 +106,56 @@ export async function GET(request) {
         : null
 
       return {
-        key,
-        label:          meta.label,
-        unit:           meta.unit,
-        precision:      meta.precision,
-        note:           meta.note,
-        actual:         hasData[key] ? actual : null,
-        target,
-        hasTarget,
-        completionRate,
-        status,
-        gap90,
-        weight:         KPI_WEIGHTS[key],
+        key, label: meta.label, unit: meta.unit, precision: meta.precision,
+        note: meta.note, actual: hasData[key] ? actual : null,
+        target, hasTarget, completionRate, status, gap90,
+        weight: KPI_WEIGHTS[key], custom: false,
       }
     })
 
+    // 合并自定义 KPI
+    const customKpiDefs = await prisma.customKpi.findMany({ where: { enabled: true }, orderBy: { sortOrder: 'asc' } })
+    const customKpis = customKpiDefs.map(def => {
+      const targets = JSON.parse(def.targets || '{}')
+      const targetRaw = targets[year]
+      const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== ''
+      const target    = hasTarget ? Number(targetRaw) : null
+      // 从 allYearsRows 取该字段的实绩
+      const catRows = allYearsRows.filter(r => r.category === def.category && r.period.startsWith(`${year}`))
+      const yearRow = catRows.find(r => r.period === String(year))
+      let actual = null
+      if (yearRow?.[def.dataField] != null) {
+        actual = Number(yearRow[def.dataField])
+      } else {
+        const monthRows = catRows.filter(r => /^\d{4}-\d{2}$/.test(r.period))
+        if (monthRows.length) {
+          // 金额字段累加，其他取最后值
+          if (def.unit === '亿元') {
+            actual = monthRows.reduce((s, r) => s + (Number(r[def.dataField]) || 0), 0)
+          } else {
+            const last = monthRows.filter(r => r[def.dataField] != null).pop()
+            actual = last ? Number(last[def.dataField]) : null
+          }
+        }
+      }
+      const hasActual = actual !== null && actual !== 0
+      let completionRate = null, status = 'no_data'
+      if (!hasTarget) { status = 'no_target' }
+      else if (!hasActual) { status = 'no_data' }
+      else {
+        completionRate = target > 0 ? actual / target : null
+        status = getKpiStatus(completionRate)
+      }
+      const gap90 = (hasTarget && target > 0 && actual !== null) ? Math.max(0, target * 0.9 - actual) : null
+      return {
+        key: def.key, label: def.label, unit: def.unit, precision: def.precision,
+        note: def.note || '', actual: hasActual ? actual : null,
+        target, hasTarget, completionRate, status, gap90,
+        weight: def.weight, custom: true, id: def.id,
+      }
+    })
+
+    const kpis = [...builtinKpis, ...customKpis]
     const overallScore = calcOverallScore(kpis)
 
     // 距年度截止日倒计时
@@ -199,10 +233,25 @@ export async function GET(request) {
     })
     KPI_KEYS.forEach(key => {
       allYearTargets[key] = [2024, 2025, 2026, 2027, 2028].map(y => ({
-        year: y,
-        target: KPI_TARGETS[key][y] || 0,
-        actual: allYearActuals[y][key],
+        year: y, target: KPI_TARGETS[key][y] || 0, actual: allYearActuals[y][key],
       }))
+    })
+    // 自定义 KPI 的五年阶梯
+    customKpiDefs.forEach(def => {
+      const targets = JSON.parse(def.targets || '{}')
+      allYearTargets[def.key] = [2024, 2025, 2026, 2027, 2028].map(y => {
+        const catRows = allYearsRows.filter(r => r.category === def.category && r.period.startsWith(`${y}`))
+        const yr = catRows.find(r => r.period === String(y))
+        let act = null
+        if (yr?.[def.dataField] != null) { act = Number(yr[def.dataField]) }
+        else {
+          const mRows = catRows.filter(r => /^\d{4}-\d{2}$/.test(r.period))
+          if (mRows.length) act = def.unit === '亿元'
+            ? mRows.reduce((s, r) => s + (Number(r[def.dataField]) || 0), 0)
+            : (mRows.filter(r => r[def.dataField] != null).pop()?.[def.dataField] ?? null)
+        }
+        return { year: y, target: targets[y] ?? 0, actual: act }
+      })
     })
 
     // 月度趋势（折线图）

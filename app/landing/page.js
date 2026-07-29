@@ -399,6 +399,13 @@ export default function LandingPage() {
   const [addQualModal, setAddQualModal] = useState(false)
   const [addQualForm, setAddQualForm]   = useState({ name: '', articleRef: '', requirement: '', status: 'pending' })
   const [addQualSaving, setAddQualSaving] = useState(false)
+  // 自定义 KPI 管理
+  const [kpiMgrModal, setKpiMgrModal] = useState(false)
+  const [customKpis, setCustomKpis]   = useState([])
+  const [kpiMgrLoading, setKpiMgrLoading] = useState(false)
+  const [addKpiModal, setAddKpiModal] = useState(false)
+  const [addKpiForm, setAddKpiForm]   = useState({ label: '', unit: '亿元', precision: 2, category: 'finance', dataField: '', targets: {}, weight: 0.05, note: '' })
+  const [addKpiSaving, setAddKpiSaving] = useState(false)
   // 协议文件
   const [files, setFiles]         = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -474,6 +481,41 @@ export default function LandingPage() {
       },
     })
   }
+  const fetchCustomKpis = async () => {
+    setKpiMgrLoading(true)
+    try { setCustomKpis(await api.get('/api/agreement/custom-kpi')) } catch {}
+    finally { setKpiMgrLoading(false) }
+  }
+  const saveAddKpi = async () => {
+    if (!addKpiForm.label.trim()) return message.error('请填写指标名称')
+    if (!addKpiForm.dataField.trim()) return message.error('请填写数据字段名')
+    setAddKpiSaving(true)
+    try {
+      await api.post('/api/agreement/custom-kpi', addKpiForm)
+      message.success('已添加自定义 KPI')
+      setAddKpiModal(false)
+      setAddKpiForm({ label: '', unit: '亿元', precision: 2, category: 'finance', dataField: '', targets: {}, weight: 0.05, note: '' })
+      fetchCustomKpis()
+      fetchDashboard(year)
+    } catch (e) { message.error('添加失败：' + e) }
+    finally { setAddKpiSaving(false) }
+  }
+  const deleteCustomKpi = (kpi) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: <span>确定删除 KPI「<strong>{kpi.label}</strong>」？历史数据保留，仅移除指标展示。</span>,
+      okText: '删除', okType: 'danger', cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/api/agreement/custom-kpi/${kpi.id}`)
+          message.success('已删除')
+          fetchCustomKpis()
+          fetchDashboard(year)
+        } catch (e) { message.error('删除失败：' + e) }
+      },
+    })
+  }
+
   const handleUpload = async ({ file, onSuccess, onError }) => {
     if (file.size > 50 * 1024 * 1024) { message.error('文件超过 50MB'); onError(new Error('too large')); return }
     setUploading(true)
@@ -763,6 +805,12 @@ export default function LandingPage() {
                         <div style={{ width: 3, height: 14, borderRadius: 2, background: '#3b82f6' }} />
                         <Text style={{ fontSize: 13, color: '#475569' }}>点击指标卡查看五年对赌目标</Text>
                         <Text type="secondary" style={{ fontSize: 12 }}>· 进度条内竖线 = 90% 全额补贴线</Text>
+                        {canEdit && (
+                          <Button size="small" icon={<PlusOutlined />} style={{ marginLeft: 'auto', borderRadius: 20, borderColor: '#6366f1', color: '#6366f1' }}
+                            onClick={() => { fetchCustomKpis(); setKpiMgrModal(true) }}>
+                            管理自定义 KPI
+                          </Button>
+                        )}
                       </div>
 
                       {/* 五年阶梯详情 */}
@@ -1056,6 +1104,114 @@ export default function LandingPage() {
               {uploading ? '上传中...' : '点击上传支撑材料（10MB 以内）'}
             </Button>
           </Upload>
+        </div>
+      </Modal>
+
+      {/* ── 自定义 KPI 管理 Modal ──────────────────────────────────── */}
+      <Modal
+        title={<div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:30, height:30, borderRadius:8, background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <BarChartOutlined style={{ color:'#fff', fontSize:14 }} />
+          </div>
+          <div>
+            <div style={{ fontSize:14, fontWeight:700 }}>自定义 KPI 管理</div>
+            <div style={{ fontSize:11, color:'#94a3b8', fontWeight:400 }}>添加或删除自定义量化指标</div>
+          </div>
+        </div>}
+        open={kpiMgrModal} onCancel={() => setKpiMgrModal(false)} footer={null} width={580}
+      >
+        <div style={{ marginBottom:14, display:'flex', justifyContent:'flex-end' }}>
+          <Button type="primary" icon={<PlusOutlined />} size="small" style={{ borderRadius:20, background:'#6366f1', borderColor:'#6366f1' }}
+            onClick={() => { setAddKpiForm({ label:'', unit:'亿元', precision:2, category:'finance', dataField:'', targets:{}, weight:0.05, note:'' }); setAddKpiModal(true) }}>
+            新增指标
+          </Button>
+        </div>
+        <Spin spinning={kpiMgrLoading}>
+          {customKpis.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#94a3b8', fontSize:13 }}>
+              暂无自定义 KPI，点击「新增指标」添加
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {customKpis.map(kpi => (
+                <div key={kpi.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:10, background:'#f8fafc', border:'1px solid #e8ecf4' }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{kpi.label}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
+                      单位：{kpi.unit} · 字段：{kpi.dataField} · 权重：{(kpi.weight*100).toFixed(0)}%
+                      {kpi.note && <span> · {kpi.note}</span>}
+                    </div>
+                  </div>
+                  <Tag style={{ margin:0, fontSize:10, color:'#6366f1', background:'#f5f3ff', border:'1px solid #ddd6fe' }}>自定义</Tag>
+                  <Button size="small" danger icon={<DeleteOutlined />} style={{ borderRadius:7, flexShrink:0 }}
+                    onClick={() => deleteCustomKpi(kpi)} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Spin>
+      </Modal>
+
+      {/* ── 新增自定义 KPI Modal ─────────────────────────────────── */}
+      <Modal
+        title={<div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <PlusOutlined style={{ color:'#6366f1' }} /><span>新增自定义 KPI 指标</span>
+        </div>}
+        open={addKpiModal} onCancel={() => setAddKpiModal(false)}
+        onOk={saveAddKpi} confirmLoading={addKpiSaving}
+        okText="确认添加" cancelText="取消" width={520}
+        styles={{ body:{ paddingTop:16 } }}
+      >
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>指标名称 <span style={{ color:'#ef4444' }}>*</span></div>
+            <Input value={addKpiForm.label} onChange={e => setAddKpiForm(p=>({...p, label:e.target.value}))}
+              placeholder="如：苏州研发投入" maxLength={30} showCount style={{ borderRadius:8 }} />
+          </div>
+          <Row gutter={12}>
+            <Col span={8}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>单位</div>
+              <Select value={addKpiForm.unit} onChange={v => setAddKpiForm(p=>({...p, unit:v}))} style={{ width:'100%' }}
+                options={['亿元','万元','元','人','项','家','个','%'].map(u=>({ value:u, label:u }))} />
+            </Col>
+            <Col span={8}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>数据分类</div>
+              <Select value={addKpiForm.category} onChange={v => setAddKpiForm(p=>({...p, category:v}))} style={{ width:'100%' }}
+                options={[{value:'finance',label:'财务'},{value:'hr',label:'人才'},{value:'ip',label:'知识产权'}]} />
+            </Col>
+            <Col span={8}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>权重（0-1）</div>
+              <Input type="number" step="0.01" min="0" max="1" value={addKpiForm.weight}
+                onChange={e => setAddKpiForm(p=>({...p, weight:Number(e.target.value)}))} style={{ borderRadius:8 }} />
+            </Col>
+          </Row>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+              数据字段名 <span style={{ color:'#ef4444' }}>*</span>
+              <span style={{ fontSize:11, color:'#94a3b8', fontWeight:400, marginLeft:6 }}>对应数据中台录入的字段 key，如 rdExpense</span>
+            </div>
+            <Input value={addKpiForm.dataField} onChange={e => setAddKpiForm(p=>({...p, dataField:e.target.value}))}
+              placeholder="如：rdExpense" maxLength={40} style={{ borderRadius:8 }} />
+          </div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:8 }}>五年考核目标（可选）</div>
+            <Row gutter={8}>
+              {[2024,2025,2026,2027,2028].map(y => (
+                <Col span={4} key={y}>
+                  <div style={{ fontSize:11, color:'#64748b', marginBottom:4, textAlign:'center' }}>{y}</div>
+                  <Input type="number" size="small" placeholder="—"
+                    value={addKpiForm.targets[y] ?? ''}
+                    onChange={e => setAddKpiForm(p=>({ ...p, targets:{ ...p.targets, [y]: e.target.value === '' ? undefined : Number(e.target.value) } }))}
+                    style={{ borderRadius:6, textAlign:'center' }} />
+                </Col>
+              ))}
+            </Row>
+          </div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>备注说明</div>
+            <Input value={addKpiForm.note} onChange={e => setAddKpiForm(p=>({...p, note:e.target.value}))}
+              placeholder="可选" maxLength={80} style={{ borderRadius:8 }} />
+          </div>
         </div>
       </Modal>
 

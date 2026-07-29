@@ -156,6 +156,25 @@ model AgreementData {
   @@unique([period, category])
 }
 
+// 自定义量化 KPI 指标
+model CustomKpi {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique  // 唯一标识，如 "custom_revenue_suzhou"
+  label       String            // 显示名称
+  unit        String            // 单位：亿元/万元/人/项等
+  precision   Int      @default(2)
+  category    String   @default("finance") // finance|hr|ip
+  dataField   String            // 对应 AgreementData.payload 的字段 key
+  targets     String   @default("{}") // JSON: {2024:v, 2025:v, ...}
+  weight      Float    @default(0.05)
+  note        String?
+  sortOrder   Int      @default(0)
+  enabled     Boolean  @default(true)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model QualitativeObligation {
   id           Int      @id @default(autoincrement())
   code         String   @unique
@@ -215,6 +234,20 @@ model HonorFile {
   mimeType    String?
   uploadedBy  Int
   createdAt   DateTime @default(now())
+}
+
+model UploadChunk {
+  id          Int      @id @default(autoincrement())
+  uploadId    String
+  chunkIndex  Int
+  data        String   // base64 chunk
+  totalChunks Int
+  meta        String?  // JSON: name, mimeType, size, category…
+  uploadedBy  Int
+  createdAt   DateTime @default(now())
+
+  @@unique([uploadId, chunkIndex])
+  @@index([uploadId])
 }
 
 model AgreementFile {
