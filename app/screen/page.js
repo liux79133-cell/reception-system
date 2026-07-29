@@ -91,18 +91,31 @@ function SegmentDonut({ segments, size = 100, strokeW = 9 }) {
 }
 
 // ── SVG 折线图（含 hover tooltip）───────────────────────────────────────────
-function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) {
-  const [tip, setTip] = useState(null) // { x, y, month, items: [{label,value,color}] }
+let _chartId = 0
+function LineChart({ series, height = 90, yMax, showArea = true }) {
+  const [tip, setTip] = useState(null)
+  const containerRef = useRef(null)
+  const [width, setWidth] = useState(280)
+  const clipId = useRef(`lc${++_chartId}`).current
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width || 280))
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
+
   const pad = { t: 10, r: 8, b: 24, l: 36 }
-  const W = width - pad.l - pad.r
+  const W = Math.max(width - pad.l - pad.r, 10)
   const H = height - pad.t - pad.b
 
   const allVals = series.flatMap(s => s.data.map(d => d.value)).filter(v => v !== null)
-  const maxVal  = yMax || (allVals.length ? Math.max(...allVals) * 1.15 : 1)
+  const dataMax = allVals.length ? Math.max(...allVals) : 0
+  const maxVal  = yMax ? Math.max(yMax, dataMax * 1.05) : (dataMax ? dataMax * 1.15 : 1)
   const months  = 12
 
   const xPos = (m) => ((m - 1) / (months - 1)) * W + pad.l
-  const yPos = (v) => pad.t + H - (v / maxVal) * H
+  const yPos = (v) => pad.t + H - Math.min(v / maxVal, 1) * H
 
   const fmtTip = (v) => {
     if (v === null || v === undefined) return '—'
@@ -152,8 +165,14 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
   const tipY = tip ? Math.max(pad.t, tip.y - tipH / 2) : 0
 
   return (
-    <svg width={width} height={height} style={{ overflow: 'visible' }}
+    <div ref={containerRef} style={{ width: '100%' }}>
+    <svg width={width} height={height} style={{ overflow: 'visible', display: 'block' }}
       onMouseLeave={() => setTip(null)}>
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={pad.l} y={pad.t} width={W} height={H} />
+        </clipPath>
+      </defs>
       {/* 网格线 */}
       {yTicks.map((t, i) => (
         <g key={i}>
@@ -165,8 +184,10 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
           </text>
         </g>
       ))}
-      {/* 折线 */}
-      {series.map(s => polyline(s.data, s.color, showArea))}
+      {/* 折线（裁剪在绘图区内） */}
+      <g clipPath={`url(#${clipId})`}>
+        {series.map(s => polyline(s.data, s.color, showArea))}
+      </g>
       {/* 透明悬浮区：每个月一条竖带 */}
       {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
         <rect key={m}
@@ -205,6 +226,7 @@ function LineChart({ series, width = 280, height = 90, yMax, showArea = true }) 
         </g>
       )}
     </svg>
+    </div>
   )
 }
 
@@ -475,7 +497,7 @@ export default function ScreenPage() {
                 目标 {data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
               </span>
             </div>
-            <LineChart width={480} height={88}
+            <LineChart height={88}
               series={[
                 { data: monthly.revenue    || [], color: C.blue,   label: '月度' },
                 { data: monthly.revenueYTD || [], color: C.indigo,  label: '累计' },
@@ -487,7 +509,7 @@ export default function ScreenPage() {
           {/* 税收 + 社保 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <Panel title="综合税收趋势" icon="💰" accent={C.green} style={{ overflow: 'hidden', padding: '10px 12px' }}>
-              <LineChart width={190} height={72}
+              <LineChart height={72}
                 series={[{ data: monthly.tax || [], color: C.green, label: '税收（亿）' }]}
               />
             </Panel>
@@ -495,7 +517,7 @@ export default function ScreenPage() {
               <div style={{ fontSize: 9, color: C.sub, textAlign: 'right', marginBottom: 2 }}>
                 目标 {data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target} 人
               </div>
-              <LineChart width={190} height={64}
+              <LineChart height={64}
                 series={[{ data: monthly.social || [], color: C.indigo, label: '人数' }]}
                 yMax={data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target || undefined}
               />
