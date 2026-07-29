@@ -11,8 +11,9 @@ import {
   FileExcelOutlined, SettingOutlined, EditOutlined,
   ArrowRightOutlined, HistoryOutlined, InfoCircleOutlined,
   CalendarOutlined, FieldTimeOutlined, LockOutlined, CloseOutlined,
-  PlusOutlined, DeleteOutlined,
+  PlusOutlined, DeleteOutlined, DownloadOutlined,
 } from '@ant-design/icons'
+import * as XLSX from 'xlsx'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
 import { useRouter } from 'next/navigation'
@@ -620,6 +621,144 @@ export default function DataCenterPage() {
     finally { setSaving(s => ({ ...s, [cat]: false })) }
   }
 
+  // ── 导出 Excel ────────────────────────────────────────────────────────────
+  const [exportModal, setExportModal] = useState(false)
+  const [exportCats, setExportCats]   = useState(['finance', 'hr', 'ip'])
+  const [exportMode, setExportMode]   = useState('monthly') // monthly | annual | all
+  const [exportYears, setExportYears] = useState([dayjs().year()])
+  const [exportFields, setExportFields] = useState({}) // { fieldKey: true/false }
+  const [exporting, setExporting]     = useState(false)
+
+  const initExportFields = () => {
+    const init = {}
+    ;['finance', 'hr', 'ip'].forEach(cat => {
+      allCatFields(cat).forEach(f => { init[f.key] = true })
+    })
+    setExportFields(init)
+  }
+
+  const doExport = async () => {
+    setExporting(true)
+    try {
+      const wb = XLSX.utils.book_new()
+      const dispUnit = globalMoneyUnit
+
+      for (const cat of exportCats) {
+        const fields = allCatFields(cat).filter(f => exportFields[f.key] !== false)
+        if (!fields.length) continue
+
+        if (exportMode === 'monthly') {
+          // 每个选中年一个 Sheet，行=字段，列=1-12月
+          for (const yr of exportYears) {
+            const rows = await api.get('/api/agreement/data', { year: yr, category: cat }).catch(() => [])
+            const monthData = {}
+            rows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).forEach(r => {
+              const m = parseInt(r.period.split('-')[1])
+              monthData[m] = r.payload
+            })
+            const header = ['指标名称', '单位', ...Array.from({length:12},(_,i)=>`${i+1}月`), '年度合计']
+            const sheetData = [header]
+            fields.forEach(f => {
+              const unit = f.baseUnit === '亿元' ? dispUnit : f.baseUnit
+              const row = [f.label, unit]
+              let total = 0
+              for (let m = 1; m <= 12; m++) {
+                const raw = monthData[m]?.[f.key]
+                if (raw == null) { row.push(''); continue }
+                const v = f.baseUnit === '亿元' && dispUnit !== '亿元' ? fromBase(raw, dispUnit) : raw
+                row.push(Number(v.toFixed(6)))
+                if (f.baseUnit === '亿元') total += Number(raw)
+              }
+              row.push(f.baseUnit === '亿元'
+                ? (dispUnit !== '亿元' ? Number(fromBase(total, dispUnit).toFixed(6)) : Number(total.toFixed(6)))
+                : '')
+              sheetData.push(row)
+            })
+            const ws = XLSX.utils.aoa_to_sheet(sheetData)
+            ws['!cols'] = [{ wch: 20 }, { wch: 6 }, ...Array(13).fill({ wch: 10 })]
+            XLSX.utils.book_append_sheet(wb, ws, `${CAT_LABELS[cat]}_${yr}月度`)
+          }
+        } else if (exportMode === 'annual') {
+          // 行=字段，列=选中年份
+          const header = ['指标名称', '单位', ...exportYears.map(y => `${y}年`)]
+          const sheetData = [header]
+          // 拉取所有选中年的年度数据
+          const allData = {}
+          await Promise.all(exportYears.map(async yr => {
+            const rows = await api.get('/api/agreement/data', { year: yr, category: cat }).catch(() => [])
+            const annRow = rows.find(r => r.period === String(yr))
+            // 无年度汇总则从月度累计
+            if (annRow) {
+              allData[yr] = annRow.payload
+            } else {
+              const ytd = {}
+              rows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).forEach(r => {
+                Object.entries(r.payload || {}).forEach(([k, v]) => {
+                  if (k === 'inputMode') return
+                  const fd = allCatFields(cat).find(f => f.key === k)
+                  ytd[k] = fd?.baseUnit === '亿元' ? (ytd[k] || 0) + Number(v) : Number(v)
+                })
+              })
+              allData[yr] = ytd
+            }
+          }))
+          fields.forEach(f => {
+            const unit = f.baseUnit === '亿元' ? dispUnit : f.baseUnit
+            const row = [f.label, unit]
+            exportYears.forEach(yr => {
+              const raw = allData[yr]?.[f.key]
+              if (raw == null) { row.push(''); return }
+              const v = f.baseUnit === '亿元' && dispUnit !== '亿元' ? fromBase(raw, dispUnit) : raw
+              row.push(Number(Number(v).toFixed(6)))
+            })
+            sheetData.push(row)
+          })
+          const ws = XLSX.utils.aoa_to_sheet(sheetData)
+          ws['!cols'] = [{ wch: 20 }, { wch: 6 }, ...exportYears.map(() => ({ wch: 12 }))]
+          XLSX.utils.book_append_sheet(wb, ws, `${CAT_LABELS[cat]}_年度汇总`)
+        } else {
+          // all：月度明细 + 年度汇总 两个 Sheet
+          // 月度：所有选中年合并，第一列年份，第二列字段，后续12列
+          const monthHeader = ['年份', '指标名称', '单位', ...Array.from({length:12},(_,i)=>`${i+1}月`), '年度合计']
+          const monthRows = [monthHeader]
+          for (const yr of exportYears) {
+            const rows = await api.get('/api/agreement/data', { year: yr, category: cat }).catch(() => [])
+            const monthData = {}
+            rows.filter(r => /^\d{4}-\d{2}$/.test(r.period)).forEach(r => {
+              const m = parseInt(r.period.split('-')[1])
+              monthData[m] = r.payload
+            })
+            fields.forEach(f => {
+              const unit = f.baseUnit === '亿元' ? dispUnit : f.baseUnit
+              const row = [yr, f.label, unit]
+              let total = 0
+              for (let m = 1; m <= 12; m++) {
+                const raw = monthData[m]?.[f.key]
+                if (raw == null) { row.push(''); continue }
+                const v = f.baseUnit === '亿元' && dispUnit !== '亿元' ? fromBase(raw, dispUnit) : raw
+                row.push(Number(Number(v).toFixed(6)))
+                if (f.baseUnit === '亿元') total += Number(raw)
+              }
+              row.push(f.baseUnit === '亿元'
+                ? (dispUnit !== '亿元' ? Number(fromBase(total, dispUnit).toFixed(6)) : Number(total.toFixed(6)))
+                : '')
+              monthRows.push(row)
+            })
+          }
+          const ws1 = XLSX.utils.aoa_to_sheet(monthRows)
+          ws1['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 6 }, ...Array(13).fill({ wch: 10 })]
+          XLSX.utils.book_append_sheet(wb, ws1, `${CAT_LABELS[cat]}_月度明细`)
+        }
+      }
+
+      const fileName = `落地协议数据_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success(`已导出 ${fileName}`)
+      setExportModal(false)
+    } catch (e) { message.error('导出失败：' + e) }
+    finally { setExporting(false) }
+  }
+
   const enabledCount = (cat) => allCatFields(cat).filter(f => fieldEnabled[cat]?.[f.key] !== false).length
   const filledCount  = (cat) => {
     const fields = allCatFields(cat).filter(f => fieldEnabled[cat]?.[f.key] !== false)
@@ -884,7 +1023,14 @@ export default function DataCenterPage() {
             <Title level={4} style={{ margin: 0, color: '#1a2d5a' }}>数据中台 · 协议数据录入</Title>
             <Text type="secondary" style={{ fontSize: 13 }}>支持按月/按年/累计三种填报模式，录入后 KPI 进度 T+0 更新</Text>
           </div>
-          <Button icon={<HistoryOutlined />} onClick={() => inputMode === 'annual' ? fetchAllAnnual() : fetchAll(inputMode, year, month)} style={{ borderRadius: 8 }}>刷新</Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button icon={<HistoryOutlined />} onClick={() => inputMode === 'annual' ? fetchAllAnnual() : fetchAll(inputMode, year, month)} style={{ borderRadius: 8 }}>刷新</Button>
+            <Button icon={<DownloadOutlined />} type="primary"
+              onClick={() => { initExportFields(); setExportModal(true) }}
+              style={{ borderRadius: 8, background: '#059669', borderColor: '#059669' }}>
+              导出 Excel
+            </Button>
+          </div>
         </div>
 
         <Card style={{ borderRadius: 14, border: '1px solid #e8ecf4', marginBottom: 16 }} styles={{ body: { padding: '16px 20px' } }}>
@@ -1093,6 +1239,176 @@ export default function DataCenterPage() {
             </div>
           )
         })()}
+      </Modal>
+
+      {/* ── 导出 Excel Modal ─────────────────────────────────────────── */}
+      <Modal
+        open={exportModal}
+        onCancel={() => setExportModal(false)}
+        footer={null}
+        width={620}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DownloadOutlined style={{ color: '#fff', fontSize: 15 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>导出数据</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>选择范围后下载 Excel 文件</div>
+            </div>
+          </div>
+        }
+      >
+        <div style={{ padding: '4px 0 8px' }}>
+
+          {/* 第一行：数据类别 */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 3, height: 13, borderRadius: 2, background: '#059669', display: 'inline-block' }} />
+              数据类别
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[
+                { key: 'finance', label: '经营与财务', icon: <DollarOutlined />, color: '#1d6fdb' },
+                { key: 'hr',      label: '人才与团队', icon: <TeamOutlined />,   color: '#7c3aed' },
+                { key: 'ip',      label: '研发与知识产权', icon: <BulbOutlined />, color: '#059669' },
+              ].map(c => {
+                const on = exportCats.includes(c.key)
+                return (
+                  <div key={c.key} onClick={() => setExportCats(p => on ? p.filter(x=>x!==c.key) : [...p, c.key])}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
+                      background: on ? `${c.color}0f` : '#f8fafc',
+                      border: `1.5px solid ${on ? c.color : '#e2e8f0'}`,
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                      <span style={{ color: on ? c.color : '#94a3b8', fontSize: 15 }}>{c.icon}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: on ? c.color : '#64748b' }}>{c.label}</span>
+                      <div style={{ marginLeft: 'auto', width: 16, height: 16, borderRadius: '50%',
+                        background: on ? c.color : 'transparent', border: `2px solid ${on ? c.color : '#d1d5db'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {on && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                      {allCatFields(c.key).length} 个指标
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 第二行：时间粒度 */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 3, height: 13, borderRadius: 2, background: '#059669', display: 'inline-block' }} />
+              时间粒度
+            </div>
+            <Radio.Group value={exportMode} onChange={e => setExportMode(e.target.value)} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  { val: 'monthly', label: '按月明细', desc: '每年一个Sheet，12列月度数据' },
+                  { val: 'annual',  label: '年度汇总', desc: '各年汇总值横向排列' },
+                  { val: 'all',     label: '全量导出', desc: '月度明细跨年合并Sheet' },
+                ].map(m => (
+                  <Radio.Button key={m.val} value={m.val}
+                    style={{ flex: 1, height: 'auto', padding: '8px 12px', borderRadius: 8, textAlign: 'center', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{m.label}</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, whiteSpace: 'normal' }}>{m.desc}</div>
+                  </Radio.Button>
+                ))}
+              </div>
+            </Radio.Group>
+          </div>
+
+          {/* 第三行：年份范围 */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 3, height: 13, borderRadius: 2, background: '#059669', display: 'inline-block' }} />
+              年份范围
+              <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>（多选）</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {ANNUAL_YEARS.map(y => {
+                const on = exportYears.includes(y)
+                const isCur = y === dayjs().year()
+                return (
+                  <div key={y} onClick={() => setExportYears(p => on ? p.filter(x=>x!==y) : [...p,y].sort())}
+                    style={{ flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+                      background: on ? '#f0fdf4' : '#f8fafc',
+                      border: `1.5px solid ${on ? '#10b981' : '#e2e8f0'}`,
+                    }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: on ? '#059669' : '#64748b' }}>{y}</div>
+                    {isCur && <div style={{ fontSize: 9, color: on ? '#10b981' : '#94a3b8' }}>当前年</div>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 第四行：字段筛选 */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 3, height: 13, borderRadius: 2, background: '#059669', display: 'inline-block' }} />
+              指标筛选
+              <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>（默认全选）</span>
+              <button onClick={() => { const a = {}; ['finance','hr','ip'].forEach(c => allCatFields(c).forEach(f => { a[f.key]=true })); setExportFields(a) }}
+                style={{ marginLeft: 'auto', fontSize: 11, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>全选</button>
+              <button onClick={() => { const a = {}; ['finance','hr','ip'].forEach(c => allCatFields(c).forEach(f => { a[f.key]=false })); setExportFields(a) }}
+                style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>清空</button>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid #e8ecf0', maxHeight: 180, overflowY: 'auto' }}>
+              {exportCats.map(cat => (
+                <div key={cat} style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: CAT_COLORS[cat], marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {CAT_ICONS[cat]} {CAT_LABELS[cat]}
+                    <button onClick={() => {
+                      const on = allCatFields(cat).every(f => exportFields[f.key] !== false)
+                      setExportFields(p => { const n={...p}; allCatFields(cat).forEach(f=>{n[f.key]=!on}); return n })
+                    }} style={{ marginLeft: 6, fontSize: 10, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      {allCatFields(cat).every(f => exportFields[f.key] !== false) ? '取消全选' : '全选'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {allCatFields(cat).map(f => {
+                      const on = exportFields[f.key] !== false
+                      return (
+                        <div key={f.key} onClick={() => setExportFields(p => ({...p,[f.key]:!on}))}
+                          style={{ padding: '3px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 11, transition: 'all 0.12s',
+                            background: on ? `${CAT_COLORS[cat]}12` : '#fff',
+                            border: `1px solid ${on ? CAT_COLORS[cat] : '#e2e8f0'}`,
+                            color: on ? CAT_COLORS[cat] : '#94a3b8', fontWeight: on ? 600 : 400,
+                          }}>
+                          {f.label}
+                          {f.kpi && <span style={{ marginLeft: 3, fontSize: 9, opacity: 0.7 }}>KPI</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              {exportCats.length === 0 && <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: '16px 0' }}>请先选择数据类别</div>}
+            </div>
+          </div>
+
+          {/* 底部操作 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+              已选 {exportCats.length} 个类别 · {exportYears.length} 个年份 · {Object.values(exportFields).filter(Boolean).length} 个指标
+              · 导出单位：<strong style={{ color: '#374151' }}>{globalMoneyUnit}</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button onClick={() => setExportModal(false)} style={{ borderRadius: 8 }}>取消</Button>
+              <Button type="primary" loading={exporting}
+                disabled={!exportCats.length || !exportYears.length || !Object.values(exportFields).some(Boolean)}
+                icon={<DownloadOutlined />}
+                onClick={doExport}
+                style={{ borderRadius: 8, background: '#059669', borderColor: '#059669', fontWeight: 600 }}>
+                下载 Excel
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </AppLayout>
   )
