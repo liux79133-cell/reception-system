@@ -550,13 +550,10 @@ export default function DataCenterPage() {
     const months = Object.entries(monthMap).filter(([, v]) => v != null)
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
-    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
-    const displayUnit = fieldDef ? getFieldUnit(fieldDef) : (inputUnits[fieldKey] || 'unknown')
-    const needConvert = fieldDef?.baseUnit === '亿元' && displayUnit !== '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
-        const storedVal = needConvert ? toBase(val, displayUnit) : val
-        return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { [fieldKey]: storedVal } })
+        // state 已统一存亿元，直接保存
+        return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { [fieldKey]: val } })
       }))
       notifySaved(`${fieldLabel} 月度数据（${months.length} 个月）`)
       setSavedAt(s => ({ ...s, [cat]: new Date().toISOString() }))
@@ -570,12 +567,11 @@ export default function DataCenterPage() {
     const months = Object.entries(monthMap).filter(([, v]) => v != null)
     if (months.length === 0) return message.error(`请先填入 ${fieldLabel} 各月数据`)
     setSaving(s => ({ ...s, [cat]: true }))
-    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
-    const multiUnit = fieldDef ? getFieldUnit(fieldDef) : cumUnit
-    const needConvert = fieldDef?.baseUnit === '亿元' && multiUnit !== '亿元'
     try {
       await Promise.all(months.map(([m, val]) => {
-        const storedVal = needConvert ? toBase(val, multiUnit) : val
+        // cumulative 模式：cumValues/multiMonthValues 用 cumUnit 输入，toBase 在 saveSplitRevenue 中已处理
+        // 这里 val 是用户输入的 cumUnit 值，需转为亿元
+        const storedVal = cumUnit !== '亿元' ? toBase(val, cumUnit) : val
         return api.post('/api/agreement/data', { period: `${year}-${String(m).padStart(2, '0')}`, category: cat, payload: { ...payloads[cat], [fieldKey]: storedVal } })
       }))
       notifySaved(`${fieldLabel} 已保存（共 ${months.length} 个月）`)
@@ -591,12 +587,10 @@ export default function DataCenterPage() {
     const years = Object.entries(yearMap).filter(([, v]) => v != null)
     if (years.length === 0) return message.error(`请先填入 ${fieldLabel} 数值`)
     setSaving(s => ({ ...s, [cat]: true }))
-    const fieldDef = allCatFields(cat).find(f => f.key === fieldKey)
-    const hasMulti = fieldDef?.inputUnits?.length > 1
-    const curUnit = fieldDef ? getFieldUnit(fieldDef) : (inputUnits[fieldKey] || '亿元')
     try {
       await Promise.all(years.map(([yr, val]) => {
-        const storedVal = hasMulti && curUnit !== fieldDef.baseUnit ? toBase(val, curUnit) : val
+        // annualAllValues 存的已是 baseUnit（亿元）值，onChange 里已做 toBase 转换，直接保存
+        const storedVal = val
         return api.post('/api/agreement/data', { period: String(yr), category: cat, payload: { [fieldKey]: storedVal } })
       }))
       notifySaved(`${fieldLabel} 年度数据（${years.length} 年）`)
@@ -734,10 +728,21 @@ export default function DataCenterPage() {
           {/* ── 按月填报 ── */}
           {inputMode === 'monthly' && visibleFields.map(field => {
             const fUnit = getFieldUnit(field)
+            const isMoney = field.baseUnit === '亿元'
+            // state 存亿元，显示时转换为当前单位
+            const rawVals = monthlyGridValues[cat]?.[field.key] || {}
+            const dispVals = {}
+            Object.entries(rawVals).forEach(([m, v]) => {
+              dispVals[m] = (v != null && isMoney && fUnit !== '亿元') ? fromBase(v, fUnit) : v
+            })
             return (
               <MonthGrid key={field.key} field={field}
-                values={monthlyGridValues[cat]?.[field.key] || {}}
-                onChange={(m, v) => setMonthlyGridValues(p => ({ ...p, [cat]: { ...p[cat], [field.key]: { ...(p[cat]?.[field.key] || {}), [m]: v } } }))}
+                values={dispVals}
+                onChange={(m, v) => {
+                  // 用户输入当前单位 → 逆转换为亿元存 state
+                  const stored = (v != null && isMoney && fUnit !== '亿元') ? toBase(v, fUnit) : v
+                  setMonthlyGridValues(p => ({ ...p, [cat]: { ...p[cat], [field.key]: { ...(p[cat]?.[field.key] || {}), [m]: stored } } }))
+                }}
                 isCumulative={false} unit={fUnit} isEditing={editMode[cat]}
                 onSave={() => saveMonthlyGrid(cat, field.key, field.label)}
                 onImport={() => { setParseModal({ open: true, cat, fieldKey: field.key, multiMonth: true }); setParseResult(null); setParseApplied(false) }}
