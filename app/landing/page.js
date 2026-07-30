@@ -162,9 +162,29 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
         }} />
       )}
 
-      {/* 顶部：指标名 + 状态标签 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, position: 'relative' }}>
-        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.3 }}>{kpi.label}</span>
+      {/* 顶部：指标名 + 核心/参考标签 + 状态标签 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, position: 'relative' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+          <span style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.3 }}>{kpi.label}</span>
+          {kpi.note && kpi.note.includes('合并') && (
+            <span style={{ fontSize: 9, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '1px 6px', display: 'inline-block', lineHeight: 1.6 }}>
+              {kpi.note.split('·')[0].trim()}
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {kpi.isCore ? (
+              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, fontWeight: 700,
+                background: 'linear-gradient(135deg,#1d4ed8,#4f46e5)', color: '#fff' }}>
+                核心考核 {kpi.coreWeight != null ? `${Math.round(kpi.coreWeight*100)}%` : ''}
+              </span>
+            ) : (
+              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
+                background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0' }}>
+                参考现状
+              </span>
+            )}
+          </div>
+        </div>
         <div style={{
           fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 800,
           color: '#fff',
@@ -196,20 +216,39 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
         )}
       </div>
 
-      {/* 进度条 */}
-      <div style={{ height: 6, background: '#f0f2f7', borderRadius: 3, overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
-        {/* 90% 参考线 */}
-        <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(0,0,0,0.12)', zIndex: 2 }} />
-        <div style={{
-          height: '100%', width: `${pct}%`, borderRadius: 3,
-          background: hasVal ? `linear-gradient(90deg, ${g.from}cc, ${g.to})` : '#e2e8f0',
-          transition: 'width 0.8s ease',
-          boxShadow: hasVal ? `0 0 6px ${g.glow}` : 'none',
-        }} />
+      {/* 进度条 + 三色分区 */}
+      <div style={{ marginBottom: 7 }}>
+        <div style={{ height: 8, background: '#f0f2f7', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+          {/* 三色背景分区：<70% 红色底、70-90% 橙色底、≥90% 绿色底 */}
+          <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'70%', background:'#fef2f2' }} />
+          <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:'20%', background:'#fffbeb' }} />
+          <div style={{ position:'absolute', left:'90%', top:0, bottom:0, right:0, background:'#f0fdf4' }} />
+          {/* 70% 竖线 */}
+          <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:1.5, background:'rgba(239,68,68,0.35)', zIndex:2 }} />
+          {/* 90% 竖线 */}
+          <div style={{ position:'absolute', left:'90%', top:0, bottom:0, width:1.5, background:'rgba(16,185,129,0.45)', zIndex:2 }} />
+          {/* 进度填充 */}
+          <div style={{
+            position:'absolute', left:0, top:0, bottom:0,
+            width: `${pct}%`, borderRadius: 4,
+            background: hasVal
+              ? pct < 70  ? 'linear-gradient(90deg,#fca5a5,#ef4444)'
+              : pct < 90  ? 'linear-gradient(90deg,#fcd34d,#f59e0b)'
+              :              'linear-gradient(90deg,#6ee7b7,#10b981)'
+              : '#e2e8f0',
+            transition: 'width 0.8s ease',
+            boxShadow: hasVal ? `0 0 6px ${g.glow}` : 'none',
+          }} />
+        </div>
+        {/* 刻度标注 */}
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:2, paddingRight:0, position:'relative' }}>
+          <span style={{ fontSize:8, color:'#fca5a5', position:'absolute', left:'70%', transform:'translateX(-50%)' }}>70%</span>
+          <span style={{ fontSize:8, color:'#6ee7b7', position:'absolute', left:'90%', transform:'translateX(-50%)' }}>90%</span>
+        </div>
       </div>
 
       {/* 底部提示 */}
-      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14, position: 'relative' }}>
+      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14, position: 'relative', marginTop: 8 }}>
         {kpi.status === 'compliant' && (
           <span style={{ color: '#059669', fontWeight: 600 }}>✓ 已达全额补贴线</span>
         )}
@@ -294,14 +333,26 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
                     </span>
                   </div>
                 </div>
-                <div style={{ height: 12, background: '#e8f0fe', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 2, background: 'rgba(0,0,0,0.15)', zIndex: 1 }} />
+                <div style={{ height: 12, borderRadius: 6, overflow: 'hidden', position: 'relative', background: '#f0f2f7' }}>
+                  <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'70%', background:'#fef2f2' }} />
+                  <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:'20%', background:'#fffbeb' }} />
+                  <div style={{ position:'absolute', left:'90%', top:0, bottom:0, right:0, background:'#f0fdf4' }} />
+                  <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:2, background:'rgba(239,68,68,0.4)', zIndex:2 }} />
+                  <div style={{ position:'absolute', left:'90%', top:0, bottom:0, width:2, background:'rgba(16,185,129,0.5)', zIndex:2 }} />
                   <div style={{
-                    height: '100%', borderRadius: 6, transition: 'width 0.8s ease',
+                    position:'absolute', left:0, top:0, bottom:0, borderRadius: 6, transition: 'width 0.8s ease',
                     width: `${pct}%`,
-                    background: `linear-gradient(90deg, ${s.bar}cc, ${s.bar})`,
+                    background: pct < 70
+                      ? 'linear-gradient(90deg,#fca5a5,#ef4444)'
+                      : pct < 90
+                      ? 'linear-gradient(90deg,#fcd34d,#f59e0b)'
+                      : 'linear-gradient(90deg,#6ee7b7,#10b981)',
                     boxShadow: `0 0 8px ${s.bar}66`,
                   }} />
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:3, position:'relative', height:10 }}>
+                  <span style={{ position:'absolute', left:'70%', transform:'translateX(-50%)', fontSize:9, color:'#ef4444', fontWeight:600 }}>零补贴线 70%</span>
+                  <span style={{ position:'absolute', left:'90%', transform:'translateX(-50%)', fontSize:9, color:'#10b981', fontWeight:600 }}>全额线 90%</span>
                 </div>
                 {gap && (
                   <div style={{ fontSize: 11, color: s.color, marginTop: 6, fontWeight: 500 }}>
@@ -347,10 +398,16 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
                   </span>
                 </div>
                 {hasActual && (
-                  <div style={{ height: 5, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(0,0,0,0.1)', zIndex: 1 }} />
-                    <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.8s ease',
-                      width: `${Math.min(pct, 100)}%`, background: ys.bar }} />
+                  <div style={{ height: 6, borderRadius: 3, overflow: 'hidden', position: 'relative', background: '#f0f2f7' }}>
+                    <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'70%', background:'#fef2f2' }} />
+                    <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:'20%', background:'#fffbeb' }} />
+                    <div style={{ position:'absolute', left:'90%', top:0, bottom:0, right:0, background:'#f0fdf4' }} />
+                    <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:1.5, background:'rgba(239,68,68,0.3)', zIndex:2 }} />
+                    <div style={{ position:'absolute', left:'90%', top:0, bottom:0, width:1.5, background:'rgba(16,185,129,0.4)', zIndex:2 }} />
+                    <div style={{ position:'absolute', left:0, top:0, bottom:0, borderRadius:3, transition:'width 0.8s ease',
+                      width: `${Math.min(pct, 100)}%`,
+                      background: pct < 70 ? 'linear-gradient(90deg,#fca5a5,#ef4444)' : pct < 90 ? 'linear-gradient(90deg,#fcd34d,#f59e0b)' : 'linear-gradient(90deg,#6ee7b7,#10b981)',
+                    }} />
                   </div>
                 )}
               </div>
@@ -594,17 +651,19 @@ export default function LandingPage() {
 
   // ── 文件相关 ──
   const FILE_CATS = [
-    { key: 'all', label: '全部' },
-    { key: 'contract', label: '协议原文' },
+    { key: 'all',        label: '全部' },
+    { key: 'contract',   label: '协议原文' },
     { key: 'supplement', label: '补充协议' },
-    { key: 'audit', label: '审计报告' },
-    { key: 'report', label: '年度报告' },
-    { key: 'other', label: '其他' },
+    { key: 'audit',      label: '审计报告' },
+    { key: 'report',     label: '年度报告' },
+    { key: 'application', label: '申请材料' },
+    { key: 'other',      label: '其他' },
   ]
   const CAT_COLOR = {
-    contract:   { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-    supplement: { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-    audit:      { color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
+    contract:    { color: '#1d4ed8', bg: '#eff6ff',  border: '#bfdbfe' },
+    supplement:  { color: '#7c3aed', bg: '#f5f3ff',  border: '#ddd6fe' },
+    audit:       { color: '#065f46', bg: '#ecfdf5',  border: '#a7f3d0' },
+    application: { color: '#b45309', bg: '#fffbeb',  border: '#fde68a' },
     report:     { color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
     other:      { color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
   }
@@ -787,6 +846,29 @@ export default function LandingPage() {
                   ),
                   children: (
                     <div data-kpi-section="true">
+                      {/* 当年核心考核说明 */}
+                      {data.coreKpiConfig && (
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, padding:'8px 14px', background:'linear-gradient(135deg,#eff6ff,#f5f3ff)', border:'1px solid #c7d2fe', borderRadius:10, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#1e40af' }}>
+                            {year} 年核心考核指标：
+                          </span>
+                          {data.coreKpiConfig.keys.map(k => {
+                            const kpi = data.kpis.find(x => x.key === k)
+                            const w = data.coreKpiConfig.weights[k]
+                            return kpi ? (
+                              <span key={k} style={{ fontSize:11, padding:'2px 10px', borderRadius:20, fontWeight:700, background:'#1d4ed8', color:'#fff' }}>
+                                {kpi.label} · {Math.round(w*10)}
+                              </span>
+                            ) : null
+                          })}
+                          <span style={{ fontSize:11, color:'#4338ca', marginLeft:2 }}>
+                            （权重比 {data.coreKpiConfig.keys.map(k => Math.round(data.coreKpiConfig.weights[k]*10)).join(':')}）
+                          </span>
+                          <span style={{ fontSize:10, color:'#64748b', marginLeft:'auto' }}>
+                            仅核心考核指标影响最终考核结果
+                          </span>
+                        </div>
+                      )}
                       {/* KPI 卡片横排 */}
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
                         {data.kpis.map(kpi => (
@@ -960,6 +1042,24 @@ export default function LandingPage() {
                   children: (
                     <Spin spinning={filesLoading}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* 申请材料快捷上传入口 */}
+                        {canEdit && (
+                          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fde68a', borderRadius:12 }}>
+                            <div style={{ fontSize:20 }}>📋</div>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>落地协议申请材料</div>
+                              <div style={{ fontSize:11, color:'#a16207' }}>上传历年补贴申请时的计算方式说明、审计附件等材料</div>
+                            </div>
+                            <Upload customRequest={handleFileUpload} showUploadList={false}
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" multiple
+                              beforeUpload={() => { setFileCat('application'); return true }}>
+                              <Button icon={<UploadOutlined />} loading={fileUploading} size="small"
+                                style={{ borderRadius:20, background:'#d97706', borderColor:'#d97706', color:'#fff', fontWeight:600 }}>
+                                上传申请材料
+                              </Button>
+                            </Upload>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {FILE_CATS.map(c => (
@@ -1014,6 +1114,13 @@ export default function LandingPage() {
                                       <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }} title={f.name}>{f.name}</div>
                                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                                         <span style={{ fontSize: 10, padding: '1px 8px', borderRadius: 20, fontWeight: 600, color: ct.color, background: ct.bg, border: `1px solid ${ct.border}` }}>{catLabel}</span>
+                                        {/* 协议年份状态标签 */}
+                                        {f.year && f.year <= 2023 && (
+                                          <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 600, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>历史归档</span>
+                                        )}
+                                        {f.year && f.year >= 2024 && (
+                                          <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0' }}>运行中</span>
+                                        )}
                                         {f.size && <span style={{ fontSize: 11, color: '#94a3b8' }}>{fmtSize(f.size)}</span>}
                                       </div>
                                     </div>

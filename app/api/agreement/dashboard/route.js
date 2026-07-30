@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, errorResponse } from '@/lib/auth'
 import {
   KPI_TARGETS, KPI_WEIGHTS, KPI_META, KPI_KEYS,
-  getDeadline, getKpiStatus, calcOverallScore,
+  getDeadline, getKpiStatus, calcOverallScore, getCoreKpi,
 } from '@/lib/agreement-config'
 
 export async function GET(request) {
@@ -83,12 +83,15 @@ export async function GET(request) {
       INDUSTRY_CHAIN:   hasFieldValue(hrRows, 'industryChainCount'),
     }
 
+    const coreKpiConfig = getCoreKpi(year)
     const builtinKpis = KPI_KEYS.map(key => {
       const targetRaw = KPI_TARGETS[key][year]
       const hasTarget = targetRaw !== null && targetRaw !== undefined
       const target    = hasTarget ? Number(targetRaw) : null
       const actual    = actuals[key]
       const meta      = KPI_META[key]
+      const isCore    = coreKpiConfig.keys.includes(key)
+      const coreWeight = isCore ? coreKpiConfig.weights[key] : null
 
       let completionRate = null
       let status = 'no_data'
@@ -109,7 +112,7 @@ export async function GET(request) {
         key, label: meta.label, unit: meta.unit, precision: meta.precision,
         note: meta.note, actual: hasData[key] ? actual : null,
         target, hasTarget, completionRate, status, gap90,
-        weight: KPI_WEIGHTS[key], custom: false,
+        weight: KPI_WEIGHTS[key], isCore, coreWeight, custom: false,
       }
     })
 
@@ -312,6 +315,7 @@ export async function GET(request) {
       qualitative,
       daysToDeadline,
       maxGapKpi,
+      coreKpiConfig,
       monthly: {
         revenue:     monthlyRevenue,
         revenueYTD:  monthlyRevenueYTD,

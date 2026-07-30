@@ -598,8 +598,8 @@ export default function ScreenPage() {
             })}
           </Panel>
 
-          {/* 五年营收对赌 */}
-          <Panel title="五年营收目标" icon="📅" style={{ flexShrink: 0, padding: '10px 12px' }}>
+          {/* 五年营收承诺 */}
+          <Panel title="五年营收承诺" icon="📅" style={{ flexShrink: 0, padding: '10px 12px' }}>
             {(() => {
               const targets = data.allYearTargets?.REVENUE || []
               const maxT = Math.max(...targets.map(t => t.target), 1)
