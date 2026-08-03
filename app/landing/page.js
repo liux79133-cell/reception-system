@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import {
   Card, Row, Col, Progress, Tag, Select, Button, Modal,
-  Input, List, Typography, Spin, Tooltip, message, Upload, Divider, Tabs,
+  Input, InputNumber, List, Typography, Spin, Tooltip, message, Upload, Divider, Tabs,
   Statistic, Timeline, Badge,
 } from 'antd'
 import {
@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
+import { KPI_META, KPI_KEYS, CORE_KPI_BY_YEAR } from '@/lib/agreement-config'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 
@@ -284,7 +285,7 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{kpi.label} · 五年阶梯对赌</span>
-          <span style={{ marginLeft: 10, fontSize: 12, color: '#64748b' }}>五年合计目标：{totalTarget5yr} {kpi.unit}</span>
+          <span style={{ marginLeft: 10, fontSize: 12, color: '#64748b' }}>五年合计指标：{totalTarget5yr} {kpi.unit}</span>
         </div>
         <Tag style={{ margin: 0, fontSize: 12, padding: '3px 14px', borderRadius: 20, fontWeight: 700,
           color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
@@ -327,9 +328,9 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
                       </Tag>
                     )}
                     <span style={{ fontSize: 13, color: '#475569' }}>
-                      实际 <strong style={{ fontSize: 15, color: s.color }}>{fmtVal(actual, kpi.precision)}</strong>
+                      实绩 <strong style={{ fontSize: 15, color: s.color }}>{fmtVal(actual, kpi.precision)}</strong>
                       <span style={{ color: '#94a3b8', margin: '0 4px' }}>/</span>
-                      目标 <strong style={{ color: '#0f172a' }}>{target} {kpi.unit}</strong>
+                      指标 <strong style={{ color: '#0f172a' }}>{target} {kpi.unit}</strong>
                     </span>
                   </div>
                 </div>
@@ -385,11 +386,11 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
                     </Tag>
                   )}
                   <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                    实际 <strong style={{ color: hasActual ? ys.color : '#94a3b8' }}>
+                    实绩 <strong style={{ color: hasActual ? ys.color : '#94a3b8' }}>
                       {hasActual ? fmtVal(actual, kpi.precision) : '—'}
                     </strong>
                     <span style={{ color: '#94a3b8', margin: '0 3px' }}>/</span>
-                    目标 <strong style={{ color: '#475569' }}>{target} {kpi.unit}</strong>
+                    指标 <strong style={{ color: '#475569' }}>{target} {kpi.unit}</strong>
                     {hasActual && rate !== null && (
                       <span style={{ marginLeft: 6, color: ys.color, fontWeight: 700 }}>
                         {(rate * 100).toFixed(1)}%
@@ -425,7 +426,7 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
               <span style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', minWidth: 44 }}>{year}</span>
               <div style={{ flex: 1, height: 4, background: '#f1f5f9', borderRadius: 2 }} />
               <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>
-                未开始 / 目标 <strong style={{ color: '#94a3b8' }}>{target} {kpi.unit}</strong>
+                未开始 / 指标 <strong style={{ color: '#94a3b8' }}>{target} {kpi.unit}</strong>
               </span>
             </div>
           )
@@ -456,6 +457,13 @@ export default function LandingPage() {
   const [addQualModal, setAddQualModal] = useState(false)
   const [addQualForm, setAddQualForm]   = useState({ name: '', articleRef: '', requirement: '', status: 'pending' })
   const [addQualSaving, setAddQualSaving] = useState(false)
+  // 五年目标总览表格
+  const [targetTableOpen, setTargetTableOpen] = useState(false)
+  const [targetTableEdit, setTargetTableEdit] = useState(false)
+  const [targetDraft, setTargetDraft]         = useState({}) // { KPI_KEY: { year: value } }
+  const [targetSaving, setTargetSaving]       = useState(false)
+  const [remoteTargets, setRemoteTargets]     = useState(null) // 从 API 拉的覆盖目标
+
   // 自定义 KPI 管理
   const [kpiMgrModal, setKpiMgrModal] = useState(false)
   const [customKpis, setCustomKpis]   = useState([])
@@ -487,7 +495,14 @@ export default function LandingPage() {
       .finally(() => setLoading(false))
   }
 
+  const fetchTargets = () => {
+    api.get('/api/agreement/targets')
+      .then(t => { setRemoteTargets(t); setTargetDraft(JSON.parse(JSON.stringify(t))) })
+      .catch(() => {})
+  }
+
   useEffect(() => { fetchDashboard(year) }, [year])
+  useEffect(() => { fetchTargets() }, [])
 
   const fetchFiles = () => {
     setFilesLoading(true)
@@ -571,6 +586,18 @@ export default function LandingPage() {
         } catch (e) { message.error('删除失败：' + e) }
       },
     })
+  }
+
+  const saveTargets = async () => {
+    setTargetSaving(true)
+    try {
+      await api.post('/api/agreement/targets', targetDraft)
+      message.success('目标值已保存，KPI卡片将同步更新')
+      setRemoteTargets(JSON.parse(JSON.stringify(targetDraft)))
+      setTargetTableEdit(false)
+      fetchDashboard(year)
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setTargetSaving(false) }
   }
 
   const handleUpload = async ({ file, onSuccess, onError }) => {
@@ -846,6 +873,15 @@ export default function LandingPage() {
                   ),
                   children: (
                     <div data-kpi-section="true">
+                      {/* 统计口径提示 */}
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'7px 14px', background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fde68a', borderRadius:9, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:'#92400e' }}>📊 统计口径</span>
+                        <span style={{ fontSize:11, color:'#78350f' }}>综合税收 = 魔门塔（苏州）+ 魔视智能 两家主体合并计算，按会计年度缴纳数认定</span>
+                        <span style={{ marginLeft:'auto', fontSize:10, color:'#a16207', background:'#fef3c7', border:'1px solid #fde68a', borderRadius:6, padding:'1px 8px' }}>
+                          依据协议第 1.2.2 条
+                        </span>
+                      </div>
+
                       {/* 当年核心考核说明 */}
                       {data.coreKpiConfig && (
                         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, padding:'8px 14px', background:'linear-gradient(135deg,#eff6ff,#f5f3ff)', border:'1px solid #c7d2fe', borderRadius:10, flexWrap:'wrap' }}>
@@ -885,15 +921,257 @@ export default function LandingPage() {
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
                         <div style={{ width: 3, height: 14, borderRadius: 2, background: '#3b82f6' }} />
-                        <Text style={{ fontSize: 13, color: '#475569' }}>点击指标卡查看五年对赌目标</Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>· 进度条内竖线 = 90% 全额补贴线</Text>
-                        {canEdit && (
-                          <Button size="small" icon={<PlusOutlined />} style={{ marginLeft: 'auto', borderRadius: 20, borderColor: '#6366f1', color: '#6366f1' }}
-                            onClick={() => { fetchCustomKpis(); setKpiMgrModal(true) }}>
-                            管理自定义 KPI
+                        <Text style={{ fontSize: 13, color: '#475569' }}>点击指标卡查看五年对赌指标</Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>· 进度条竖线：70% 零补贴线 · 90% 全额线</Text>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                          <Button
+                            size="small"
+                            icon={<CalendarOutlined />}
+                            style={{ borderRadius: 20, borderColor: '#0ea5e9', color: '#0ea5e9' }}
+                            onClick={() => { setTargetTableOpen(v => !v); setTargetTableEdit(false) }}
+                          >
+                            {targetTableOpen ? '收起' : '展开'}五年目标总览
                           </Button>
-                        )}
+                          {canEdit && (
+                            <Button size="small" icon={<PlusOutlined />} style={{ borderRadius: 20, borderColor: '#6366f1', color: '#6366f1' }}
+                              onClick={() => { fetchCustomKpis(); setKpiMgrModal(true) }}>
+                              管理自定义 KPI
+                            </Button>
+                          )}
+                        </div>
                       </div>
+
+                      {/* ── 五年考核指标总览表格 ── */}
+                      {targetTableOpen && remoteTargets && (() => {
+                        // 展开每个KPI×每个年份为一行，格式：指标｜年份｜协议指标值｜基础线70%｜全额线90%｜当前实绩
+                        const YEARS_ALL = [2024, 2025, 2026, 2027, 2028]
+                        const builtinKpis = data.kpis.filter(k => !k.custom)
+                        const rows = []
+                        builtinKpis.forEach(kpi => {
+                          const meta = KPI_META[kpi.key] || {}
+                          YEARS_ALL.forEach(y => {
+                            const coreConf = CORE_KPI_BY_YEAR[y] || CORE_KPI_BY_YEAR[2026]
+                            const isCore = coreConf.keys.includes(kpi.key)
+                            const targetVal = targetDraft[kpi.key]?.[y]
+                            const hasTarget = targetVal !== null && targetVal !== undefined
+                            const line70 = hasTarget ? (targetVal * 0.7) : null
+                            const line90 = hasTarget ? (targetVal * 0.9) : null
+                            // 当前实绩：只有当前年份才有
+                            const actualVal = y === year
+                              ? (data.kpis.find(k => k.key === kpi.key)?.actual ?? null)
+                              : null
+                            const isCurYear = y === year
+                            rows.push({ kpi, meta, y, isCore, targetVal, hasTarget, line70, line90, actualVal, isCurYear })
+                          })
+                        })
+
+                        const fmtN = (v, unit, precision) => {
+                          if (v === null || v === undefined) return '—'
+                          const p = precision ?? (unit === '亿元' ? 2 : 0)
+                          if (p === 0) return Number(v).toLocaleString()
+                          return Number(v).toFixed(p).replace(/\.?0+$/, '')
+                        }
+
+                        // 实绩状态色
+                        const actualColor = (actualVal, targetVal) => {
+                          if (actualVal === null || !targetVal) return '#94a3b8'
+                          const r = actualVal / targetVal
+                          if (r >= 0.9) return '#10b981'
+                          if (r >= 0.7) return '#f59e0b'
+                          return '#ef4444'
+                        }
+
+                        return (
+                          <div style={{ marginBottom: 16, background: '#fff', borderRadius: 14, border: '1px solid #e8ecf4', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                            {/* 表格头部操作栏 */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 8 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>五年考核指标总览</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1px 8px' }}>
+                                  协议第三条 · 年度发展目标
+                                </span>
+                                {targetTableEdit && (
+                                  <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '1px 8px' }}>
+                                    ✏️ 编辑中 · 修改后保存
+                                  </span>
+                                )}
+                              </div>
+                              {canEdit && (
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  {targetTableEdit ? (
+                                    <>
+                                      <Button size="small" onClick={() => { setTargetDraft(JSON.parse(JSON.stringify(remoteTargets))); setTargetTableEdit(false) }}
+                                        style={{ borderRadius: 8 }}>取消</Button>
+                                      <Button size="small" type="primary" loading={targetSaving} onClick={saveTargets}
+                                        style={{ borderRadius: 8, background: '#10b981', borderColor: '#10b981', fontWeight: 600 }}>
+                                        保存并同步 KPI 卡片
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button size="small" icon={<EditOutlined />} onClick={() => setTargetTableEdit(true)}
+                                      style={{ borderRadius: 8, borderColor: '#6366f1', color: '#6366f1' }}>
+                                      修改协议指标值
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 表格主体 */}
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                <thead>
+                                  <tr style={{ background: '#f8fafc' }}>
+                                    {[
+                                      { label: '指标',        align: 'left',   width: 130 },
+                                      { label: '年份',        align: 'center', width: 72 },
+                                      { label: '协议指标值',  align: 'center', width: 110 },
+                                      { label: '基础线（70%）', align: 'center', width: 110 },
+                                      { label: '全额线（90%）', align: 'center', width: 110 },
+                                      { label: '当前实绩',    align: 'center', width: 110 },
+                                    ].map((col, i) => (
+                                      <th key={i} style={{
+                                        padding: '10px 14px', textAlign: col.align, fontWeight: 600,
+                                        fontSize: 12, color: '#475569', whiteSpace: 'nowrap',
+                                        borderBottom: '2px solid #e2e8f0', minWidth: col.width,
+                                        borderRight: i < 5 ? '1px solid #f1f5f9' : 'none',
+                                      }}>
+                                        {col.label}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map(({ kpi, meta, y, isCore, targetVal, hasTarget, line70, line90, actualVal, isCurYear }, ri) => {
+                                    const isFirstRowOfKpi = y === 2024
+                                    const kpiRowSpan = 5
+                                    const precision = kpi.precision ?? (kpi.unit === '亿元' ? 2 : 0)
+                                    const aColor = actualColor(actualVal, targetVal)
+                                    const isEvenKpi = Math.floor(ri / 5) % 2 === 0
+                                    const rowBg = isCurYear
+                                      ? '#eff6ff'
+                                      : isEvenKpi ? '#fff' : '#fafafa'
+
+                                    return (
+                                      <tr key={`${kpi.key}-${y}`}
+                                        style={{
+                                          background: rowBg,
+                                          borderBottom: y === 2028 ? '2px solid #e2e8f0' : '1px solid #f1f5f9',
+                                        }}
+                                      >
+                                        {/* 指标名（rowspan=5，只在第一行渲染） */}
+                                        {isFirstRowOfKpi && (
+                                          <td rowSpan={kpiRowSpan} style={{
+                                            padding: '0 14px', fontWeight: 600, color: '#0f172a',
+                                            fontSize: 13, verticalAlign: 'middle',
+                                            borderRight: '1px solid #e2e8f0',
+                                            borderBottom: '2px solid #e2e8f0',
+                                            background: isEvenKpi ? '#fff' : '#fafafa',
+                                          }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                              <span>{kpi.label}</span>
+                                              <div style={{ display: 'flex', gap: 4 }}>
+                                                {isCore ? (
+                                                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, fontWeight: 700, background: 'linear-gradient(135deg,#1d4ed8,#4f46e5)', color: '#fff' }}>核心</span>
+                                                ) : (
+                                                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>参考</span>
+                                                )}
+                                                <span style={{ fontSize: 9, color: '#94a3b8' }}>{kpi.unit}</span>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        )}
+
+                                        {/* 年份 */}
+                                        <td style={{
+                                          padding: '9px 14px', textAlign: 'center',
+                                          fontWeight: isCurYear ? 700 : 400,
+                                          color: isCurYear ? '#1d4ed8' : '#64748b',
+                                          fontSize: 13, borderRight: '1px solid #f1f5f9',
+                                          whiteSpace: 'nowrap',
+                                        }}>
+                                          {y}
+                                          {isCurYear && (
+                                            <span style={{ marginLeft: 4, fontSize: 9, background: '#1d4ed8', color: '#fff', borderRadius: 4, padding: '1px 4px' }}>当前</span>
+                                          )}
+                                        </td>
+
+                                        {/* 协议指标值（可编辑） */}
+                                        <td style={{ padding: '6px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                                          {targetTableEdit ? (
+                                            <InputNumber
+                                              size="small"
+                                              value={targetVal ?? null}
+                                              min={0}
+                                              precision={precision}
+                                              onChange={v => setTargetDraft(d => ({
+                                                ...d,
+                                                [kpi.key]: { ...d[kpi.key], [y]: v },
+                                              }))}
+                                              style={{ width: 88, textAlign: 'center' }}
+                                              placeholder="—"
+                                            />
+                                          ) : (
+                                            <span style={{ fontWeight: 600, color: hasTarget ? '#0f172a' : '#cbd5e1' }}>
+                                              {hasTarget ? `${fmtN(targetVal, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                            </span>
+                                          )}
+                                        </td>
+
+                                        {/* 基础线 70% */}
+                                        <td style={{ padding: '9px 14px', textAlign: 'center', color: '#ef4444', fontWeight: 500, borderRight: '1px solid #f1f5f9', fontSize: 13 }}>
+                                          {hasTarget ? `${fmtN(line70, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                        </td>
+
+                                        {/* 全额线 90% */}
+                                        <td style={{ padding: '9px 14px', textAlign: 'center', color: '#10b981', fontWeight: 500, borderRight: '1px solid #f1f5f9', fontSize: 13 }}>
+                                          {hasTarget ? `${fmtN(line90, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                        </td>
+
+                                        {/* 当前实绩 */}
+                                        <td style={{ padding: '9px 14px', textAlign: 'center', fontSize: 13 }}>
+                                          {isCurYear ? (
+                                            actualVal !== null ? (
+                                              <span style={{ fontWeight: 700, color: aColor }}>
+                                                {fmtN(actualVal, kpi.unit, precision)}{kpi.unit}
+                                              </span>
+                                            ) : (
+                                              <span style={{ color: '#94a3b8', fontSize: 12 }}>待录入</span>
+                                            )
+                                          ) : (
+                                            <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* 底部说明 */}
+                            <div style={{ padding: '10px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: '#64748b' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} />基础线 70%（零补贴线）
+                                </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: 2, background: '#10b981', display: 'inline-block' }} />全额线 90%（全额补贴）
+                                </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: 2, background: '#eff6ff', border: '1px solid #93c5fd', display: 'inline-block' }} />蓝色底色 = 当前年（{year}）
+                                </span>
+                                <span>· 综合税收 2024 年无指标（协议原文为"—"）</span>
+                              </div>
+                              {canEdit && !targetTableEdit && (
+                                <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>
+                                  点击「修改协议指标值」可直接编辑，保存后 KPI 卡片同步更新
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* 五年阶梯详情 */}
                       {activeKpiData && (

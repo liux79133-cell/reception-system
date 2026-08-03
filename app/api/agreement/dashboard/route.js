@@ -5,6 +5,27 @@ import {
   getDeadline, getKpiStatus, calcOverallScore, getCoreKpi,
 } from '@/lib/agreement-config'
 
+const KPI_TARGET_PREFIX = 'kpi_target_'
+
+// 从 AppConfig 读取目标值覆盖，合并到静态配置
+async function getEffectiveTargets() {
+  const overrides = await prisma.appConfig.findMany({
+    where: { key: { startsWith: KPI_TARGET_PREFIX } },
+  })
+  const effective = {}
+  KPI_KEYS.forEach(key => {
+    effective[key] = { ...KPI_TARGETS[key] }
+  })
+  overrides.forEach(c => {
+    const rest = c.key.slice(KPI_TARGET_PREFIX.length)
+    const lastUnderscore = rest.lastIndexOf('_')
+    const kpiKey = rest.slice(0, lastUnderscore)
+    const year   = Number(rest.slice(lastUnderscore + 1))
+    if (effective[kpiKey]) effective[kpiKey][year] = Number(c.value)
+  })
+  return effective
+}
+
 export async function GET(request) {
   try {
     requireAuth(request)
@@ -83,9 +104,10 @@ export async function GET(request) {
       INDUSTRY_CHAIN:   hasFieldValue(hrRows, 'industryChainCount'),
     }
 
+    const effectiveTargets = await getEffectiveTargets()
     const coreKpiConfig = getCoreKpi(year)
     const builtinKpis = KPI_KEYS.map(key => {
-      const targetRaw = KPI_TARGETS[key][year]
+      const targetRaw = effectiveTargets[key][year]
       const hasTarget = targetRaw !== null && targetRaw !== undefined
       const target    = hasTarget ? Number(targetRaw) : null
       const actual    = actuals[key]
@@ -236,7 +258,7 @@ export async function GET(request) {
     })
     KPI_KEYS.forEach(key => {
       allYearTargets[key] = [2024, 2025, 2026, 2027, 2028].map(y => ({
-        year: y, target: KPI_TARGETS[key][y] || 0, actual: allYearActuals[y][key],
+        year: y, target: (effectiveTargets[key][y] ?? 0), actual: allYearActuals[y][key],
       }))
     })
     // 自定义 KPI 的五年阶梯

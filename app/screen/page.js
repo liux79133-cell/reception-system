@@ -285,6 +285,11 @@ function KpiRingRow({ kpis }) {
             <div style={{ fontSize: 10, color, fontWeight: 500, marginTop: 1 }}>
               {fmt(kpi.actual, kpi.precision)}<span style={{ color: C.muted }}>{kpi.unit}</span>
             </div>
+            {kpi.isCore ? (
+              <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 6, fontWeight: 700, background: '#1d4ed8', color: '#fff', display: 'inline-block', marginTop: 2 }}>核心</span>
+            ) : (
+              <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 6, color: '#94a3b8', background: 'rgba(15,23,42,0.06)', display: 'inline-block', marginTop: 2 }}>参考</span>
+            )}
           </div>
         )
       })}
@@ -495,15 +500,14 @@ export default function ScreenPage() {
           </Panel>
 
           {/* 关键节点 */}
-          <Panel title="协议关键节点" icon="📌" style={{ flex: 1, overflow: 'hidden', padding: '10px 12px' }}>
+          <Panel title="协议关键节点（第1.2.2条）" icon="📌" style={{ flexShrink: 0, padding: '10px 12px' }}>
             {[
-              { date: '2024-12-31', label: '2024 年度考核', active: true },
-              { date: '2027-12-31', label: 'IPO 目标截止' },
+              { date: `${year}-12-31`, label: `${year} 年度考核截止`, active: year <= new Date().getFullYear() },
+              { date: '2027-12-31', label: '五年协议 IPO 指标截止' },
               { date: '2028-12-31', label: '五年协议到期' },
-              { date: '2029-12-31', label: '总部大楼建设' },
             ].map((n, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start',
-                paddingBottom: 6, marginBottom: 6, borderBottom: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+                paddingBottom: 6, marginBottom: 6, borderBottom: i < 2 ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{
                   width: 6, height: 6, borderRadius: '50%', marginTop: 2, flexShrink: 0,
                   background: n.active ? C.yellow : C.blue,
@@ -517,6 +521,57 @@ export default function ScreenPage() {
               </div>
             ))}
           </Panel>
+
+          {/* IPO / 整体营收目标（第1.2.1条，独立展示，不参与KPI考核） */}
+          <Panel title="集团整体指标（第1.2.1条）" icon="🎯" style={{ flex: 1, overflow: 'hidden', padding: '10px 12px' }}
+            accent="#7c3aed">
+            <div style={{ fontSize: 10, color: '#6d28d9', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '4px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+              ⚠️ 以下为集团整体指标，含苏州以外主体，<strong>不计入本协议 KPI 考核</strong>
+            </div>
+            {/* IPO 目标 */}
+            <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 3 }}>
+                IPO 指标
+              </div>
+              <div style={{ fontSize: 9, color: C.sub, lineHeight: 1.5 }}>
+                以 2027-12-31 前在纽交所 / 纳斯达克 / 港交所 / 上交所 / 深交所完成合格 IPO
+              </div>
+            </div>
+            {/* 集团整体营收目标 */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 6 }}>集团整体营业收入指标（亿元）</div>
+              {[
+                { year: 2023, target: 5 },
+                { year: 2024, target: 9 },
+                { year: 2025, target: 20 },
+                { year: 2026, target: 40 },
+              ].map(({ year: y, target }) => {
+                const isCur = y === year
+                const isPast = y < year
+                const groupActual = isCur
+                  ? data.kpis.find(k => k.key === 'REVENUE')?.actual ?? null
+                  : null
+                const pct = groupActual !== null ? Math.min(groupActual / target * 100, 120) : 0
+                return (
+                  <div key={y} style={{ marginBottom: 5, opacity: isPast ? 0.55 : 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ fontSize: 10, color: isCur ? '#7c3aed' : C.sub, fontWeight: isCur ? 700 : 400 }}>
+                        {y} 年 {isCur ? '(当前年)' : ''}
+                      </span>
+                      <span style={{ fontSize: 9, color: C.muted }}>≥{target} 亿</span>
+                    </div>
+                    <div style={{ height: 4, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, borderRadius: 3,
+                        background: isCur ? '#7c3aed' : '#94a3b8', transition: 'width 1s ease' }} />
+                    </div>
+                  </div>
+                )
+              })}
+              <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>
+                * 含京/深等全国主体，非苏州落地协议口径
+              </div>
+            </div>
+          </Panel>
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
@@ -524,6 +579,18 @@ export default function ScreenPage() {
 
           {/* KPI 环形 */}
           <Panel title={`${year} 年度 KPI 完成率`} icon="◎" accent={C.blue} style={{ flexShrink: 0, padding: '10px 12px' }}>
+            {/* 统计口径提示 */}
+            <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 7, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>📊 统计口径：综合税收 = 魔门塔 + 魔视合并</span>
+              {data.coreKpiConfig && (
+                <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
+                  核心：{data.coreKpiConfig.keys.map(k => {
+                    const kpi = data.kpis.find(x => x.key === k)
+                    return kpi?.label
+                  }).filter(Boolean).join('·')} （{data.coreKpiConfig.keys.map(k => Math.round(data.coreKpiConfig.weights[k]*10)).join(':')}）
+                </span>
+              )}
+            </div>
             <KpiRingRow kpis={data.kpis} />
           </Panel>
 
@@ -537,7 +604,7 @@ export default function ScreenPage() {
                 </div>
               ))}
               <span style={{ marginLeft: 'auto', fontSize: 10, color: C.sub }}>
-                目标 {data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
+                指标 {data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
               </span>
             </div>
             <LineChart height={88}
@@ -558,7 +625,7 @@ export default function ScreenPage() {
             </Panel>
             <Panel title="社保人数变化" icon="👥" accent={C.indigo} style={{ overflow: 'hidden', padding: '10px 12px' }}>
               <div style={{ fontSize: 9, color: C.sub, textAlign: 'right', marginBottom: 2 }}>
-                目标 {data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target} 人
+                指标 {data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target} 人
               </div>
               <LineChart height={64}
                 series={[{ data: monthly.social || [], color: C.indigo, label: '人数' }]}
@@ -571,27 +638,51 @@ export default function ScreenPage() {
         {/* ══ 右列 ══════════════════════════════════════════════════ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* KPI 进度条 */}
+          {/* KPI 完成进度（含三色分区和70%/90%刻度线） */}
           <Panel title="KPI 完成进度" icon="◎" style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
+            {/* 统计口径说明 */}
+            <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+              综合税收口径：魔门塔 + 魔视合并计算
+            </div>
             {data.kpis.map(kpi => {
               const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
               const color = sc(kpi.status)
+              const hasVal = kpi.status !== 'no_data' && kpi.status !== 'no_target'
               return (
-                <div key={kpi.key} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: C.text }}>{kpi.label}</span>
+                <div key={kpi.key} style={{ marginBottom: 9 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: C.text }}>{kpi.label}</span>
+                      {kpi.isCore ? (
+                        <span style={{ fontSize: 8, padding: '0 4px', borderRadius: 6, fontWeight: 700, background: '#1d4ed8', color: '#fff', lineHeight: '14px' }}>核心</span>
+                      ) : (
+                        <span style={{ fontSize: 8, padding: '0 4px', borderRadius: 6, color: '#94a3b8', background: 'rgba(15,23,42,0.06)', lineHeight: '14px' }}>参考</span>
+                      )}
+                    </div>
                     <span style={{ fontSize: 10, color, fontWeight: 700 }}>
                       {kpi.status === 'no_data' || kpi.status === 'no_target' ? '—' : `${pct.toFixed(1)}%`}
                     </span>
                   </div>
-                  <div style={{ height: 6, background: C.track, borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(15,23,42,0.2)', zIndex: 2 }} />
+                  {/* 三色分区进度条 */}
+                  <div style={{ height: 7, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '70%', background: '#fef2f2' }} />
+                    <div style={{ position: 'absolute', left: '70%', top: 0, bottom: 0, width: '20%', background: '#fffbeb' }} />
+                    <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, right: 0, background: '#f0fdf4' }} />
+                    <div style={{ position: 'absolute', left: '70%', top: 0, bottom: 0, width: 1.5, background: 'rgba(239,68,68,0.4)', zIndex: 2 }} />
+                    <div style={{ position: 'absolute', left: '90%', top: 0, bottom: 0, width: 1.5, background: 'rgba(16,185,129,0.5)', zIndex: 2 }} />
                     <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4,
-                      background: `linear-gradient(90deg, ${color}88, ${color})`, transition: 'width 1s ease' }} />
+                      background: hasVal
+                        ? pct < 70  ? 'linear-gradient(90deg,#fca5a5,#ef4444)'
+                        : pct < 90  ? 'linear-gradient(90deg,#fcd34d,#f59e0b)'
+                        :              'linear-gradient(90deg,#6ee7b7,#10b981)'
+                        : '#e2e8f0',
+                      transition: 'width 1s ease' }} />
                   </div>
-                  <div style={{ fontSize: 9, color: C.muted, marginTop: 1, display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 9, color: C.muted, marginTop: 2, display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
                     <span>{fmt(kpi.actual, kpi.precision)} {kpi.unit}</span>
-                    <span>目标 {kpi.target ?? '—'} {kpi.unit}</span>
+                    <span style={{ position: 'absolute', left: '70%', transform: 'translateX(-50%)', color: '#fca5a5' }}>70%</span>
+                    <span style={{ position: 'absolute', left: '90%', transform: 'translateX(-50%)', color: '#6ee7b7' }}>90%</span>
+                    <span>指标 {kpi.target ?? '—'} {kpi.unit}</span>
                   </div>
                 </div>
               )
