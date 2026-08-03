@@ -522,53 +522,56 @@ export default function ScreenPage() {
             ))}
           </Panel>
 
-          {/* IPO / 整体营收目标（第1.2.1条，独立展示，不参与KPI考核） */}
-          <Panel title="集团整体指标（第1.2.1条）" icon="🎯" style={{ flex: 1, overflow: 'hidden', padding: '10px 12px' }}
-            accent="#7c3aed">
-            <div style={{ fontSize: 10, color: '#6d28d9', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '4px 8px', marginBottom: 8, lineHeight: 1.5 }}>
-              ⚠️ 以下为集团整体指标，含苏州以外主体，<strong>不计入本协议 KPI 考核</strong>
+          {/* 1.2.1条：集团整体指标，虚线边框与苏州KPI（1.2.2条）视觉隔离 */}
+          <Panel style={{ flex: 1, overflow: 'hidden', padding: '10px 12px', background: 'rgba(245,243,255,0.9)', border: '1.5px dashed #c4b5fd', boxShadow: 'none' }}>
+            {/* 标题 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+              <span style={{ fontSize: 10 }}>🎯</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#5b21b6', letterSpacing: 0.3 }}>集团整体指标（第 1.2.1 条）</span>
             </div>
+            {/* 非苏州口径警示 */}
+            <div style={{ fontSize: 9, color: '#6d28d9', background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 5, padding: '3px 8px', marginBottom: 8, lineHeight: 1.6 }}>
+              ⚠️ 含苏州以外主体（京/深等）· <strong>不计入苏州落地协议 KPI 考核</strong>
+            </div>
+
             {/* IPO 目标 */}
-            <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 3 }}>
-                IPO 指标
-              </div>
-              <div style={{ fontSize: 9, color: C.sub, lineHeight: 1.5 }}>
-                以 2027-12-31 前在纽交所 / 纳斯达克 / 港交所 / 上交所 / 深交所完成合格 IPO
+            <div style={{ marginBottom: 8, paddingBottom: 7, borderBottom: '1px dashed #ddd6fe' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 3 }}>IPO 目标</div>
+              <div style={{ fontSize: 9, color: C.sub, lineHeight: 1.6 }}>
+                <strong style={{ color: '#7c3aed' }}>2027-12-31</strong> 前在纽交所 / 纳斯达克 / 港交所 / 上交所 / 深交所完成合格 IPO
               </div>
             </div>
-            {/* 集团整体营收目标 */}
+
+            {/* 集团整体营业收入（2023-2026不低于门槛） */}
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 6 }}>集团整体营业收入指标（亿元）</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 6 }}>
+                集团整体营业收入（不低于）
+              </div>
               {[
-                { year: 2023, target: 5 },
-                { year: 2024, target: 9 },
-                { year: 2025, target: 20 },
-                { year: 2026, target: 40 },
-              ].map(({ year: y, target }) => {
-                const isCur = y === year
+                { y: 2023, min: 5  },
+                { y: 2024, min: 9  },
+                { y: 2025, min: 20 },
+                { y: 2026, min: 40 },
+              ].map(({ y, min }) => {
                 const isPast = y < year
-                const groupActual = isCur
-                  ? data.kpis.find(k => k.key === 'REVENUE')?.actual ?? null
-                  : null
-                const pct = groupActual !== null ? Math.min(groupActual / target * 100, 120) : 0
+                const isCur  = y === year
                 return (
-                  <div key={y} style={{ marginBottom: 5, opacity: isPast ? 0.55 : 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <span style={{ fontSize: 10, color: isCur ? '#7c3aed' : C.sub, fontWeight: isCur ? 700 : 400 }}>
-                        {y} 年 {isCur ? '(当前年)' : ''}
-                      </span>
-                      <span style={{ fontSize: 9, color: C.muted }}>≥{target} 亿</span>
+                  <div key={y} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, opacity: isPast ? 0.5 : 1 }}>
+                    <span style={{ fontSize: 10, color: isCur ? '#7c3aed' : C.muted, fontWeight: isCur ? 700 : 400, minWidth: 30 }}>
+                      {y}
+                    </span>
+                    <div style={{ flex: 1, height: 4, background: '#ede9fe', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: isPast ? '100%' : (isCur ? '50%' : '0%'), borderRadius: 3,
+                        background: isPast ? '#c4b5fd' : '#7c3aed', transition: 'width 1s ease' }} />
                     </div>
-                    <div style={{ height: 4, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, borderRadius: 3,
-                        background: isCur ? '#7c3aed' : '#94a3b8', transition: 'width 1s ease' }} />
-                    </div>
+                    <span style={{ fontSize: 10, color: '#7c3aed', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>
+                      ≥{min}亿
+                    </span>
                   </div>
                 )
               })}
-              <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>
-                * 含京/深等全国主体，非苏州落地协议口径
+              <div style={{ fontSize: 9, color: C.muted, marginTop: 5 }}>
+                * 集团口径，含北京/深圳等非苏州主体
               </div>
             </div>
           </Panel>
@@ -581,7 +584,7 @@ export default function ScreenPage() {
           <Panel title={`${year} 年度 KPI 完成率`} icon="◎" accent={C.blue} style={{ flexShrink: 0, padding: '10px 12px' }}>
             {/* 统计口径提示 */}
             <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 7, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>📊 统计口径：综合税收 = 魔门塔 + 魔视合并</span>
+              <span>📊 统计口径：综合税收 = 苏初 + 苏魔两家合并计算</span>
               {data.coreKpiConfig && (
                 <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
                   核心：{data.coreKpiConfig.keys.map(k => {
@@ -642,7 +645,7 @@ export default function ScreenPage() {
           <Panel title="KPI 完成进度" icon="◎" style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
             {/* 统计口径说明 */}
             <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 8, lineHeight: 1.5 }}>
-              综合税收口径：魔门塔 + 魔视合并计算
+              综合税收口径：苏初 + 苏魔两家合并计算
             </div>
             {data.kpis.map(kpi => {
               const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
