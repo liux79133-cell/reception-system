@@ -522,59 +522,6 @@ export default function ScreenPage() {
             ))}
           </Panel>
 
-          {/* 1.2.1条：集团整体指标，虚线边框与苏州KPI（1.2.2条）视觉隔离 */}
-          <Panel style={{ flex: 1, overflow: 'hidden', padding: '10px 12px', background: 'rgba(245,243,255,0.9)', border: '1.5px dashed #c4b5fd', boxShadow: 'none' }}>
-            {/* 标题 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
-              <span style={{ fontSize: 10 }}>🎯</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#5b21b6', letterSpacing: 0.3 }}>集团整体指标（第 1.2.1 条）</span>
-            </div>
-            {/* 非苏州口径警示 */}
-            <div style={{ fontSize: 9, color: '#6d28d9', background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 5, padding: '3px 8px', marginBottom: 8, lineHeight: 1.6 }}>
-              ⚠️ 含苏州以外主体（京/深等）· <strong>不计入苏州落地协议 KPI 考核</strong>
-            </div>
-
-            {/* IPO 目标 */}
-            <div style={{ marginBottom: 8, paddingBottom: 7, borderBottom: '1px dashed #ddd6fe' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 3 }}>IPO 目标</div>
-              <div style={{ fontSize: 9, color: C.sub, lineHeight: 1.6 }}>
-                <strong style={{ color: '#7c3aed' }}>2027-12-31</strong> 前在纽交所 / 纳斯达克 / 港交所 / 上交所 / 深交所完成合格 IPO
-              </div>
-            </div>
-
-            {/* 集团整体营业收入（2023-2026不低于门槛） */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 6 }}>
-                集团整体营业收入（不低于）
-              </div>
-              {[
-                { y: 2023, min: 5  },
-                { y: 2024, min: 9  },
-                { y: 2025, min: 20 },
-                { y: 2026, min: 40 },
-              ].map(({ y, min }) => {
-                const isPast = y < year
-                const isCur  = y === year
-                return (
-                  <div key={y} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, opacity: isPast ? 0.5 : 1 }}>
-                    <span style={{ fontSize: 10, color: isCur ? '#7c3aed' : C.muted, fontWeight: isCur ? 700 : 400, minWidth: 30 }}>
-                      {y}
-                    </span>
-                    <div style={{ flex: 1, height: 4, background: '#ede9fe', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: isPast ? '100%' : (isCur ? '50%' : '0%'), borderRadius: 3,
-                        background: isPast ? '#c4b5fd' : '#7c3aed', transition: 'width 1s ease' }} />
-                    </div>
-                    <span style={{ fontSize: 10, color: '#7c3aed', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>
-                      ≥{min}亿
-                    </span>
-                  </div>
-                )
-              })}
-              <div style={{ fontSize: 9, color: C.muted, marginTop: 5 }}>
-                * 集团口径，含北京/深圳等非苏州主体
-              </div>
-            </div>
-          </Panel>
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
@@ -747,6 +694,76 @@ export default function ScreenPage() {
             })()}
             <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>* {data.overallScore.toFixed(1)} 分估算</div>
           </Panel>
+        </div>
+      </div>
+
+      {/* ── 1.2.1条：集团整体指标横向条幅（与1.2.2苏州KPI视觉隔离）── */}
+      <div style={{
+        marginTop: 6, flexShrink: 0,
+        background: 'rgba(245,243,255,0.92)', border: '1.5px dashed #c4b5fd',
+        borderRadius: 10, padding: '8px 16px',
+        display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'nowrap',
+      }}>
+        {/* 标题 + 警示 */}
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#5b21b6', marginBottom: 3 }}>
+            🎯 集团整体指标（第 1.2.1 条）
+          </div>
+          <div style={{ fontSize: 9, color: '#6d28d9', background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 4, padding: '2px 7px', lineHeight: 1.6, whiteSpace: 'nowrap' }}>
+            ⚠️ 含苏州以外主体（京/深等）· 不计入苏州落地协议 KPI 考核
+          </div>
+        </div>
+
+        {/* 分隔线 */}
+        <div style={{ width: 1, alignSelf: 'stretch', background: '#ddd6fe', flexShrink: 0 }} />
+
+        {/* IPO 目标 */}
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 2 }}>IPO 目标</div>
+          <div style={{ fontSize: 9, color: C.sub, lineHeight: 1.6 }}>
+            以 <strong style={{ color: '#7c3aed' }}>2027-12-31</strong> 前在纽交所 / 纳斯达克 / 港交所 / 上交所 / 深交所完成合格 IPO
+          </div>
+        </div>
+
+        {/* 分隔线 */}
+        <div style={{ width: 1, alignSelf: 'stretch', background: '#ddd6fe', flexShrink: 0 }} />
+
+        {/* 集团营收门槛：4年横排 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 4 }}>
+            集团整体营业收入（不低于，2023-2026年）
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+            {[
+              { y: 2023, min: 5  },
+              { y: 2024, min: 9  },
+              { y: 2025, min: 20 },
+              { y: 2026, min: 40 },
+            ].map(({ y, min }) => {
+              const isPast = y < year
+              const isCur  = y === year
+              return (
+                <div key={y} style={{ flex: 1, opacity: isPast ? 0.55 : 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontSize: 9, color: isCur ? '#7c3aed' : C.muted, fontWeight: isCur ? 700 : 400 }}>
+                      {y}{isCur ? ' ▶' : ''}
+                    </span>
+                    <span style={{ fontSize: 9, color: '#7c3aed', fontWeight: 600 }}>≥{min}亿</span>
+                  </div>
+                  <div style={{ height: 5, background: '#ede9fe', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 3, transition: 'width 1s ease',
+                      width: isPast ? '100%' : (isCur ? '60%' : '0%'),
+                      background: isPast ? '#a78bfa' : '#7c3aed' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 备注 */}
+        <div style={{ fontSize: 9, color: C.muted, flexShrink: 0, maxWidth: 100, lineHeight: 1.5 }}>
+          * 集团口径<br />含北京/深圳<br />等非苏州主体
         </div>
       </div>
 
