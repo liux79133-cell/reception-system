@@ -269,26 +269,35 @@ function LineChart({ series, height = 90, yMax, showArea = true }) {
 }
 
 // ── KPI 环形组（7个小环）────────────────────────────────────────────────────
-function KpiRingRow({ kpis }) {
+function KpiRingRow({ kpis, activeKey, onSelect }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'nowrap', gap: 4 }}>
       {kpis.map(kpi => {
-        const pct = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
-        const color = sc(kpi.status)
+        const pct    = kpi.completionRate !== null ? Math.min(kpi.completionRate * 100, 100) : 0
+        const color  = sc(kpi.status)
+        const active = kpi.key === activeKey
         return (
-          <div key={kpi.key} style={{ textAlign: 'center', minWidth: 72 }}>
-            <DonutChart percent={pct} color={color} size={72} strokeW={7}
+          <div key={kpi.key}
+            onClick={() => onSelect(kpi.key)}
+            style={{
+              textAlign: 'center', cursor: 'pointer', borderRadius: 10, padding: '4px 6px',
+              background: active ? `${color}14` : 'transparent',
+              border: active ? `1.5px solid ${color}50` : '1.5px solid transparent',
+              transition: 'all 0.18s', minWidth: 0, flex: 1,
+            }}
+          >
+            <DonutChart percent={pct} color={color} size={64} strokeW={7}
               label={pct > 0 ? `${pct.toFixed(0)}` : '—'}
               sublabel="%"
             />
-            <div style={{ fontSize: 11, color: C.text, fontWeight: 600, marginTop: 3, lineHeight: 1.2 }}>{kpi.label}</div>
-            <div style={{ fontSize: 10, color, fontWeight: 500, marginTop: 1 }}>
-              {fmt(kpi.actual, kpi.precision)}<span style={{ color: C.muted }}>{kpi.unit}</span>
+            <div style={{ fontSize: 10, color: active ? color : C.text, fontWeight: active ? 700 : 600, marginTop: 2, lineHeight: 1.2 }}>{kpi.label}</div>
+            <div style={{ fontSize: 9, color, fontWeight: 500, marginTop: 1 }}>
+              {fmt(kpi.actual, kpi.precision)}<span style={{ color: C.muted, marginLeft: 1 }}>{kpi.unit}</span>
             </div>
             {kpi.isCore ? (
-              <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 6, fontWeight: 700, background: '#1d4ed8', color: '#fff', display: 'inline-block', marginTop: 2 }}>核心</span>
+              <span style={{ fontSize: 7, padding: '0 4px', borderRadius: 5, fontWeight: 700, background: '#1d4ed8', color: '#fff', display: 'inline-block', marginTop: 2 }}>核心</span>
             ) : (
-              <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 6, color: '#94a3b8', background: 'rgba(15,23,42,0.06)', display: 'inline-block', marginTop: 2 }}>参考</span>
+              <span style={{ fontSize: 7, padding: '0 4px', borderRadius: 5, color: '#94a3b8', background: 'rgba(15,23,42,0.06)', display: 'inline-block', marginTop: 2 }}>参考</span>
             )}
           </div>
         )
@@ -322,9 +331,10 @@ function Panel({ title, icon, children, style = {}, accent }) {
 // ── 主大屏 ────────────────────────────────────────────────────────────────────
 export default function ScreenPage() {
   const router = useRouter()
-  const [year, setYear]   = useState(2024)
-  const [data, setData]   = useState(null)
-  const [now,  setNow]    = useState(new Date())
+  const [year, setYear]       = useState(2024)
+  const [data, setData]       = useState(null)
+  const [now,  setNow]        = useState(new Date())
+  const [activeKpi, setActiveKpi] = useState('REVENUE') // 点击环形图切换折线图
 
   const load = useCallback(() => {
     api.get('/api/agreement/dashboard', { year }).then(setData).catch(() => {})
@@ -525,65 +535,83 @@ export default function ScreenPage() {
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
+        {(() => {
+          // 根据 activeKpi 决定折线图数据
+          const activeKpiData = data.kpis.find(k => k.key === activeKpi)
+          const chartConfig = {
+            REVENUE:          { series: [{ data: monthly.revenue || [], color: C.blue, label: '月度（亿元）' }, { data: monthly.revenueYTD || [], color: C.indigo, label: '年度累计' }], yMax: activeKpiData?.target },
+            TAX_TOTAL:        { series: [{ data: monthly.tax     || [], color: C.green, label: '综合税收（亿元）' }],                                                                      yMax: activeKpiData?.target },
+            PERSONAL_TAX:     { series: [{ data: monthly.pit     || [], color: C.yellow, label: '个税（亿元）' }],                                                                        yMax: activeKpiData?.target },
+            SOCIAL_INSURANCE: { series: [{ data: monthly.social  || [], color: C.indigo, label: '社保人数（人）' }],                                                                      yMax: activeKpiData?.target },
+          }
+          const cfg = chartConfig[activeKpi] || chartConfig.REVENUE
+          const color = sc(activeKpiData?.status || 'no_data')
 
-          {/* KPI 环形 */}
-          <Panel title={`${year} 年度 KPI 完成率`} icon="◎" accent={C.blue} style={{ flexShrink: 0, padding: '10px 12px' }}>
-            {/* 统计口径提示 */}
-            <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 7, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>📊 统计口径：综合税收 = 苏初 + 苏魔两家合并计算</span>
-              {data.coreKpiConfig && (
-                <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
-                  核心：{data.coreKpiConfig.keys.map(k => {
-                    const kpi = data.kpis.find(x => x.key === k)
-                    return kpi?.label
-                  }).filter(Boolean).join('·')} （{data.coreKpiConfig.keys.map(k => Math.round(data.coreKpiConfig.weights[k]*10)).join(':')}）
-                </span>
-              )}
-            </div>
-            <KpiRingRow kpis={data.kpis} />
-          </Panel>
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* 营业收入折线 */}
-          <Panel title="营业收入月度趋势" icon="📈" accent={C.blue} style={{ flex: 2, overflow: 'hidden', padding: '10px 12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-              {[{ color: C.blue, label: '月度（亿元）' }, { color: C.indigo, label: '年度累计' }].map(s => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <div style={{ width: 12, height: 2, background: s.color, borderRadius: 2 }} />
-                  <span style={{ fontSize: 10, color: C.sub }}>{s.label}</span>
+              {/* KPI 环形行 */}
+              <Panel title={`${year} 年度 KPI 完成率`} icon="◎" accent={C.blue} style={{ flexShrink: 0, padding: '10px 12px' }}>
+                <div style={{ fontSize: 9, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 5, padding: '3px 8px', marginBottom: 7, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>📊 统计口径：综合税收 = 苏初 + 苏魔两家合并计算</span>
+                  {data.coreKpiConfig && (
+                    <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
+                      核心：{data.coreKpiConfig.keys.map(k => data.kpis.find(x => x.key === k)?.label).filter(Boolean).join('·')}
+                      （{data.coreKpiConfig.keys.map(k => Math.round(data.coreKpiConfig.weights[k] * 10)).join(':')}）
+                    </span>
+                  )}
                 </div>
-              ))}
-              <span style={{ marginLeft: 'auto', fontSize: 10, color: C.sub }}>
-                指标 {data.kpis.find(k => k.key === 'REVENUE')?.target} 亿元
-              </span>
-            </div>
-            <LineChart height={88}
-              series={[
-                { data: monthly.revenue    || [], color: C.blue,   label: '月度' },
-                { data: monthly.revenueYTD || [], color: C.indigo,  label: '累计' },
-              ]}
-              yMax={data.kpis.find(k => k.key === 'REVENUE')?.target || undefined}
-            />
-          </Panel>
+                <KpiRingRow kpis={data.kpis} activeKey={activeKpi} onSelect={setActiveKpi} />
+                <div style={{ fontSize: 9, color: C.muted, textAlign: 'center', marginTop: 5 }}>
+                  点击指标环 · 下方折线图切换
+                </div>
+              </Panel>
 
-          {/* 税收 + 社保 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <Panel title="综合税收趋势" icon="💰" accent={C.green} style={{ overflow: 'hidden', padding: '10px 12px' }}>
-              <LineChart height={72}
-                series={[{ data: monthly.tax || [], color: C.green, label: '税收（亿）' }]}
-              />
-            </Panel>
-            <Panel title="社保人数变化" icon="👥" accent={C.indigo} style={{ overflow: 'hidden', padding: '10px 12px' }}>
-              <div style={{ fontSize: 9, color: C.sub, textAlign: 'right', marginBottom: 2 }}>
-                指标 {data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target} 人
-              </div>
-              <LineChart height={64}
-                series={[{ data: monthly.social || [], color: C.indigo, label: '人数' }]}
-                yMax={data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')?.target || undefined}
-              />
-            </Panel>
-          </div>
-        </div>
+              {/* 动态折线图：随点击切换 */}
+              <Panel
+                title={activeKpiData ? `${activeKpiData.label} · 月度趋势` : '月度趋势'}
+                icon="📈"
+                accent={color}
+                style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '10px 12px' }}
+              >
+                {/* 图例 + 指标值 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                  {cfg.series.map(s => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 12, height: 2, background: s.color, borderRadius: 2 }} />
+                      <span style={{ fontSize: 10, color: C.sub }}>{s.label}</span>
+                    </div>
+                  ))}
+                  {activeKpiData?.target != null && (
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: C.sub }}>
+                      指标 {activeKpiData.target} {activeKpiData.unit}
+                    </span>
+                  )}
+                  {activeKpiData?.actual != null && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color }}>
+                      实绩 {fmt(activeKpiData.actual, activeKpiData.precision)} {activeKpiData.unit}
+                      {activeKpiData.completionRate != null && (
+                        <span style={{ marginLeft: 4, fontSize: 9 }}>（{(activeKpiData.completionRate * 100).toFixed(1)}%）</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <LineChart
+                  height={180}
+                  series={cfg.series}
+                  yMax={cfg.yMax || undefined}
+                />
+                {/* 无月度数据提示 */}
+                {cfg.series.every(s => s.data.every(d => d.value === null)) && (
+                  <div style={{ textAlign: 'center', color: C.muted, fontSize: 12, marginTop: 8 }}>
+                    暂无月度数据 · 前往数据中台录入
+                  </div>
+                )}
+              </Panel>
+
+            </div>
+          )
+        })()}
 
         {/* ══ 右列 ══════════════════════════════════════════════════ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'hidden' }}>
