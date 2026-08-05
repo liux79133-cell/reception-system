@@ -175,11 +175,6 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
               </Tooltip>
             )}
           </div>
-          {kpi.note && kpi.note.includes('合并') && (
-            <span style={{ fontSize: 9, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '1px 6px', display: 'inline-block', lineHeight: 1.6 }}>
-              {kpi.note.split('·')[0].trim()}
-            </span>
-          )}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {kpi.isCore ? (
               <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, fontWeight: 700,
@@ -209,9 +204,9 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
       </div>
 
       {/* 实绩数字 */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 10, position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 8, position: 'relative' }}>
         <span style={{
-          fontSize: 30, fontWeight: 900, lineHeight: 1,
+          fontSize: 28, fontWeight: 900, lineHeight: 1,
           background: hasVal ? `linear-gradient(135deg, ${g.from}, ${g.to})` : 'none',
           WebkitBackgroundClip: hasVal ? 'text' : 'unset',
           WebkitTextFillColor: hasVal ? 'transparent' : '#cbd5e1',
@@ -225,41 +220,8 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
         )}
       </div>
 
-      {/* 进度条 + 三色分区 */}
-      <div style={{ marginBottom: 7 }}>
-        <div style={{ height: 8, background: '#f0f2f7', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-          <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'70%', background:'#fef2f2' }} />
-          <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:'20%', background:'#fffbeb' }} />
-          <div style={{ position:'absolute', left:'90%', top:0, bottom:0, right:0, background:'#f0fdf4' }} />
-          <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:1.5, background:'rgba(239,68,68,0.35)', zIndex:2 }} />
-          <div style={{ position:'absolute', left:'90%', top:0, bottom:0, width:1.5, background:'rgba(16,185,129,0.45)', zIndex:2 }} />
-          <div style={{
-            position:'absolute', left:0, top:0, bottom:0,
-            width: `${pct}%`, borderRadius: 4,
-            background: hasVal
-              ? pct < 70  ? 'linear-gradient(90deg,#fca5a5,#ef4444)'
-              : pct < 90  ? 'linear-gradient(90deg,#fcd34d,#f59e0b)'
-              :              'linear-gradient(90deg,#6ee7b7,#10b981)'
-              : '#e2e8f0',
-            transition: 'width 0.8s ease',
-            boxShadow: hasVal ? `0 0 6px ${g.glow}` : 'none',
-          }} />
-        </div>
-        {/* 刻度：显示实际阈值数值 */}
-        {kpi.target != null && (
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:3, position:'relative', height:24 }}>
-            <span style={{ position:'absolute', left:'70%', transform:'translateX(-50%)', fontSize:8, color:'#ef4444', whiteSpace:'nowrap', lineHeight:1.2 }}>
-              零补贴线<br/>{fmtDisplay(kpi.target * 0.7, kpi.unit, dispUnit, kpi.precision)}{dispUnit}
-            </span>
-            <span style={{ position:'absolute', left:'90%', transform:'translateX(-50%)', fontSize:8, color:'#10b981', whiteSpace:'nowrap', lineHeight:1.2 }}>
-              全额线<br/>{fmtDisplay(kpi.target * 0.9, kpi.unit, dispUnit, kpi.precision)}{dispUnit}
-            </span>
-          </div>
-        )}
-      </div>
-
       {/* 底部提示 */}
-      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14, position: 'relative', marginTop: 8 }}>
+      <div style={{ fontSize: 11, color: '#94a3b8', minHeight: 14 }}>
         {kpi.status === 'compliant' && (
           <span style={{ color: '#059669', fontWeight: 600 }}>✓ 已达全额补贴线</span>
         )}
@@ -1057,18 +1019,25 @@ export default function LandingPage() {
                           </span>
                         </div>
                       )}
-                      {/* KPI 卡片横排 */}
+                      {/* KPI 卡片横排：核心考核在前，参考现状在后 */}
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
-                        {data.kpis.map(kpi => (
-                          <div key={kpi.key} style={{ flex: '0 0 calc(14.28% - 9px)', minWidth: 150 }}>
-                            <KpiCard
-                              kpi={kpi}
-                              isActive={activeKpi === kpi.key}
-                              onClick={() => setActiveKpi(kpi.key === activeKpi ? null : kpi.key)}
-                              displayUnit={displayUnit}
-                            />
-                          </div>
-                        ))}
+                        {[...data.kpis]
+                          .sort((a, b) => {
+                            if (a.isCore && !b.isCore) return -1
+                            if (!a.isCore && b.isCore) return 1
+                            return 0
+                          })
+                          .map(kpi => (
+                            <div key={kpi.key} style={{ flex: '0 0 calc(14.28% - 9px)', minWidth: 148 }}>
+                              <KpiCard
+                                kpi={kpi}
+                                isActive={activeKpi === kpi.key}
+                                onClick={() => setActiveKpi(kpi.key === activeKpi ? null : kpi.key)}
+                                displayUnit={displayUnit}
+                              />
+                            </div>
+                          ))
+                        }
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
