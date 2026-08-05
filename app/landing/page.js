@@ -166,7 +166,15 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
       {/* 顶部：指标名 + 核心/参考标签 + 状态标签 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, position: 'relative' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
-          <span style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.3 }}>{kpi.label}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.3 }}>{kpi.label}</span>
+            {/* 社保人数低于零补贴线时显示预警图标 */}
+            {kpi.key === 'SOCIAL_INSURANCE' && kpi.status === 'risk' && (
+              <Tooltip title="社保人数低于协议底线（70%），存在零补贴风险">
+                <WarningOutlined style={{ color: '#ef4444', fontSize: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              </Tooltip>
+            )}
+          </div>
           {kpi.note && kpi.note.includes('合并') && (
             <span style={{ fontSize: 9, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '1px 6px', display: 'inline-block', lineHeight: 1.6 }}>
               {kpi.note.split('·')[0].trim()}
@@ -220,15 +228,11 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
       {/* 进度条 + 三色分区 */}
       <div style={{ marginBottom: 7 }}>
         <div style={{ height: 8, background: '#f0f2f7', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-          {/* 三色背景分区：<70% 红色底、70-90% 橙色底、≥90% 绿色底 */}
           <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'70%', background:'#fef2f2' }} />
           <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:'20%', background:'#fffbeb' }} />
           <div style={{ position:'absolute', left:'90%', top:0, bottom:0, right:0, background:'#f0fdf4' }} />
-          {/* 70% 竖线 */}
           <div style={{ position:'absolute', left:'70%', top:0, bottom:0, width:1.5, background:'rgba(239,68,68,0.35)', zIndex:2 }} />
-          {/* 90% 竖线 */}
           <div style={{ position:'absolute', left:'90%', top:0, bottom:0, width:1.5, background:'rgba(16,185,129,0.45)', zIndex:2 }} />
-          {/* 进度填充 */}
           <div style={{
             position:'absolute', left:0, top:0, bottom:0,
             width: `${pct}%`, borderRadius: 4,
@@ -241,11 +245,17 @@ function KpiCard({ kpi, isActive, onClick, displayUnit }) {
             boxShadow: hasVal ? `0 0 6px ${g.glow}` : 'none',
           }} />
         </div>
-        {/* 刻度标注 */}
-        <div style={{ display:'flex', justifyContent:'space-between', marginTop:2, paddingRight:0, position:'relative' }}>
-          <span style={{ fontSize:8, color:'#fca5a5', position:'absolute', left:'70%', transform:'translateX(-50%)' }}>70%</span>
-          <span style={{ fontSize:8, color:'#6ee7b7', position:'absolute', left:'90%', transform:'translateX(-50%)' }}>90%</span>
-        </div>
+        {/* 刻度：显示实际阈值数值 */}
+        {kpi.target != null && (
+          <div style={{ display:'flex', justifyContent:'space-between', marginTop:3, position:'relative', height:24 }}>
+            <span style={{ position:'absolute', left:'70%', transform:'translateX(-50%)', fontSize:8, color:'#ef4444', whiteSpace:'nowrap', lineHeight:1.2 }}>
+              零补贴线<br/>{fmtDisplay(kpi.target * 0.7, kpi.unit, dispUnit, kpi.precision)}{dispUnit}
+            </span>
+            <span style={{ position:'absolute', left:'90%', transform:'translateX(-50%)', fontSize:8, color:'#10b981', whiteSpace:'nowrap', lineHeight:1.2 }}>
+              全额线<br/>{fmtDisplay(kpi.target * 0.9, kpi.unit, dispUnit, kpi.precision)}{dispUnit}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 底部提示 */}
@@ -984,6 +994,37 @@ export default function LandingPage() {
                   ),
                   children: (
                     <div data-kpi-section="true">
+                      {/* ── 社保人数红色预警横幅 ── */}
+                      {(() => {
+                        const si = data.kpis.find(k => k.key === 'SOCIAL_INSURANCE')
+                        if (!si || si.status !== 'risk' || si.actual == null) return null
+                        const line70 = si.target != null ? Math.round(si.target * 0.7) : null
+                        return (
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            marginBottom: 12, padding: '10px 16px',
+                            background: 'linear-gradient(135deg,#fef2f2,#fff1f2)',
+                            border: '1.5px solid #fecdd3', borderRadius: 10,
+                            boxShadow: '0 2px 8px rgba(239,68,68,0.12)',
+                          }}>
+                            <WarningOutlined style={{ color: '#ef4444', fontSize: 18, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>
+                                ⚠️ 当前人员规模低于协议约定底线，请及时关注
+                              </div>
+                              <div style={{ fontSize: 11, color: '#f87171' }}>
+                                苏初 + 苏魔合并社保人数 <strong>{Number(si.actual).toLocaleString()} 人</strong>，
+                                协议零补贴底线 {line70 != null ? `${line70} 人` : `目标值 × 70%`}（目标 {si.target} 人），
+                                差距 <strong>{line70 != null ? `${line70 - si.actual} 人` : '—'}</strong>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 20, fontWeight: 700, color: '#fff', background: '#ef4444', flexShrink: 0 }}>
+                              零补贴风险
+                            </span>
+                          </div>
+                        )
+                      })()}
+
                       {/* 统计口径提示 */}
                       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'7px 14px', background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fde68a', borderRadius:9, flexWrap:'wrap' }}>
                         <span style={{ fontSize:11, fontWeight:700, color:'#92400e' }}>📊 统计口径</span>
