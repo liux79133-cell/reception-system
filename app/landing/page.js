@@ -323,15 +323,29 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
                     boxShadow: `0 0 8px ${s.bar}66`,
                   }} />
                 </div>
-                <div style={{ display:'flex', justifyContent:'space-between', marginTop:3, position:'relative', height:10 }}>
-                  <span style={{ position:'absolute', left:'70%', transform:'translateX(-50%)', fontSize:9, color:'#ef4444', fontWeight:600 }}>零补贴线 70%</span>
-                  <span style={{ position:'absolute', left:'90%', transform:'translateX(-50%)', fontSize:9, color:'#10b981', fontWeight:600 }}>全额线 90%</span>
-                </div>
-                {gap && (
-                  <div style={{ fontSize: 11, color: s.color, marginTop: 6, fontWeight: 500 }}>
-                    还需 <strong>{gap}</strong> 才能解锁全额补贴
-                  </div>
-                )}
+                {/* 两条线下方分别显示距离提示 */}
+                {(() => {
+                  const gap70Raw = actual !== null && target > 0 ? Math.max(0, target * 0.7 - actual) : null
+                  const gap90Raw = actual !== null && target > 0 ? Math.max(0, target * 0.9 - actual) : null
+                  const gap70 = gap70Raw > 0.00001 ? fmtGap(gap70Raw, kpi.unit, kpi.precision) : null
+                  const gap90 = gap90Raw > 0.00001 ? fmtGap(gap90Raw, kpi.unit, kpi.precision) : null
+                  return (
+                    <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, position:'relative', minHeight:28 }}>
+                      <span style={{ position:'absolute', left:'70%', transform:'translateX(-50%)', textAlign:'center', lineHeight:1.3 }}>
+                        <span style={{ display:'block', fontSize:8, color:'#ef4444', fontWeight:700 }}>零补贴线</span>
+                        <span style={{ display:'block', fontSize:8, color: gap70 ? '#ef4444' : '#10b981', fontWeight:600 }}>
+                          {gap70 ? `还差 ${gap70}` : '✓ 已超过'}
+                        </span>
+                      </span>
+                      <span style={{ position:'absolute', left:'90%', transform:'translateX(-50%)', textAlign:'center', lineHeight:1.3 }}>
+                        <span style={{ display:'block', fontSize:8, color:'#10b981', fontWeight:700 }}>全额线</span>
+                        <span style={{ display:'block', fontSize:8, color: gap90 ? '#f59e0b' : '#10b981', fontWeight:600 }}>
+                          {gap90 ? `还差 ${gap90}` : '✓ 已超过'}
+                        </span>
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
             )
           }
