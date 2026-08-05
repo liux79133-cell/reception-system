@@ -517,6 +517,12 @@ export default function LandingPage() {
   const [aiApplying, setAiApplying]       = useState(false)
   // 协议类型：'current'=2024-2028当前协议 | 'historic'=历史参考协议
   const [aiParseType, setAiParseType]     = useState('current')
+  // 快速录入 Modal
+  const [quickInputModal, setQuickInputModal] = useState(false)
+  const [quickInputMode, setQuickInputMode]   = useState('annual') // annual | monthly
+  const [quickInputMonth, setQuickInputMonth] = useState(dayjs().subtract(1,'month').month() + 1)
+  const [quickFields, setQuickFields]         = useState({})
+  const [quickSaving, setQuickSaving]         = useState(false)
   // 协议文件
   const [files, setFiles]         = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -644,6 +650,49 @@ export default function LandingPage() {
       fetchDashboard(year)
     } catch (e) { message.error('保存失败：' + e) }
     finally { setTargetSaving(false) }
+  }
+
+  // 快速录入保存
+  const saveQuickInput = async () => {
+    const filled = Object.entries(quickFields).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    if (filled.length === 0) return message.error('请至少填写一个字段')
+    setQuickSaving(true)
+    try {
+      // 统一换算为亿元存储（与数据中台一致）
+      const MONEY_FIELDS = ['revenue','revenueSuzhou','vatPaidSuzhou','citPaidSuzhou','pitSuzhou','vatPayable','citPayable','rdExpense']
+      const financePayload = {}, hrPayload = {}, ipPayload = {}
+      const FIELD_CAT = {
+        revenue: 'finance', revenueSuzhou: 'finance',
+        vatPaidSuzhou: 'finance', citPaidSuzhou: 'finance',
+        pitSuzhou: 'finance', vatPayable: 'finance',
+        citPayable: 'finance', rdExpense: 'finance',
+        socialInsuranceCount: 'hr', nationalTalentNew: 'hr',
+        industryChainCount: 'hr', nationalTalentCount: 'hr',
+        coreStaffCount: 'hr', executiveCount: 'hr', highEarnerCount: 'hr',
+        inventionPatentNew: 'ip', inventionPatentApplied: 'ip',
+        inventionPatentGranted: 'ip', utilityPatent: 'ip', softwareCopyright: 'ip',
+      }
+      filled.forEach(([k, v]) => {
+        const val = MONEY_FIELDS.includes(k) ? Number(v) / 1e8 : Number(v)
+        const cat = FIELD_CAT[k]
+        if (cat === 'finance') financePayload[k] = val
+        else if (cat === 'hr') hrPayload[k] = val
+        else if (cat === 'ip') ipPayload[k] = val
+      })
+      const period = quickInputMode === 'annual'
+        ? String(year)
+        : `${year}-${String(quickInputMonth).padStart(2,'0')}`
+      const saves = []
+      if (Object.keys(financePayload).length > 0) saves.push(api.post('/api/agreement/data', { period, category: 'finance', payload: financePayload }))
+      if (Object.keys(hrPayload).length > 0)      saves.push(api.post('/api/agreement/data', { period, category: 'hr',      payload: hrPayload      }))
+      if (Object.keys(ipPayload).length > 0)       saves.push(api.post('/api/agreement/data', { period, category: 'ip',      payload: ipPayload       }))
+      await Promise.all(saves)
+      message.success(`数据已保存（${period}），KPI 卡片同步更新`)
+      setQuickInputModal(false)
+      setQuickFields({})
+      fetchDashboard(year)
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setQuickSaving(false) }
   }
 
   // AI 解析协议 PDF
@@ -930,14 +979,16 @@ export default function LandingPage() {
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>天</span>
                   </div>
                 )}
-                {/* 录入数据 */}
-                <Button
-                  onClick={() => router.push('/data-center')}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.85)', borderRadius: 8 }}
-                  icon={<DatabaseOutlined />}
-                >
-                  录入数据
-                </Button>
+                {/* 快速录入 */}
+                {canEdit && (
+                  <Button
+                    onClick={() => { setQuickFields({}); setQuickInputModal(true) }}
+                    style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 8, fontWeight: 600 }}
+                    icon={<DatabaseOutlined />}
+                  >
+                    录入数据
+                  </Button>
+                )}
                 {/* 数据大屏 */}
                 <Button onClick={() => router.push('/screen')} style={{
                   background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
@@ -2046,6 +2097,132 @@ export default function LandingPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── 快速录入 Modal ──────────────────────────────────────────── */}
+      <Modal
+        title={
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:30, height:30, borderRadius:8, background:'linear-gradient(135deg,#1d4ed8,#3b82f6)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <DatabaseOutlined style={{ color:'#fff', fontSize:14 }} />
+            </div>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700 }}>快速录入数据</div>
+              <div style={{ fontSize:11, color:'#94a3b8', fontWeight:400 }}>
+                {year} 年 · 保存后 KPI 卡片与数据大屏自动同步
+              </div>
+            </div>
+          </div>
+        }
+        open={quickInputModal}
+        onCancel={() => setQuickInputModal(false)}
+        onOk={saveQuickInput}
+        confirmLoading={quickSaving}
+        okText="保存并同步" cancelText="取消"
+        width={600}
+        styles={{ body:{ paddingTop:14 } }}
+      >
+        {/* 录入模式切换 */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16, padding:'8px 12px', background:'#f8fafc', borderRadius:8, border:'1px solid #e2e8f0' }}>
+          <span style={{ fontSize:12, color:'#475569', fontWeight:600 }}>录入模式：</span>
+          {[
+            { key:'annual',  label:`${year} 年度汇总` },
+            { key:'monthly', label:'按月录入' },
+          ].map(m => (
+            <div key={m.key} onClick={() => setQuickInputMode(m.key)} style={{
+              padding:'4px 14px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:600,
+              background: quickInputMode===m.key ? '#1d4ed8' : '#fff',
+              color:      quickInputMode===m.key ? '#fff'    : '#64748b',
+              border:`1px solid ${quickInputMode===m.key ? '#1d4ed8' : '#e2e8f0'}`,
+              transition:'all 0.15s',
+            }}>{m.label}</div>
+          ))}
+          {quickInputMode==='monthly' && (
+            <Select
+              value={quickInputMonth}
+              onChange={setQuickInputMonth}
+              size="small" style={{ width:80 }}
+              options={Array.from({length:12},(_,i)=>({ value:i+1, label:`${i+1} 月` }))}
+            />
+          )}
+          <span style={{ marginLeft:'auto', fontSize:11, color:'#94a3b8' }}>
+            存储路径：与数据中台共用同一张表
+          </span>
+        </div>
+
+        {/* 字段分组 */}
+        {[
+          {
+            title:'💰 财务数据', color:'#1d4ed8',
+            note:'金额单位：元（系统自动换算为亿元存储）',
+            fields:[
+              { key:'revenue',       label:'营业收入',          kpi:'REVENUE',      unit:'元', placeholder:'如：160370000' },
+              { key:'vatPaidSuzhou', label:'增值税实缴苏州',     kpi:'TAX_TOTAL',    unit:'元', placeholder:'如：5000000' },
+              { key:'citPaidSuzhou', label:'企业所得税实缴苏州', kpi:'TAX_TOTAL',    unit:'元', placeholder:'如：3000000' },
+              { key:'pitSuzhou',     label:'个人所得税苏州代扣', kpi:'PERSONAL_TAX', unit:'元', placeholder:'如：2000000' },
+            ],
+          },
+          {
+            title:'👥 人才数据', color:'#7c3aed',
+            note:'人数类填实际人数',
+            fields:[
+              { key:'socialInsuranceCount', label:'苏州社保参保人数（苏初+苏魔合并）', kpi:'SOCIAL_INSURANCE', unit:'人', placeholder:'如：350' },
+              { key:'nationalTalentNew',    label:'国家级人才有效申报（本年）',         kpi:'NATIONAL_TALENT',  unit:'人', placeholder:'如：1' },
+              { key:'industryChainCount',   label:'已引进产业链企业数',                kpi:'INDUSTRY_CHAIN',   unit:'家', placeholder:'如：0' },
+            ],
+          },
+          {
+            title:'🔬 知识产权', color:'#059669',
+            note:'项数类填本年新增数',
+            fields:[
+              { key:'inventionPatentNew', label:'发明专利申请（本年新增）', kpi:'INVENTION_PATENT', unit:'项', placeholder:'如：30' },
+            ],
+          },
+        ].map(group => (
+          <div key={group.title} style={{ marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <span style={{ fontSize:13, fontWeight:700, color:group.color }}>{group.title}</span>
+              <span style={{ fontSize:11, color:'#94a3b8' }}>{group.note}</span>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {group.fields.map(f => {
+                const kpiData = data?.kpis.find(k => k.key === f.kpi)
+                const isMoneyField = f.unit === '元'
+                return (
+                  <div key={f.key} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ flex:'0 0 180px', fontSize:12, color:'#374151', fontWeight:500 }}>
+                      {f.label}
+                      {kpiData?.isCore && (
+                        <span style={{ marginLeft:4, fontSize:9, padding:'0 4px', borderRadius:5, background:'#1d4ed8', color:'#fff', fontWeight:700 }}>核心</span>
+                      )}
+                    </div>
+                    <InputNumber
+                      value={quickFields[f.key] ?? null}
+                      onChange={v => setQuickFields(p => ({ ...p, [f.key]: v }))}
+                      min={0}
+                      precision={isMoneyField ? 0 : 0}
+                      style={{ flex:1 }}
+                      placeholder={f.placeholder}
+                      addonAfter={<span style={{ color:'#94a3b8', fontSize:11 }}>{f.unit}</span>}
+                    />
+                    {/* 当前已录实绩（参考） */}
+                    {kpiData?.actual != null && (
+                      <span style={{ fontSize:11, color:'#94a3b8', whiteSpace:'nowrap', flex:'0 0 auto' }}>
+                        当前：{kpiData.unit === '亿元'
+                          ? `${(kpiData.actual * 1e8).toLocaleString()} 元`
+                          : `${kpiData.actual} ${kpiData.unit}`}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+
+        <div style={{ padding:'8px 12px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:8, fontSize:11, color:'#166534' }}>
+          ✅ 保存后数据实时写入，落地协议 KPI 卡片和数据大屏均自动更新，无需重复录入
+        </div>
       </Modal>
     </AppLayout>
   )
