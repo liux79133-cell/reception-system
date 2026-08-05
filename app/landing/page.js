@@ -36,8 +36,9 @@ const DISPLAY_UNITS = { '亿元': ['亿元', '万元', '元'], '人': ['人'], '
 function cvtDisplay(val, baseUnit, dispUnit) {
   if (val == null) return null
   if (baseUnit === '亿元') {
-    if (dispUnit === '万元') return val * 10000
-    if (dispUnit === '元')   return val * 1e8
+    if (dispUnit === '千万元') return val * 10
+    if (dispUnit === '万元')   return val * 10000
+    if (dispUnit === '元')     return val * 1e8
   }
   return val
 }
@@ -1027,10 +1028,12 @@ export default function LandingPage() {
                 <Select
                   value={displayUnit}
                   onChange={setDisplayUnit}
-                  style={{ width: 76 }}
+                  style={{ width: 82 }}
                   options={[
-                    { value: '亿元', label: '亿元' },
-                    { value: '万元', label: '万元' },
+                    { value: '亿元',  label: '亿元'  },
+                    { value: '千万元', label: '千万元' },
+                    { value: '万元',  label: '万元'  },
+                    { value: '元',    label: '元'    },
                   ]}
                 />
                 {/* 倒计时小胶囊 */}
@@ -1222,12 +1225,16 @@ export default function LandingPage() {
                           })
                         })
 
+                        // 换算+格式化（亿元类字段跟随 displayUnit；其他单位原样）
                         const fmtN = (v, unit, precision) => {
                           if (v === null || v === undefined) return '—'
-                          const p = precision ?? (unit === '亿元' ? 2 : 0)
-                          if (p === 0) return Number(v).toLocaleString()
-                          return Number(v).toFixed(p).replace(/\.?0+$/, '')
+                          const converted = unit === '亿元' ? cvtDisplay(v, '亿元', displayUnit) : v
+                          const dispU = unit === '亿元' ? displayUnit : unit
+                          const p = precision ?? (dispU === '元' ? 0 : dispU === '万元' || dispU === '千万元' ? 2 : 3)
+                          if (p === 0) return Number(converted).toLocaleString()
+                          return Number(converted).toFixed(p).replace(/\.?0+$/, '')
                         }
+                        const tableUnit = (unit) => unit === '亿元' ? displayUnit : unit
 
                         // 实绩状态色
                         const actualColor = (actualVal, targetVal) => {
@@ -1282,10 +1289,10 @@ export default function LandingPage() {
                                     {[
                                       { label: '指标',        align: 'left',   width: 130 },
                                       { label: '年份',        align: 'center', width: 72 },
-                                      { label: '协议指标值',  align: 'center', width: 110 },
-                                      { label: '基础线（70%）', align: 'center', width: 110 },
-                                      { label: '全额线（90%）', align: 'center', width: 110 },
-                                      { label: '当前实绩',    align: 'center', width: 110 },
+                                      { label: `协议指标值（${displayUnit}）`,  align: 'center', width: 120 },
+                                      { label: `基础线 70%（${displayUnit}）`,  align: 'center', width: 120 },
+                                      { label: `全额线 90%（${displayUnit}）`,  align: 'center', width: 120 },
+                                      { label: `当前实绩（${displayUnit}）`,    align: 'center', width: 120 },
                                     ].map((col, i) => (
                                       <th key={i} style={{
                                         padding: '10px 14px', textAlign: col.align, fontWeight: 600,
@@ -1333,7 +1340,7 @@ export default function LandingPage() {
                                                 ) : (
                                                   <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>参考</span>
                                                 )}
-                                                <span style={{ fontSize: 9, color: '#94a3b8' }}>{kpi.unit}</span>
+                                                <span style={{ fontSize: 9, color: '#94a3b8' }}>{tableUnit(kpi.unit)}</span>
                                               </div>
                                             </div>
                                           </td>
@@ -1370,19 +1377,19 @@ export default function LandingPage() {
                                             />
                                           ) : (
                                             <span style={{ fontWeight: 600, color: hasTarget ? '#0f172a' : '#cbd5e1' }}>
-                                              {hasTarget ? `${fmtN(targetVal, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                              {hasTarget ? `${fmtN(targetVal, kpi.unit, precision)}` : '—'}
                                             </span>
                                           )}
                                         </td>
 
                                         {/* 基础线 70% */}
                                         <td style={{ padding: '9px 14px', textAlign: 'center', color: '#ef4444', fontWeight: 500, borderRight: '1px solid #f1f5f9', fontSize: 13 }}>
-                                          {hasTarget ? `${fmtN(line70, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                          {hasTarget ? fmtN(line70, kpi.unit, precision) : '—'}
                                         </td>
 
                                         {/* 全额线 90% */}
                                         <td style={{ padding: '9px 14px', textAlign: 'center', color: '#10b981', fontWeight: 500, borderRight: '1px solid #f1f5f9', fontSize: 13 }}>
-                                          {hasTarget ? `${fmtN(line90, kpi.unit, precision)}${kpi.unit}` : '—'}
+                                          {hasTarget ? fmtN(line90, kpi.unit, precision) : '—'}
                                         </td>
 
                                         {/* 当前实绩 */}
@@ -1390,7 +1397,7 @@ export default function LandingPage() {
                                           {isCurYear ? (
                                             actualVal !== null ? (
                                               <span style={{ fontWeight: 700, color: aColor }}>
-                                                {fmtN(actualVal, kpi.unit, precision)}{kpi.unit}
+                                                {fmtN(actualVal, kpi.unit, precision)}
                                               </span>
                                             ) : (
                                               <span style={{ color: '#94a3b8', fontSize: 12 }}>待录入</span>

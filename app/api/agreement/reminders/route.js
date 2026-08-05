@@ -124,7 +124,7 @@ export async function GET(request) {
       const doneKey = `${baseKey}_${dueDate.slice(0,4)}`
       const isDone  = doneSet.has(doneKey)
       const effectivePriority = (!isDone && daysLeft <= r.urgentDays) ? 'high' : r.priority
-      return {
+      return [{
         id:           r.id,
         title:        r.title,
         articleRef:   r.articleRef,
@@ -140,7 +140,7 @@ export async function GET(request) {
         sortOrder:    -1,
         createdAt:    new Date(0).toISOString(),
         updatedAt:    new Date(0).toISOString(),
-      }]  // flatMap: 返回单元素数组，隐藏时返回空数组 []
+      }]
     }).sort((a, b) => a.daysLeft - b.daysLeft)
 
     // 用户自定义提醒
