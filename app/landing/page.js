@@ -436,6 +436,59 @@ function KpiLadder({ kpi, allYearTargets, currentYear }) {
   )
 }
 
+// ── 协议文件卡片 ──────────────────────────────────────────────────────────────
+function FileCard({ f, token, canEdit, onDelete, FILE_CATS, CAT_COLOR, fileIcon, fmtSize, isHistoric }) {
+  const ct = CAT_COLOR[f.category] || CAT_COLOR.other
+  const catLabel = FILE_CATS.find(c => c.key === f.category)?.label || '其他'
+  return (
+    <div style={{
+      background: isHistoric ? '#fafafa' : '#fff',
+      borderRadius: 12, border: `1px solid ${isHistoric ? '#e8ecf4' : '#e2e8f0'}`,
+      padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'box-shadow 0.15s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {fileIcon(f.mimeType, f.name)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }} title={f.name}>{f.name}</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, color: ct.color, background: ct.bg, border: `1px solid ${ct.border}` }}>{catLabel}</span>
+            {/* 协议状态标签 */}
+            {isHistoric ? (
+              <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 600, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>历史参考</span>
+            ) : (
+              <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0' }}>进行中</span>
+            )}
+            {f.year && <span style={{ fontSize: 9, color: '#94a3b8' }}>{f.year} 年</span>}
+            {f.size && <span style={{ fontSize: 11, color: '#94a3b8' }}>{fmtSize(f.size)}</span>}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 7 }}>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>{dayjs(f.createdAt).format('YYYY-MM-DD')}</span>
+        <div style={{ display: 'flex', gap: 2 }}>
+          <a href={`/api/agreement/files/${f.id}/view?token=${token}`} target="_blank" rel="noopener noreferrer">
+            <Button type="text" size="small" icon={<EyeOutlined />} style={{ color: '#3b82f6', padding: '0 6px' }}>查看</Button>
+          </a>
+          <a href={`/api/agreement/files/${f.id}/view?download=1&token=${token}`} target="_blank" rel="noopener noreferrer">
+            <Button type="text" size="small" icon={<DownloadOutlined />} style={{ color: '#64748b', padding: '0 6px' }}>下载</Button>
+          </a>
+          {canEdit && (
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ padding: '0 6px' }}
+              onClick={() => Modal.confirm({ title: '确认删除', content: `确定删除「${f.name}」？`, okText: '删除', okType: 'danger', cancelText: '取消', onOk: () => onDelete(f.id, f.name) })}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const router = useRouter()
@@ -471,6 +524,12 @@ export default function LandingPage() {
   const [addKpiModal, setAddKpiModal] = useState(false)
   const [addKpiForm, setAddKpiForm]   = useState({ label: '', unit: '亿元', precision: 2, category: 'finance', dataField: '', targets: {}, weight: 0.05, note: '' })
   const [addKpiSaving, setAddKpiSaving] = useState(false)
+  // AI 解析协议
+  const [aiParseModal, setAiParseModal]   = useState(false)
+  const [aiParsing, setAiParsing]         = useState(false)
+  const [aiResult, setAiResult]           = useState(null)   // 解析结果
+  const [aiApplying, setAiApplying]       = useState(false)
+  const [aiParseYear, setAiParseYear]     = useState(null)   // 关联年份
   // 协议文件
   const [files, setFiles]         = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -598,6 +657,50 @@ export default function LandingPage() {
       fetchDashboard(year)
     } catch (e) { message.error('保存失败：' + e) }
     finally { setTargetSaving(false) }
+  }
+
+  // AI 解析协议 PDF
+  const handleAiParse = async ({ file, onSuccess, onError }) => {
+    setAiParsing(true)
+    setAiResult(null)
+    try {
+      const tkn = localStorage.getItem('token')
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/agreement/ai-parse', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tkn}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '解析失败')
+      setAiResult(data.result)
+      onSuccess(data)
+    } catch (e) { message.error('AI 解析失败：' + e.message); onError(e) }
+    finally { setAiParsing(false) }
+  }
+
+  const applyAiResult = async () => {
+    if (!aiResult?.kpiTargets) return
+    setAiApplying(true)
+    try {
+      // 合并到现有 targetDraft
+      const merged = JSON.parse(JSON.stringify(remoteTargets || {}))
+      for (const [key, years] of Object.entries(aiResult.kpiTargets)) {
+        if (!merged[key]) merged[key] = {}
+        for (const [yr, val] of Object.entries(years)) {
+          if (val !== null && val !== undefined) merged[key][yr] = val
+        }
+      }
+      await api.post('/api/agreement/targets', merged)
+      setRemoteTargets(merged)
+      setTargetDraft(JSON.parse(JSON.stringify(merged)))
+      message.success('AI 解析结果已应用，KPI 卡片同步更新')
+      setAiParseModal(false)
+      setAiResult(null)
+      fetchDashboard(year)
+    } catch (e) { message.error('应用失败：' + e) }
+    finally { setAiApplying(false) }
   }
 
   const handleUpload = async ({ file, onSuccess, onError }) => {
@@ -1320,25 +1423,10 @@ export default function LandingPage() {
                   children: (
                     <Spin spinning={filesLoading}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {/* 申请材料快捷上传入口 */}
-                        {canEdit && (
-                          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fde68a', borderRadius:12 }}>
-                            <div style={{ fontSize:20 }}>📋</div>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>落地协议申请材料</div>
-                              <div style={{ fontSize:11, color:'#a16207' }}>上传历年补贴申请时的计算方式说明、审计附件等材料</div>
-                            </div>
-                            <Upload customRequest={handleFileUpload} showUploadList={false}
-                              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" multiple
-                              beforeUpload={() => { setFileCat('application'); return true }}>
-                              <Button icon={<UploadOutlined />} loading={fileUploading} size="small"
-                                style={{ borderRadius:20, background:'#d97706', borderColor:'#d97706', color:'#fff', fontWeight:600 }}>
-                                上传申请材料
-                              </Button>
-                            </Upload>
-                          </div>
-                        )}
+
+                        {/* ── 顶部操作栏 ── */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                          {/* 分类筛选 */}
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {FILE_CATS.map(c => (
                               <div key={c.key} onClick={() => setFileCat(c.key)} style={{
@@ -1353,77 +1441,121 @@ export default function LandingPage() {
                               </div>
                             ))}
                           </div>
+                          {/* 上传 + AI 解析 */}
                           {canEdit && (
-                            <Upload customRequest={handleFileUpload} showUploadList={false}
-                              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" multiple>
-                              <Button type="primary" icon={<UploadOutlined />} loading={fileUploading}
-                                style={{ background: '#0f172a', borderColor: '#0f172a', borderRadius: 8 }}>
-                                上传文件
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <Button
+                                icon={<span style={{ fontSize: 13 }}>🤖</span>}
+                                onClick={() => { setAiParseModal(true); setAiResult(null) }}
+                                style={{ borderRadius: 8, borderColor: '#6366f1', color: '#6366f1', fontWeight: 600 }}
+                              >
+                                AI 识别协议指标
                               </Button>
-                            </Upload>
+                              <Upload customRequest={handleFileUpload} showUploadList={false}
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" multiple>
+                                <Button type="primary" icon={<UploadOutlined />} loading={fileUploading}
+                                  style={{ background: '#0f172a', borderColor: '#0f172a', borderRadius: 8 }}>
+                                  上传文件
+                                </Button>
+                              </Upload>
+                            </div>
                           )}
                         </div>
 
-                        {filteredFiles.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '48px 24px', background: '#f8fafc', borderRadius: 14, border: '2px dashed #e2e8f0' }}>
-                            <FolderOpenOutlined style={{ fontSize: 40, color: '#cbd5e1', marginBottom: 12 }} />
-                            <div style={{ color: '#94a3b8', fontSize: 14 }}>暂无文件</div>
-                            {canEdit && <div style={{ color: '#cbd5e1', fontSize: 12, marginTop: 4 }}>点击「上传文件」导入协议附件</div>}
-                          </div>
-                        ) : (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                            {filteredFiles.map(f => {
-                              const ct = CAT_COLOR[f.category] || CAT_COLOR.other
-                              const catLabel = FILE_CATS.find(c => c.key === f.category)?.label || '其他'
-                              return (
-                                <div key={f.id} style={{
-                                  background: '#fff', borderRadius: 12, border: '1px solid #e8ecf4',
-                                  padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10,
-                                  boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'box-shadow 0.15s',
-                                }}
-                                  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
-                                  onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                                    <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      {fileIcon(f.mimeType, f.name)}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }} title={f.name}>{f.name}</div>
-                                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                                        <span style={{ fontSize: 10, padding: '1px 8px', borderRadius: 20, fontWeight: 600, color: ct.color, background: ct.bg, border: `1px solid ${ct.border}` }}>{catLabel}</span>
-                                        {/* 协议年份状态标签 */}
-                                        {f.year && f.year <= 2023 && (
-                                          <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 600, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>历史归档</span>
-                                        )}
-                                        {f.year && f.year >= 2024 && (
-                                          <span style={{ fontSize: 9, padding: '1px 7px', borderRadius: 20, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0' }}>运行中</span>
-                                        )}
-                                        {f.size && <span style={{ fontSize: 11, color: '#94a3b8' }}>{fmtSize(f.size)}</span>}
-                                      </div>
-                                    </div>
+                        {/* ── 进行中协议（2024-2028）── */}
+                        {(() => {
+                          const activeFiles = files.filter(f => !f.year || f.year >= 2024)
+                          const displayFiles = fileCat === 'all' ? activeFiles : activeFiles.filter(f => f.category === fileCat)
+                          return (
+                            <div>
+                              {/* 分组标题 */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                <div style={{ width: 3, height: 16, borderRadius: 2, background: '#10b981', flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>进行中协议（2024–2028）</span>
+                                <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 20, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0' }}>进行中</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>{activeFiles.length} 个文件</span>
+                                {/* 申请材料快捷上传 */}
+                                {canEdit && (
+                                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Upload customRequest={handleFileUpload} showUploadList={false}
+                                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" multiple
+                                      beforeUpload={() => { setFileCat('application'); return true }}>
+                                      <Button size="small" icon={<UploadOutlined />} loading={fileUploading}
+                                        style={{ borderRadius: 20, borderColor: '#d97706', color: '#d97706', fontSize: 11 }}>
+                                        上传申请材料
+                                      </Button>
+                                    </Upload>
+                                    <Upload customRequest={handleFileUpload} showUploadList={false}
+                                      accept=".pdf,.doc,.docx,.xls,.xlsx" multiple
+                                      beforeUpload={() => { setFileCat('contract'); return true }}>
+                                      <Button size="small" icon={<UploadOutlined />} loading={fileUploading}
+                                        style={{ borderRadius: 20, borderColor: '#1d4ed8', color: '#1d4ed8', fontSize: 11 }}>
+                                        上传协议原文
+                                      </Button>
+                                    </Upload>
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{dayjs(f.createdAt).format('YYYY-MM-DD HH:mm')}</span>
-                                    <div style={{ display: 'flex', gap: 2 }}>
-                                      <a href={`/api/agreement/files/${f.id}/view?token=${token}`} target="_blank" rel="noopener noreferrer">
-                                        <Button type="text" size="small" icon={<EyeOutlined />} style={{ color: '#3b82f6', padding: '0 6px' }}>查看</Button>
-                                      </a>
-                                      <a href={`/api/agreement/files/${f.id}/view?download=1&token=${token}`} target="_blank" rel="noopener noreferrer">
-                                        <Button type="text" size="small" icon={<DownloadOutlined />} style={{ color: '#64748b', padding: '0 6px' }}>下载</Button>
-                                      </a>
-                                      {canEdit && (
-                                        <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ padding: '0 6px' }}
-                                          onClick={() => { Modal.confirm({ title: '确认删除', content: `确定删除「${f.name}」？`, okText: '删除', okType: 'danger', cancelText: '取消', onOk: () => deleteFile(f.id, f.name) }) }}
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
+                                )}
+                              </div>
+                              {displayFiles.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '28px 24px', background: '#f8fafc', borderRadius: 12, border: '2px dashed #e2e8f0', marginBottom: 8 }}>
+                                  <FolderOpenOutlined style={{ fontSize: 32, color: '#cbd5e1', marginBottom: 8 }} />
+                                  <div style={{ color: '#94a3b8', fontSize: 13 }}>暂无进行中协议文件</div>
+                                  {canEdit && <div style={{ color: '#cbd5e1', fontSize: 11, marginTop: 4 }}>点击右上角「上传文件」添加</div>}
                                 </div>
-                              )
-                            })}
-                          </div>
-                        )}
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10, marginBottom: 8 }}>
+                                  {displayFiles.map(f => <FileCard key={f.id} f={f} token={token} canEdit={canEdit} onDelete={deleteFile} FILE_CATS={FILE_CATS} CAT_COLOR={CAT_COLOR} fileIcon={fileIcon} fmtSize={fmtSize} isHistoric={false} />)}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* 分隔线 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                          <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>历史协议（仅供参考）</span>
+                          <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                        </div>
+
+                        {/* ── 历史参考协议（2019-2023）── */}
+                        {(() => {
+                          const histFiles = files.filter(f => f.year && f.year <= 2023)
+                          const displayFiles = fileCat === 'all' ? histFiles : histFiles.filter(f => f.category === fileCat)
+                          return (
+                            <div style={{ opacity: 0.82 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                <div style={{ width: 3, height: 16, borderRadius: 2, background: '#94a3b8', flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>历史参考协议（2019–2023）</span>
+                                <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 20, fontWeight: 600, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>历史参考</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>{histFiles.length} 个文件</span>
+                                {canEdit && (
+                                  <Upload customRequest={handleFileUpload} showUploadList={false}
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx" multiple
+                                    beforeUpload={() => { setFileCat('contract'); return true }}
+                                    style={{ marginLeft: 'auto' }}>
+                                    <Button size="small" icon={<UploadOutlined />} loading={fileUploading}
+                                      style={{ marginLeft: 'auto', borderRadius: 20, borderColor: '#94a3b8', color: '#64748b', fontSize: 11 }}>
+                                      上传历史协议
+                                    </Button>
+                                  </Upload>
+                                )}
+                              </div>
+                              {displayFiles.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '20px 24px', background: '#fafafa', borderRadius: 12, border: '2px dashed #f1f5f9' }}>
+                                  <div style={{ color: '#cbd5e1', fontSize: 13 }}>暂无历史协议文件</div>
+                                  {canEdit && <div style={{ color: '#e2e8f0', fontSize: 11, marginTop: 4 }}>可上传 2019-2023 年历史协议作为参考</div>}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                                  {displayFiles.map(f => <FileCard key={f.id} f={f} token={token} canEdit={canEdit} onDelete={deleteFile} FILE_CATS={FILE_CATS} CAT_COLOR={CAT_COLOR} fileIcon={fileIcon} fmtSize={fmtSize} isHistoric={true} />)}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* 年份未标注的文件（无法分类）归入进行中 */}
                       </div>
                     </Spin>
                   ),
@@ -1661,6 +1793,113 @@ export default function LandingPage() {
             />
           </div>
         </div>
+      </Modal>
+
+      {/* ── AI 识别协议指标 Modal ─────────────────────────────────── */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>AI 识别协议指标</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>上传协议 PDF → 自动解析指标目标值 → 一键填充</div>
+            </div>
+          </div>
+        }
+        open={aiParseModal}
+        onCancel={() => { setAiParseModal(false); setAiResult(null) }}
+        footer={null}
+        width={640}
+        styles={{ body: { paddingTop: 16 } }}
+      >
+        {!aiResult ? (
+          <div>
+            <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, fontSize: 12, color: '#5b21b6', lineHeight: 1.7 }}>
+              <strong>功能说明：</strong>上传落地协议 PDF，AI 将自动识别：营业收入、综合税收、个税、社保人数、国家级人才申报、发明专利、产业链企业等各年度指标值，识别后可预览并一键写入系统。
+            </div>
+            <Upload.Dragger
+              customRequest={handleAiParse}
+              showUploadList={false}
+              accept=".pdf"
+              maxCount={1}
+              style={{ borderRadius: 10 }}
+            >
+              <Spin spinning={aiParsing}>
+                <div style={{ padding: '28px 0' }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    {aiParsing ? 'AI 解析中，请稍候...' : '点击或拖拽上传协议 PDF'}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>仅支持 .pdf 格式 · 建议上传含清晰表格的协议正文</div>
+                </div>
+              </Spin>
+            </Upload.Dragger>
+          </div>
+        ) : (
+          <div>
+            {/* 解析结果预览 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: 20, padding: '2px 12px' }}>
+                ✅ 解析完成
+              </span>
+              {aiResult.agreementPeriod && (
+                <span style={{ fontSize: 12, color: '#64748b' }}>协议期：{aiResult.agreementPeriod}</span>
+              )}
+            </div>
+
+            {aiResult.notes && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+                📌 {aiResult.notes}
+              </div>
+            )}
+
+            {/* 识别到的指标表 */}
+            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>指标</th>
+                    {[2024, 2025, 2026, 2027, 2028].map(y => (
+                      <th key={y} style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', minWidth: 70 }}>{y} 年</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(aiResult.kpiTargets).length === 0 ? (
+                    <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>未识别到标准指标，请检查 PDF 内容</td></tr>
+                  ) : (
+                    Object.entries(aiResult.kpiTargets).map(([key, years], ri) => {
+                      const meta = KPI_META[key]
+                      return (
+                        <tr key={key} style={{ background: ri % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                          <td style={{ padding: '7px 10px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9' }}>
+                            {meta?.label || key}
+                            <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{meta?.unit}</span>
+                          </td>
+                          {[2024, 2025, 2026, 2027, 2028].map(y => (
+                            <td key={y} style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', color: years[y] != null ? '#1d4ed8' : '#cbd5e1', fontWeight: years[y] != null ? 600 : 400 }}>
+                              {years[y] ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button onClick={() => setAiResult(null)} style={{ borderRadius: 8 }}>重新上传</Button>
+              <Button onClick={() => { setAiParseModal(false); setAiResult(null) }} style={{ borderRadius: 8 }}>取消</Button>
+              <Button type="primary" loading={aiApplying} onClick={applyAiResult}
+                disabled={Object.keys(aiResult.kpiTargets).length === 0}
+                style={{ borderRadius: 8, background: '#6366f1', borderColor: '#6366f1', fontWeight: 600 }}>
+                确认应用到 KPI 指标
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </AppLayout>
   )
