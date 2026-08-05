@@ -529,7 +529,8 @@ export default function LandingPage() {
   const [aiParsing, setAiParsing]         = useState(false)
   const [aiResult, setAiResult]           = useState(null)   // 解析结果
   const [aiApplying, setAiApplying]       = useState(false)
-  const [aiParseYear, setAiParseYear]     = useState(null)   // 关联年份
+  // 协议类型：'current'=2024-2028当前协议 | 'historic'=历史参考协议
+  const [aiParseType, setAiParseType]     = useState('current')
   // 协议文件
   const [files, setFiles]         = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -682,20 +683,27 @@ export default function LandingPage() {
 
   const applyAiResult = async () => {
     if (!aiResult?.kpiTargets) return
+    // 历史协议不允许写入当前 KPI
+    if (aiParseType === 'historic') {
+      message.warning('历史参考协议仅供查阅，不写入当前 KPI 指标体系')
+      return
+    }
     setAiApplying(true)
     try {
-      // 合并到现有 targetDraft
+      // 只写 2024-2028 范围，历史年份完全屏蔽
+      const CURRENT_YEARS = [2024, 2025, 2026, 2027, 2028]
       const merged = JSON.parse(JSON.stringify(remoteTargets || {}))
       for (const [key, years] of Object.entries(aiResult.kpiTargets)) {
         if (!merged[key]) merged[key] = {}
         for (const [yr, val] of Object.entries(years)) {
+          if (!CURRENT_YEARS.includes(Number(yr))) continue   // 严格过滤历史年份
           if (val !== null && val !== undefined) merged[key][yr] = val
         }
       }
       await api.post('/api/agreement/targets', merged)
       setRemoteTargets(merged)
       setTargetDraft(JSON.parse(JSON.stringify(merged)))
-      message.success('AI 解析结果已应用，KPI 卡片同步更新')
+      message.success('AI 解析结果已同步到 2024-2028 KPI 指标，卡片即时更新')
       setAiParseModal(false)
       setAiResult(null)
       fetchDashboard(year)
@@ -1802,20 +1810,70 @@ export default function LandingPage() {
             <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>AI 识别协议指标</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>上传协议 PDF → 自动解析指标目标值 → 一键填充</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>上传协议 PDF → 自动解析指标目标值 → 预览确认</div>
             </div>
           </div>
         }
         open={aiParseModal}
-        onCancel={() => { setAiParseModal(false); setAiResult(null) }}
+        onCancel={() => { setAiParseModal(false); setAiResult(null); setAiParseType('current') }}
         footer={null}
-        width={640}
+        width={660}
         styles={{ body: { paddingTop: 16 } }}
       >
         {!aiResult ? (
           <div>
-            <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, fontSize: 12, color: '#5b21b6', lineHeight: 1.7 }}>
-              <strong>功能说明：</strong>上传落地协议 PDF，AI 将自动识别：营业收入、综合税收、个税、社保人数、国家级人才申报、发明专利、产业链企业等各年度指标值，识别后可预览并一键写入系统。
+            {/* 第一步：选择协议类型 */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                第一步：选择协议类型
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  {
+                    key: 'current',
+                    label: '当前有效协议',
+                    sub: '2024–2028 年',
+                    desc: '解析后可同步写入 KPI 指标体系',
+                    bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8',
+                    activeBg: '#dbeafe', activeBorder: '#3b82f6',
+                  },
+                  {
+                    key: 'historic',
+                    label: '历史参考协议',
+                    sub: '2019–2023 年',
+                    desc: '仅预览，不写入当前 KPI，避免数据混淆',
+                    bg: '#f8fafc', border: '#e2e8f0', color: '#64748b',
+                    activeBg: '#f1f5f9', activeBorder: '#94a3b8',
+                  },
+                ].map(opt => (
+                  <div key={opt.key} onClick={() => setAiParseType(opt.key)} style={{
+                    flex: 1, padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                    background: aiParseType === opt.key ? opt.activeBg : opt.bg,
+                    border: `2px solid ${aiParseType === opt.key ? opt.activeBorder : opt.border}`,
+                    transition: 'all 0.15s',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: aiParseType === opt.key ? opt.activeBorder : '#cbd5e1' }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: aiParseType === opt.key ? opt.color : '#475569' }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{opt.sub}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', paddingLeft: 14 }}>{opt.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 历史协议警告 */}
+            {aiParseType === 'historic' && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 12, color: '#9a3412', display: 'flex', gap: 8 }}>
+                <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+                <span>历史协议解析结果<strong>仅供预览查阅</strong>，不会写入当前 2024-2028 KPI 指标体系，不影响现有 KPI 卡片数据。</span>
+              </div>
+            )}
+
+            {/* 第二步：上传 */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+              第二步：上传协议 PDF
             </div>
             <Upload.Dragger
               customRequest={handleAiParse}
@@ -1825,78 +1883,142 @@ export default function LandingPage() {
               style={{ borderRadius: 10 }}
             >
               <Spin spinning={aiParsing}>
-                <div style={{ padding: '28px 0' }}>
-                  <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                <div style={{ padding: '24px 0' }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
                     {aiParsing ? 'AI 解析中，请稍候...' : '点击或拖拽上传协议 PDF'}
                   </div>
-                  <div style={{ fontSize: 12, color: '#94a3b8' }}>仅支持 .pdf 格式 · 建议上传含清晰表格的协议正文</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>仅支持 .pdf · 建议上传含清晰表格的协议正文</div>
                 </div>
               </Spin>
             </Upload.Dragger>
           </div>
         ) : (
           <div>
-            {/* 解析结果预览 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: 20, padding: '2px 12px' }}>
+            {/* 解析完成标题行 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#065f46', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: 20, padding: '2px 12px' }}>
                 ✅ 解析完成
               </span>
+              {/* 协议类型徽章 */}
+              {aiParseType === 'current' ? (
+                <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 20, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  当前有效协议（2024–2028）
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 20, fontWeight: 600, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                  历史参考协议（仅预览）
+                </span>
+              )}
               {aiResult.agreementPeriod && (
-                <span style={{ fontSize: 12, color: '#64748b' }}>协议期：{aiResult.agreementPeriod}</span>
+                <span style={{ fontSize: 11, color: '#64748b' }}>协议期：{aiResult.agreementPeriod}</span>
               )}
             </div>
 
+            {/* 历史协议：显示隔离警告 */}
+            {aiParseType === 'historic' && (
+              <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 10, fontSize: 12, color: '#9a3412', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 3 }}>历史协议数据已隔离 · 不可写入当前 KPI</div>
+                  <div>以下为 AI 从历史协议中识别的指标，<strong>仅供查阅对比</strong>，不会影响 2024-2028 年度 KPI 卡片和落地协议追踪数据。</div>
+                </div>
+              </div>
+            )}
+
+            {/* 当前协议：显示将写入提示 */}
+            {aiParseType === 'current' && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 12, color: '#1e40af' }}>
+                ✏️ 确认后，以下识别结果将同步写入 <strong>2024–2028 年</strong> KPI 指标体系，可在「五年目标总览」中查看和修改。
+              </div>
+            )}
+
             {aiResult.notes && (
-              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+              <div style={{ marginBottom: 10, padding: '7px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e' }}>
                 📌 {aiResult.notes}
               </div>
             )}
 
-            {/* 识别到的指标表 */}
-            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>指标</th>
-                    {[2024, 2025, 2026, 2027, 2028].map(y => (
-                      <th key={y} style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', minWidth: 70 }}>{y} 年</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(aiResult.kpiTargets).length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>未识别到标准指标，请检查 PDF 内容</td></tr>
-                  ) : (
-                    Object.entries(aiResult.kpiTargets).map(([key, years], ri) => {
-                      const meta = KPI_META[key]
-                      return (
-                        <tr key={key} style={{ background: ri % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                          <td style={{ padding: '7px 10px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9' }}>
-                            {meta?.label || key}
-                            <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{meta?.unit}</span>
-                          </td>
-                          {[2024, 2025, 2026, 2027, 2028].map(y => (
-                            <td key={y} style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', color: years[y] != null ? '#1d4ed8' : '#cbd5e1', fontWeight: years[y] != null ? 600 : 400 }}>
-                              {years[y] ?? '—'}
-                            </td>
-                          ))}
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {/* 识别结果表：当前协议展示2024-2028，历史协议按AI识别结果展示 */}
+            {(() => {
+              const displayYears = aiParseType === 'current'
+                ? [2024, 2025, 2026, 2027, 2028]
+                : [...new Set(
+                    Object.values(aiResult.kpiTargets)
+                      .flatMap(years => Object.keys(years).map(Number))
+                      .filter(y => y >= 2019 && y <= 2028)
+                      .sort()
+                  )]
+              if (displayYears.length === 0) displayYears.push(...[2024, 2025, 2026, 2027, 2028])
+              const colSpan = displayYears.length + 1
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <Button onClick={() => setAiResult(null)} style={{ borderRadius: 8 }}>重新上传</Button>
-              <Button onClick={() => { setAiParseModal(false); setAiResult(null) }} style={{ borderRadius: 8 }}>取消</Button>
-              <Button type="primary" loading={aiApplying} onClick={applyAiResult}
-                disabled={Object.keys(aiResult.kpiTargets).length === 0}
-                style={{ borderRadius: 8, background: '#6366f1', borderColor: '#6366f1', fontWeight: 600 }}>
-                确认应用到 KPI 指标
-              </Button>
+              return (
+                <div style={{ overflowX: 'auto', marginBottom: 14 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: aiParseType === 'historic' ? '#f8fafc' : '#eff6ff' }}>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>指标</th>
+                        {displayYears.map(y => (
+                          <th key={y} style={{
+                            padding: '8px 10px', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid #e2e8f0', minWidth: 66,
+                            color: (aiParseType === 'current' && y >= 2024 && y <= 2028) ? '#1d4ed8' : '#94a3b8',
+                          }}>
+                            {y}
+                            {aiParseType === 'historic' && <div style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 400 }}>仅参考</div>}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.keys(aiResult.kpiTargets).length === 0 ? (
+                        <tr><td colSpan={colSpan} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>未识别到标准指标，请检查 PDF 内容</td></tr>
+                      ) : (
+                        Object.entries(aiResult.kpiTargets).map(([key, years], ri) => {
+                          const meta = KPI_META[key]
+                          return (
+                            <tr key={key} style={{ background: ri % 2 === 0 ? '#fff' : '#f8fafc', opacity: aiParseType === 'historic' ? 0.8 : 1 }}>
+                              <td style={{ padding: '7px 10px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9' }}>
+                                {meta?.label || key}
+                                <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{meta?.unit}</span>
+                              </td>
+                              {displayYears.map(y => (
+                                <td key={y} style={{
+                                  padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9',
+                                  color: years[y] != null ? (aiParseType === 'historic' ? '#64748b' : '#1d4ed8') : '#cbd5e1',
+                                  fontWeight: years[y] != null ? 600 : 400,
+                                }}>
+                                  {years[y] ?? '—'}
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
+
+            {/* 底部按钮 */}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+              <Button onClick={() => setAiResult(null)} style={{ borderRadius: 8 }}>← 重新上传</Button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button onClick={() => { setAiParseModal(false); setAiResult(null); setAiParseType('current') }} style={{ borderRadius: 8 }}>关闭</Button>
+                {aiParseType === 'current' ? (
+                  <Button type="primary" loading={aiApplying} onClick={applyAiResult}
+                    disabled={Object.keys(aiResult.kpiTargets).length === 0}
+                    style={{ borderRadius: 8, background: '#6366f1', borderColor: '#6366f1', fontWeight: 600 }}>
+                    确认应用到 KPI 指标
+                  </Button>
+                ) : (
+                  <Tooltip title="历史协议数据已与当前 KPI 隔离，无法写入">
+                    <Button disabled style={{ borderRadius: 8, cursor: 'not-allowed' }}>
+                      🔒 历史协议不可写入
+                    </Button>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           </div>
         )}
