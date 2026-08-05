@@ -690,10 +690,18 @@ export default function LandingPage() {
   }
   const deleteReminder = (item) => {
     Modal.confirm({
-      title: '确认删除', content: `删除「${item.title}」？`,
-      okText: '删除', okType: 'danger', cancelText: '取消',
+      title: '确认删除',
+      content: item.system
+        ? `隐藏系统提醒「${item.title}」？隐藏后将不再显示，可在设置中恢复。`
+        : `删除「${item.title}」？此操作不可恢复。`,
+      okText: '确认', okType: 'danger', cancelText: '取消',
       onOk: async () => {
-        await api.delete(`/api/agreement/reminders/${item.id}`)
+        if (item.system) {
+          const year = item.dueDate?.slice(0, 4) || new Date().getFullYear()
+          await api.post('/api/agreement/reminders', { systemId: item.id, year, hidden: true })
+        } else {
+          await api.delete(`/api/agreement/reminders/${item.id}`)
+        }
         message.success('已删除')
         fetchReminders()
       },
@@ -1951,15 +1959,13 @@ export default function LandingPage() {
                                       )}
                                     </div>
 
-                                    {/* 操作按钮：系统提醒不可删除 */}
+                                    {/* 操作按钮 */}
                                     {canEdit && (
                                       <div style={{ display:'flex', gap:4, flexShrink:0 }}>
                                         {!item.system && (
                                           <Button size="small" icon={<EditOutlined />} onClick={() => openReminderEdit(item)} style={{ borderRadius:7 }} />
                                         )}
-                                        {!item.system && (
-                                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteReminder(item)} style={{ borderRadius:7 }} />
-                                        )}
+                                        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteReminder(item)} style={{ borderRadius:7 }} />
                                       </div>
                                     )}
                                   </div>

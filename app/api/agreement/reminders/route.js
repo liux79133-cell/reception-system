@@ -111,14 +111,17 @@ export async function GET(request) {
     requireAuth(request)
     const now = new Date()
 
-    // 读取用户对系统提醒的完成状态（存在 AppConfig，key: sys_reminder_{id}_{year}）
-    const configs = await prisma.appConfig.findMany({ where: { key: { startsWith: 'sys_reminder_' } } })
-    const doneSet = new Set(configs.filter(c => c.value === 'done').map(c => c.key))
+    // 读取用户对系统提醒的完成/隐藏状态（存在 AppConfig，key: sys_reminder_{id}_{year}）
+    const configs   = await prisma.appConfig.findMany({ where: { key: { startsWith: 'sys_reminder_' } } })
+    const doneSet   = new Set(configs.filter(c => c.value === 'done').map(c => c.key))
+    const hiddenSet = new Set(configs.filter(c => c.value === 'hidden').map(c => c.key))
 
-    // 生成系统内置提醒
-    const sysItems = SYSTEM_REMINDERS.map(r => {
+    // 生成系统内置提醒（跳过已永久隐藏的）
+    const sysItems = SYSTEM_REMINDERS.flatMap(r => {
       const { dueDate, daysLeft } = calcDue(r, now)
-      const doneKey = `sys_reminder_${r.id}_${dueDate.slice(0,4)}`
+      const baseKey = `sys_reminder_${r.id}`
+      if ([...hiddenSet].some(k => k.startsWith(baseKey + '_'))) return []
+      const doneKey = `${baseKey}_${dueDate.slice(0,4)}`
       const isDone  = doneSet.has(doneKey)
       const effectivePriority = (!isDone && daysLeft <= r.urgentDays) ? 'high' : r.priority
       return {
@@ -134,11 +137,11 @@ export async function GET(request) {
         priority:     effectivePriority,
         status:       isDone ? 'done' : 'pending',
         system:       true,
-        sortOrder:    -1,   // 系统提醒排最前
+        sortOrder:    -1,
         createdAt:    new Date(0).toISOString(),
         updatedAt:    new Date(0).toISOString(),
-      }
-    }).sort((a, b) => a.daysLeft - b.daysLeft)  // 按紧迫程度排序
+      }]  // flatMap: 返回单元素数组，隐藏时返回空数组 []
+    }).sort((a, b) => a.daysLeft - b.daysLeft)
 
     // 用户自定义提醒
     const userItems = await prisma.clauseReminder.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] })
@@ -161,13 +164,14 @@ export async function POST(request) {
     requireEditor(request)
     const body = await request.json()
 
-    // 系统提醒完成状态更新
+    // 系统提醒状态更新（完成 or 永久隐藏）
     if (body.systemId && body.year) {
       const key = `sys_reminder_${body.systemId}_${body.year}`
+      const value = body.hidden ? 'hidden' : (body.done ? 'done' : 'pending')
       await prisma.appConfig.upsert({
         where: { key },
-        update: { value: body.done ? 'done' : 'pending' },
-        create: { key, value: body.done ? 'done' : 'pending' },
+        update: { value },
+        create: { key, value },
       })
       return Response.json({ ok: true })
     }
