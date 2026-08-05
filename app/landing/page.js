@@ -1055,7 +1055,7 @@ export default function LandingPage() {
                       {/* 统计口径提示 */}
                       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'7px 14px', background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fde68a', borderRadius:9, flexWrap:'wrap' }}>
                         <span style={{ fontSize:11, fontWeight:700, color:'#92400e' }}>📊 统计口径</span>
-                        <span style={{ fontSize:11, color:'#78350f' }}>综合税收 = 苏初（魔门塔苏州）+ 苏魔（魔视智能）两家主体合并计算，按会计年度缴纳数认定</span>
+                        <span style={{ fontSize:11, color:'#78350f' }}>综合税收 = 苏初 + 苏魔两家主体合并计算，按会计年度缴纳数认定</span>
                         <span style={{ marginLeft:'auto', fontSize:10, color:'#a16207', background:'#fef3c7', border:'1px solid #fde68a', borderRadius:6, padding:'1px 8px' }}>
                           依据协议第 1.2.2 条
                         </span>
