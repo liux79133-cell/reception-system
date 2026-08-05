@@ -700,8 +700,18 @@ export default function LandingPage() {
     })
   }
   const toggleReminderDone = async (item) => {
-    const nextStatus = item.status === 'done' ? 'pending' : 'done'
-    await api.put(`/api/agreement/reminders/${item.id}`, { ...item, status: nextStatus })
+    if (item.system) {
+      // 系统内置提醒：通过 AppConfig 记录完成状态
+      const year = item.dueDate?.slice(0, 4) || new Date().getFullYear()
+      await api.post('/api/agreement/reminders', {
+        systemId: item.id,
+        year,
+        done: item.status !== 'done',
+      })
+    } else {
+      const nextStatus = item.status === 'done' ? 'pending' : 'done'
+      await api.put(`/api/agreement/reminders/${item.id}`, { ...item, status: nextStatus })
+    }
     fetchReminders()
   }
 
@@ -1871,66 +1881,85 @@ export default function LandingPage() {
                             {reminders.map(item => {
                               const isDone = item.status === 'done'
                               const isHigh = item.priority === 'high'
-                              const borderColor = isDone ? '#e2e8f0' : isHigh ? '#fecdd3' : '#fde68a'
-                              const bgColor     = isDone ? '#f8fafc' : isHigh ? '#fff1f2' : '#fffbeb'
+                              const days   = item.daysLeft
+                              const borderColor = isDone ? '#e2e8f0' : isHigh ? '#fecdd3' : (item.system ? '#bfdbfe' : '#fde68a')
+                              const bgColor     = isDone ? '#f8fafc' : isHigh ? '#fff1f2' : (item.system ? '#eff6ff' : '#fffbeb')
+                              // 剩余天数标签颜色
+                              const dayColor = days == null ? null : days <= 14 ? '#dc2626' : days <= 30 ? '#d97706' : days <= 60 ? '#0369a1' : '#64748b'
+                              const dayBg    = days == null ? null : days <= 14 ? '#fff1f2' : days <= 30 ? '#fffbeb' : days <= 60 ? '#eff6ff' : '#f8fafc'
                               return (
-                                <div key={item.id} style={{ borderRadius:12, border:`1px solid ${borderColor}`, background:bgColor, padding:'12px 16px', opacity: isDone ? 0.6 : 1 }}>
+                                <div key={item.id} style={{ borderRadius:12, border:`1px solid ${borderColor}`, background:bgColor, padding:'12px 16px', opacity: isDone ? 0.65 : 1 }}>
                                   <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
                                     {/* 完成勾选 */}
-                                    {canEdit && (
-                                      <div onClick={() => toggleReminderDone(item)} style={{
-                                        width:18, height:18, borderRadius:5, border:`2px solid ${isDone ? '#10b981' : '#cbd5e1'}`,
-                                        background: isDone ? '#10b981' : '#fff', flexShrink:0, cursor:'pointer', marginTop:1,
-                                        display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'#fff',
-                                      }}>
-                                        {isDone && '✓'}
-                                      </div>
-                                    )}
+                                    <div onClick={() => canEdit && toggleReminderDone(item)} style={{
+                                      width:18, height:18, borderRadius:5, border:`2px solid ${isDone ? '#10b981' : '#cbd5e1'}`,
+                                      background: isDone ? '#10b981' : '#fff', flexShrink:0, cursor: canEdit ? 'pointer' : 'default', marginTop:2,
+                                      display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'#fff',
+                                    }}>
+                                      {isDone && '✓'}
+                                    </div>
+
                                     <div style={{ flex:1, minWidth:0 }}>
-                                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
-                                        <span style={{ fontSize:14, fontWeight:700, color: isDone ? '#94a3b8' : '#0f172a',
+                                      {/* 标题行 */}
+                                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:3 }}>
+                                        <span style={{ fontSize:13, fontWeight:700, color: isDone ? '#94a3b8' : '#0f172a',
                                           textDecoration: isDone ? 'line-through' : 'none' }}>
                                           {item.title}
                                         </span>
+                                        {item.system && (
+                                          <Tag style={{ margin:0, fontSize:9, color:'#1d4ed8', background:'#eff6ff', border:'1px solid #bfdbfe' }}>协议约定</Tag>
+                                        )}
                                         {item.articleRef && (
-                                          <Tag style={{ margin:0, fontSize:10, color:'#64748b', background:'#f8fafc', border:'1px solid #e2e8f0' }}>
-                                            {item.articleRef}
-                                          </Tag>
+                                          <Tag style={{ margin:0, fontSize:9, color:'#64748b', background:'#f8fafc', border:'1px solid #e2e8f0' }}>{item.articleRef}</Tag>
                                         )}
                                         {isHigh && !isDone && (
-                                          <Tag style={{ margin:0, fontSize:10, fontWeight:700, color:'#dc2626', background:'#fff1f2', border:'1px solid #fecdd3' }}>
-                                            ⚠️ 紧急
-                                          </Tag>
+                                          <Tag style={{ margin:0, fontSize:9, fontWeight:700, color:'#dc2626', background:'#fff1f2', border:'1px solid #fecdd3' }}>⚠️ 紧急</Tag>
                                         )}
                                         {isDone && (
-                                          <Tag style={{ margin:0, fontSize:10, color:'#10b981', background:'#f0fdf4', border:'1px solid #bbf7d0' }}>
-                                            ✓ 已完成
-                                          </Tag>
+                                          <Tag style={{ margin:0, fontSize:9, color:'#10b981', background:'#f0fdf4', border:'1px solid #bbf7d0' }}>✓ 已完成</Tag>
+                                        )}
+                                        {/* 剩余天数徽章 */}
+                                        {!isDone && days != null && (
+                                          <span style={{ marginLeft:'auto', fontSize:11, fontWeight:700, color: dayColor, background: dayBg,
+                                            border:`1px solid ${dayColor}40`, borderRadius:20, padding:'1px 9px', flexShrink:0 }}>
+                                            {days <= 0 ? '⚠️ 已逾期' : days === 1 ? '明天截止' : `还剩 ${days} 天`}
+                                          </span>
                                         )}
                                       </div>
+
+                                      {/* 时间 */}
                                       {(item.dueDate || item.dueRecurring) && (
-                                        <div style={{ fontSize:11, color: isDone ? '#94a3b8' : (isHigh ? '#dc2626' : '#d97706'), marginBottom:4, fontWeight:600 }}>
+                                        <div style={{ fontSize:11, color: isDone ? '#94a3b8' : (isHigh ? '#dc2626' : '#64748b'), marginBottom:3 }}>
                                           ⏰ {item.dueRecurring || item.dueDate}
+                                          {item.dueDate && item.dueRecurring && <span style={{ color:'#94a3b8', marginLeft:4 }}>· 下次截止 {item.dueDate}</span>}
                                         </div>
                                       )}
+
+                                      {/* 描述 */}
                                       {item.description && (
-                                        <div style={{ fontSize:12, color:'#64748b', marginBottom: item.clauseText ? 6 : 0 }}>{item.description}</div>
+                                        <div style={{ fontSize:11, color:'#64748b', marginBottom: item.clauseText ? 4 : 0, lineHeight:1.5 }}>{item.description}</div>
                                       )}
+
+                                      {/* 条款原文折叠 */}
                                       {item.clauseText && (
                                         <details style={{ marginTop:4 }}>
-                                          <summary style={{ fontSize:11, color:'#94a3b8', cursor:'pointer', userSelect:'none' }}>
-                                            📄 查看条款原文
-                                          </summary>
-                                          <div style={{ marginTop:6, padding:'8px 12px', background:'#f8fafc', borderRadius:7, border:'1px solid #e2e8f0', fontSize:11, color:'#475569', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+                                          <summary style={{ fontSize:11, color:'#94a3b8', cursor:'pointer', userSelect:'none' }}>📄 查看条款原文</summary>
+                                          <div style={{ marginTop:5, padding:'8px 12px', background:'#f8fafc', borderRadius:7, border:'1px solid #e2e8f0', fontSize:11, color:'#475569', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
                                             {item.clauseText}
                                           </div>
                                         </details>
                                       )}
                                     </div>
+
+                                    {/* 操作按钮：系统提醒不可删除 */}
                                     {canEdit && (
                                       <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-                                        <Button size="small" icon={<EditOutlined />} onClick={() => openReminderEdit(item)} style={{ borderRadius:7 }} />
-                                        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteReminder(item)} style={{ borderRadius:7 }} />
+                                        {!item.system && (
+                                          <Button size="small" icon={<EditOutlined />} onClick={() => openReminderEdit(item)} style={{ borderRadius:7 }} />
+                                        )}
+                                        {!item.system && (
+                                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteReminder(item)} style={{ borderRadius:7 }} />
+                                        )}
                                       </div>
                                     )}
                                   </div>

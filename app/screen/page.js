@@ -547,26 +547,32 @@ export default function ScreenPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {reminders.filter(r => r.status !== 'done').map(r => {
                   const isHigh = r.priority === 'high'
-                  const dotColor = isHigh ? C.red : C.yellow
+                  const days   = r.daysLeft
+                  const dotColor = isHigh ? C.red : (days != null && days <= 30 ? C.yellow : C.blue)
                   return (
                     <div key={r.id} style={{
                       padding: '6px 8px', borderRadius: 7,
-                      background: isHigh ? `${C.red}08` : `${C.yellow}08`,
-                      border: `1px solid ${isHigh ? C.red : C.yellow}25`,
+                      background: isHigh ? `${C.red}08` : `${dotColor}06`,
+                      border: `1px solid ${dotColor}25`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5 }}>
                         <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, marginTop: 3, flexShrink: 0,
                           animation: isHigh ? 'pulse 1.5s ease-in-out infinite' : 'none' }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{r.title}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.text, lineHeight: 1.3, flex: 1 }}>{r.title}</div>
+                            {days != null && (
+                              <span style={{ fontSize: 8, fontWeight: 700, color: isHigh ? C.red : (days <= 30 ? C.yellow : C.muted),
+                                background: isHigh ? `${C.red}12` : `${dotColor}10`, borderRadius: 10, padding: '1px 5px', flexShrink: 0 }}>
+                                {days <= 0 ? '已逾期' : days === 1 ? '明天' : `${days}天`}
+                              </span>
+                            )}
+                          </div>
                           {r.articleRef && <div style={{ fontSize: 8, color: C.muted, marginTop: 1 }}>{r.articleRef}</div>}
                           {(r.dueDate || r.dueRecurring) && (
-                            <div style={{ fontSize: 9, color: dotColor, marginTop: 2, fontWeight: 600 }}>
+                            <div style={{ fontSize: 8, color: dotColor, marginTop: 1, fontWeight: 600 }}>
                               ⏰ {r.dueRecurring || r.dueDate}
                             </div>
-                          )}
-                          {r.description && (
-                            <div style={{ fontSize: 9, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{r.description}</div>
                           )}
                         </div>
                       </div>
