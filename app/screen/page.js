@@ -334,7 +334,8 @@ export default function ScreenPage() {
   const [year, setYear]       = useState(2024)
   const [data, setData]       = useState(null)
   const [now,  setNow]        = useState(new Date())
-  const [activeKpi, setActiveKpi] = useState('REVENUE') // 点击环形图切换折线图
+  const [activeKpi, setActiveKpi] = useState('REVENUE')
+  const [reminders, setReminders] = useState([])
 
   const load = useCallback(() => {
     api.get('/api/agreement/dashboard', { year }).then(setData).catch(() => {})
@@ -352,6 +353,9 @@ export default function ScreenPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    api.get('/api/agreement/reminders').then(setReminders).catch(() => {})
+  }, [])
   useEffect(() => {
     const t = setInterval(() => { load(); setNow(new Date()) }, 60000)
     return () => clearInterval(t)
@@ -532,6 +536,47 @@ export default function ScreenPage() {
             ))}
           </Panel>
 
+          {/* 近期需关注条款 */}
+          <Panel title="近期需关注条款" icon="📋" style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
+            {reminders.length === 0 ? (
+              <div style={{ fontSize: 10, color: C.muted, textAlign: 'center', padding: '16px 0' }}>
+                暂无条款提醒<br/>
+                <span style={{ fontSize: 9 }}>在落地协议页面添加</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {reminders.filter(r => r.status !== 'done').map(r => {
+                  const isHigh = r.priority === 'high'
+                  const dotColor = isHigh ? C.red : C.yellow
+                  return (
+                    <div key={r.id} style={{
+                      padding: '6px 8px', borderRadius: 7,
+                      background: isHigh ? `${C.red}08` : `${C.yellow}08`,
+                      border: `1px solid ${isHigh ? C.red : C.yellow}25`,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, marginTop: 3, flexShrink: 0,
+                          animation: isHigh ? 'pulse 1.5s ease-in-out infinite' : 'none' }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{r.title}</div>
+                          {r.articleRef && <div style={{ fontSize: 8, color: C.muted, marginTop: 1 }}>{r.articleRef}</div>}
+                          {(r.dueDate || r.dueRecurring) && (
+                            <div style={{ fontSize: 9, color: dotColor, marginTop: 2, fontWeight: 600 }}>
+                              ⏰ {r.dueRecurring || r.dueDate}
+                            </div>
+                          )}
+                          {r.description && (
+                            <div style={{ fontSize: 9, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{r.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Panel>
+
         </div>
 
         {/* ══ 中列 ══════════════════════════════════════════════════ */}
@@ -697,30 +742,83 @@ export default function ScreenPage() {
             })()}
           </Panel>
 
-          {/* 补贴预测 */}
-          <Panel title="补贴预测" icon="💡" accent={C.indigo} style={{ flexShrink: 0, padding: '10px 12px' }}>
+          {/* 地方贡献奖励（2.2.3/2.2.4条实时计算） */}
+          <Panel title="地方贡献奖励预测" icon="💰" accent={C.green} style={{ flexShrink: 0, padding: '10px 12px' }}>
             {(() => {
-              const s = data.overallScore
-              const tiers = [
-                { label: '悲观', val: s < 70 ? 0 : Math.round(s * 5.5), color: C.red },
-                { label: '中性', val: s < 70 ? 0 : Math.round(s * 8.2), color: C.yellow },
-                { label: '乐观', val: s < 70 ? 0 : Math.round(s * 11),  color: C.green },
-              ]
-              const mx = Math.max(...tiers.map(t => t.val), 1)
-              return tiers.map(t => (
-                <div key={t.label} style={{ marginBottom: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <span style={{ fontSize: 10, color: C.sub }}>{t.label}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: t.color }}>~{t.val} 万元</span>
+              const taxKpi = data.kpis.find(k => k.key === 'TAX_TOTAL')
+              const pitKpi = data.kpis.find(k => k.key === 'PERSONAL_TAX')
+              const taxYi  = taxKpi?.actual ?? 0   // 综合税收（亿元）
+              const pitYi  = pitKpi?.actual ?? 0   // 个税（亿元）
+              const taxW = taxYi * 1e8             // 换算成元
+
+              // 2.2.3：综合税收地方留存奖励
+              let taxReward = 0, taxTier = null
+              if (taxW > 3000e4)      { taxReward = taxYi * 0.5 * 0.5 * 1e4; taxTier = { label: '税收 > 3000万', rate: '留存50%' } }
+              else if (taxW > 2000e4) { taxReward = taxYi * 0.4 * 0.5 * 1e4; taxTier = { label: '税收 > 2000万', rate: '留存40%' } }
+              else if (taxW > 1000e4) { taxReward = taxYi * 0.3 * 0.5 * 1e4; taxTier = { label: '税收 > 1000万', rate: '留存30%' } }
+
+              // 2.2.4：个税奖励（上限200万）
+              const pitRewardRaw = pitYi * 0.5 * 1e4   // 万元
+              const pitReward    = Math.min(pitRewardRaw, 200)
+
+              const total = taxReward + pitReward
+              const hasData = taxKpi?.actual != null || pitKpi?.actual != null
+
+              return (
+                <div>
+                  {/* 2.2.3 */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: C.sub, marginBottom: 4, letterSpacing: 0.5 }}>第 2.2.3 条 · 综合税收地方留存奖励</div>
+                    {[
+                      { min: 1000, max: 2000, rate: 0.3, label: '1000-2000万' },
+                      { min: 2000, max: 3000, rate: 0.4, label: '2000-3000万' },
+                      { min: 3000, max: null, rate: 0.5, label: '> 3000万' },
+                    ].map(tier => {
+                      const inTier = taxW > tier.min * 1e4 && (tier.max == null || taxW <= tier.max * 1e4)
+                      const active = taxW > tier.min * 1e4
+                      return (
+                        <div key={tier.label} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3, opacity: active ? 1 : 0.45 }}>
+                          <div style={{ width: 5, height: 5, borderRadius: '50%', background: inTier ? C.green : (active ? C.yellow : C.track), flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, color: C.sub, flex: 1 }}>税收 &gt; {tier.label}</span>
+                          <span style={{ fontSize: 9, color: C.sub }}>地方留存 {tier.rate * 100}%</span>
+                          {inTier && taxReward > 0 && (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: C.green }}>≈{taxReward.toFixed(1)}万</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {!hasData && <div style={{ fontSize: 9, color: C.muted }}>录入税收数据后自动计算</div>}
                   </div>
-                  <div style={{ height: 4, background: C.track, borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${(t.val / mx) * 100}%`,
-                      background: t.color, borderRadius: 3, transition: 'width 1s ease' }} />
+
+                  <div style={{ height: 1, background: C.border, margin: '6px 0' }} />
+
+                  {/* 2.2.4 */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: C.sub, marginBottom: 4, letterSpacing: 0.5 }}>第 2.2.4 条 · 个税奖励（年上限200万）</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                      <span style={{ fontSize: 9, color: C.sub, flex: 1 }}>年薪50万+ 员工个税 × 50% 地方留存</span>
+                      {pitKpi?.actual != null ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: C.green }}>≈{pitReward.toFixed(1)}万</span>
+                      ) : (
+                        <span style={{ fontSize: 9, color: C.muted }}>待录入</span>
+                      )}
+                    </div>
+                    {pitRewardRaw > 200 && (
+                      <div style={{ fontSize: 9, color: C.yellow }}>已触达上限 200万</div>
+                    )}
                   </div>
+
+                  {/* 合计 */}
+                  {hasData && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: `${C.green}12`, border: `1px solid ${C.green}30`, borderRadius: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>预计合计奖励</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: C.green }}>≈ {total.toFixed(1)} 万元</span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 8, color: C.muted, marginTop: 4 }}>* 估算值，实际以审计确认为准</div>
                 </div>
-              ))
+              )
             })()}
-            <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>* {data.overallScore.toFixed(1)} 分估算</div>
           </Panel>
         </div>
       </div>

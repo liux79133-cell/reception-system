@@ -264,3 +264,22 @@ model AgreementFile {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// 协议条款提醒（2.x 类条款触发节点）
+model ClauseReminder {
+  id           Int      @id @default(autoincrement())
+  title        String                        // 提醒标题，如「半年财务审计表」
+  articleRef   String   @default("")         // 条款引用，如「第2.2.5条」
+  description  String   @default("")         // 详细说明
+  dueType      String   @default("date")     // date|recurring|event
+  dueDate      String?                       // 具体日期 YYYY-MM-DD 或 MM-DD（每年重复）
+  dueRecurring String?  @default("")         // 周期描述，如「每年6月/12月」
+  priority     String   @default("normal")   // high|normal|low
+  status       String   @default("pending")  // pending|done|snoozed
+  clauseText   String?  @default("")         // 条款原文（可手动粘贴）
+  fileId       Int?                          // 关联协议文件 ID（AgreementFile）
+  sortOrder    Int      @default(0)
+  createdById  Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

@@ -517,6 +517,13 @@ export default function LandingPage() {
   const [aiApplying, setAiApplying]       = useState(false)
   // 协议类型：'current'=2024-2028当前协议 | 'historic'=历史参考协议
   const [aiParseType, setAiParseType]     = useState('current')
+  // 条款提醒管理
+  const [reminders, setReminders]           = useState([])
+  const [remindersLoading, setRemindersLoading] = useState(false)
+  const [reminderModal, setReminderModal]   = useState({ open: false, item: null })
+  const [reminderForm, setReminderForm]     = useState({})
+  const [reminderSaving, setReminderSaving] = useState(false)
+
   // 快速录入 Modal
   const [quickInputModal, setQuickInputModal] = useState(false)
   const [quickInputMode, setQuickInputMode]   = useState('annual') // annual | monthly
@@ -547,6 +554,11 @@ export default function LandingPage() {
       .finally(() => setLoading(false))
   }
 
+  const fetchReminders = () => {
+    setRemindersLoading(true)
+    api.get('/api/agreement/reminders').then(setReminders).catch(() => {}).finally(() => setRemindersLoading(false))
+  }
+
   const fetchTargets = () => {
     api.get('/api/agreement/targets')
       .then(t => { setRemoteTargets(t); setTargetDraft(JSON.parse(JSON.stringify(t))) })
@@ -554,7 +566,7 @@ export default function LandingPage() {
   }
 
   useEffect(() => { fetchDashboard(year) }, [year])
-  useEffect(() => { fetchTargets() }, [])
+  useEffect(() => { fetchTargets(); fetchReminders() }, [])
 
   const fetchFiles = () => {
     setFilesLoading(true)
@@ -650,6 +662,47 @@ export default function LandingPage() {
       fetchDashboard(year)
     } catch (e) { message.error('保存失败：' + e) }
     finally { setTargetSaving(false) }
+  }
+
+  // 条款提醒 CRUD
+  const openReminderEdit = (item) => {
+    setReminderForm(item ? { ...item } : {
+      title: '', articleRef: '', description: '',
+      dueType: 'date', dueDate: '', dueRecurring: '',
+      priority: 'normal', status: 'pending', clauseText: '',
+    })
+    setReminderModal({ open: true, item: item || null })
+  }
+  const saveReminder = async () => {
+    if (!reminderForm.title?.trim()) return message.error('请填写提醒标题')
+    setReminderSaving(true)
+    try {
+      if (reminderModal.item) {
+        await api.put(`/api/agreement/reminders/${reminderModal.item.id}`, reminderForm)
+      } else {
+        await api.post('/api/agreement/reminders', reminderForm)
+      }
+      message.success('已保存')
+      setReminderModal({ open: false, item: null })
+      fetchReminders()
+    } catch (e) { message.error('保存失败：' + e) }
+    finally { setReminderSaving(false) }
+  }
+  const deleteReminder = (item) => {
+    Modal.confirm({
+      title: '确认删除', content: `删除「${item.title}」？`,
+      okText: '删除', okType: 'danger', cancelText: '取消',
+      onOk: async () => {
+        await api.delete(`/api/agreement/reminders/${item.id}`)
+        message.success('已删除')
+        fetchReminders()
+      },
+    })
+  }
+  const toggleReminderDone = async (item) => {
+    const nextStatus = item.status === 'done' ? 'pending' : 'done'
+    await api.put(`/api/agreement/reminders/${item.id}`, { ...item, status: nextStatus })
+    fetchReminders()
   }
 
   // 快速录入保存
@@ -1643,6 +1696,253 @@ export default function LandingPage() {
                     </Spin>
                   ),
                 },
+
+                // ══ Tab 4：奖励预测 ══
+                {
+                  key: 'rewards',
+                  label: (
+                    <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      💰 奖励预测
+                    </span>
+                  ),
+                  children: (() => {
+                    const taxKpi = data?.kpis.find(k => k.key === 'TAX_TOTAL')
+                    const pitKpi = data?.kpis.find(k => k.key === 'PERSONAL_TAX')
+                    const taxYi  = taxKpi?.actual ?? 0
+                    const pitYi  = pitKpi?.actual ?? 0
+                    const taxW   = taxYi * 1e8
+
+                    let taxReward = 0
+                    if      (taxW > 3000e4) taxReward = taxYi * 0.5 * 0.5 * 1e4
+                    else if (taxW > 2000e4) taxReward = taxYi * 0.4 * 0.5 * 1e4
+                    else if (taxW > 1000e4) taxReward = taxYi * 0.3 * 0.5 * 1e4
+
+                    const pitRewardRaw = pitYi * 0.5 * 1e4
+                    const pitReward    = Math.min(pitRewardRaw, 200)
+                    const total        = taxReward + pitReward
+                    const hasData      = taxKpi?.actual != null || pitKpi?.actual != null
+
+                    return (
+                      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                        {/* 说明横幅 */}
+                        <div style={{ padding:'10px 16px', background:'linear-gradient(135deg,#f0fdf4,#dcfce7)', border:'1px solid #bbf7d0', borderRadius:12 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#065f46', marginBottom:4 }}>地方贡献奖励预测（{year} 年度）</div>
+                          <div style={{ fontSize:11, color:'#16a34a' }}>基于当前已录入实绩实时计算 · 实际以审计确认为准</div>
+                        </div>
+
+                        <Row gutter={16}>
+                          {/* 2.2.3：综合税收地方留存 */}
+                          <Col xs={24} md={12}>
+                            <Card style={{ borderRadius:12, border:'1px solid #e8ecf4', height:'100%' }} styles={{ body:{ padding:'16px' } }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:4 }}>第 2.2.3 条 · 综合税收地方留存奖励</div>
+                              <div style={{ fontSize:11, color:'#94a3b8', marginBottom:12 }}>
+                                当年综合税收（苏初+苏魔合并）超额部分 × 地方留存比例 × 50%
+                              </div>
+                              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
+                                {[
+                                  { min:1000, max:2000,  rate:0.3, label:'> 1000万，≤ 2000万' },
+                                  { min:2000, max:3000,  rate:0.4, label:'> 2000万，≤ 3000万' },
+                                  { min:3000, max:null,  rate:0.5, label:'> 3000万' },
+                                ].map(tier => {
+                                  const active = taxW > tier.min * 1e4
+                                  const isCur  = taxW > tier.min * 1e4 && (tier.max == null || taxW <= tier.max * 1e4)
+                                  return (
+                                    <div key={tier.label} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8,
+                                      background: isCur ? '#f0fdf4' : active ? '#f8fafc' : '#f8fafc',
+                                      border:`1px solid ${isCur ? '#bbf7d0' : '#e2e8f0'}`,
+                                      opacity: active ? 1 : 0.5 }}>
+                                      <span style={{ fontSize:11, color:'#475569', flex:1 }}>税收 {tier.label}</span>
+                                      <span style={{ fontSize:11, color:'#64748b' }}>留存 {tier.rate*100}%</span>
+                                      {isCur && taxReward > 0 && (
+                                        <Tag style={{ margin:0, fontSize:11, fontWeight:700, color:'#065f46', background:'#dcfce7', border:'1px solid #bbf7d0' }}>
+                                          ≈ {taxReward.toFixed(1)} 万元
+                                        </Tag>
+                                      )}
+                                      {isCur && <span style={{ fontSize:11, fontWeight:700, color:'#10b981' }}>← 当前档位</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <div style={{ fontSize:11, color:'#94a3b8' }}>
+                                当前综合税收实绩：
+                                <strong style={{ color: taxKpi?.actual != null ? '#10b981' : '#94a3b8' }}>
+                                  {taxKpi?.actual != null ? `${(taxYi*1e4).toFixed(0)} 万元` : '待录入'}
+                                </strong>
+                              </div>
+                            </Card>
+                          </Col>
+
+                          {/* 2.2.4：个税奖励 */}
+                          <Col xs={24} md={12}>
+                            <Card style={{ borderRadius:12, border:'1px solid #e8ecf4', height:'100%' }} styles={{ body:{ padding:'16px' } }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:4 }}>第 2.2.4 条 · 年薪50万+个税奖励</div>
+                              <div style={{ fontSize:11, color:'#94a3b8', marginBottom:12 }}>
+                                年薪50万以上员工个税 × 50% 地方留存 · <strong>年度上限 200 万元</strong>
+                              </div>
+                              <div style={{ padding:'12px 14px', background:'#eff6ff', borderRadius:8, border:'1px solid #bfdbfe', marginBottom:12 }}>
+                                <div style={{ fontSize:12, color:'#64748b', marginBottom:4 }}>个税实缴（苏初+苏魔合并）</div>
+                                <div style={{ fontSize:22, fontWeight:800, color:'#1d4ed8' }}>
+                                  {pitKpi?.actual != null ? `${(pitYi*1e4).toFixed(2)} 万元` : '待录入'}
+                                </div>
+                              </div>
+                              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
+                                  <span style={{ color:'#64748b' }}>个税 × 50% 地方留存</span>
+                                  <span style={{ fontWeight:600 }}>{pitRewardRaw.toFixed(1)} 万元</span>
+                                </div>
+                                {pitRewardRaw > 200 && (
+                                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#f59e0b' }}>
+                                    <span>年度上限截断</span>
+                                    <span style={{ fontWeight:600 }}>- {(pitRewardRaw - 200).toFixed(1)} 万元</span>
+                                  </div>
+                                )}
+                                <div style={{ borderTop:'1px solid #e2e8f0', paddingTop:6, display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                                  <span style={{ fontWeight:700, color:'#0f172a' }}>实际可获奖励</span>
+                                  <span style={{ fontWeight:800, color:'#10b981' }}>≈ {pitReward.toFixed(1)} 万元</span>
+                                </div>
+                              </div>
+                            </Card>
+                          </Col>
+                        </Row>
+
+                        {/* 合计 */}
+                        {hasData && (
+                          <div style={{ padding:'16px 20px', background:'linear-gradient(135deg,#f0fdf4,#dcfce7)', borderRadius:14, border:'1.5px solid #86efac', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                            <div>
+                              <div style={{ fontSize:15, fontWeight:700, color:'#065f46' }}>预计本年合计奖励</div>
+                              <div style={{ fontSize:11, color:'#16a34a', marginTop:2 }}>2.2.3 综合税收留存 + 2.2.4 个税奖励</div>
+                            </div>
+                            <div style={{ fontSize:32, fontWeight:900, color:'#10b981' }}>≈ {total.toFixed(1)} <span style={{ fontSize:16 }}>万元</span></div>
+                          </div>
+                        )}
+                        {!hasData && (
+                          <div style={{ textAlign:'center', padding:'32px', background:'#f8fafc', borderRadius:14, border:'2px dashed #e2e8f0' }}>
+                            <div style={{ fontSize:32, marginBottom:8 }}>💰</div>
+                            <div style={{ color:'#94a3b8', fontSize:14 }}>录入综合税收和个税数据后自动计算</div>
+                            <Button size="small" style={{ marginTop:12, borderRadius:20 }} onClick={() => { setQuickFields({}); setQuickInputModal(true) }}>
+                              快速录入数据 →
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })(),
+                },
+
+                // ══ Tab 5：条款管理 ══
+                {
+                  key: 'clauses',
+                  label: (
+                    <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      📋 条款提醒
+                      {reminders.filter(r => r.status !== 'done' && r.priority === 'high').length > 0 && (
+                        <span style={{ fontSize:10, background:'#ef4444', color:'#fff', borderRadius:20, padding:'0 6px', fontWeight:700 }}>
+                          {reminders.filter(r => r.status !== 'done' && r.priority === 'high').length}
+                        </span>
+                      )}
+                    </span>
+                  ),
+                  children: (
+                    <Spin spinning={remindersLoading}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                        {/* 顶部操作栏 */}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+                          <div style={{ fontSize:13, color:'#475569' }}>
+                            共 {reminders.length} 条提醒 · 未完成 {reminders.filter(r => r.status !== 'done').length} 条
+                          </div>
+                          {canEdit && (
+                            <Button type="primary" size="small" icon={<PlusOutlined />}
+                              onClick={() => openReminderEdit(null)}
+                              style={{ borderRadius:20, background:'#3b82f6', borderColor:'#3b82f6' }}>
+                              添加条款提醒
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* 提醒列表 */}
+                        {reminders.length === 0 ? (
+                          <div style={{ textAlign:'center', padding:'40px 24px', background:'#f8fafc', borderRadius:14, border:'2px dashed #e2e8f0' }}>
+                            <div style={{ fontSize:36, marginBottom:8 }}>📋</div>
+                            <div style={{ color:'#94a3b8', fontSize:14 }}>暂无条款提醒</div>
+                            {canEdit && <div style={{ color:'#cbd5e1', fontSize:12, marginTop:4 }}>点击「添加条款提醒」创建</div>}
+                          </div>
+                        ) : (
+                          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                            {reminders.map(item => {
+                              const isDone = item.status === 'done'
+                              const isHigh = item.priority === 'high'
+                              const borderColor = isDone ? '#e2e8f0' : isHigh ? '#fecdd3' : '#fde68a'
+                              const bgColor     = isDone ? '#f8fafc' : isHigh ? '#fff1f2' : '#fffbeb'
+                              return (
+                                <div key={item.id} style={{ borderRadius:12, border:`1px solid ${borderColor}`, background:bgColor, padding:'12px 16px', opacity: isDone ? 0.6 : 1 }}>
+                                  <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                                    {/* 完成勾选 */}
+                                    {canEdit && (
+                                      <div onClick={() => toggleReminderDone(item)} style={{
+                                        width:18, height:18, borderRadius:5, border:`2px solid ${isDone ? '#10b981' : '#cbd5e1'}`,
+                                        background: isDone ? '#10b981' : '#fff', flexShrink:0, cursor:'pointer', marginTop:1,
+                                        display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'#fff',
+                                      }}>
+                                        {isDone && '✓'}
+                                      </div>
+                                    )}
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
+                                        <span style={{ fontSize:14, fontWeight:700, color: isDone ? '#94a3b8' : '#0f172a',
+                                          textDecoration: isDone ? 'line-through' : 'none' }}>
+                                          {item.title}
+                                        </span>
+                                        {item.articleRef && (
+                                          <Tag style={{ margin:0, fontSize:10, color:'#64748b', background:'#f8fafc', border:'1px solid #e2e8f0' }}>
+                                            {item.articleRef}
+                                          </Tag>
+                                        )}
+                                        {isHigh && !isDone && (
+                                          <Tag style={{ margin:0, fontSize:10, fontWeight:700, color:'#dc2626', background:'#fff1f2', border:'1px solid #fecdd3' }}>
+                                            ⚠️ 紧急
+                                          </Tag>
+                                        )}
+                                        {isDone && (
+                                          <Tag style={{ margin:0, fontSize:10, color:'#10b981', background:'#f0fdf4', border:'1px solid #bbf7d0' }}>
+                                            ✓ 已完成
+                                          </Tag>
+                                        )}
+                                      </div>
+                                      {(item.dueDate || item.dueRecurring) && (
+                                        <div style={{ fontSize:11, color: isDone ? '#94a3b8' : (isHigh ? '#dc2626' : '#d97706'), marginBottom:4, fontWeight:600 }}>
+                                          ⏰ {item.dueRecurring || item.dueDate}
+                                        </div>
+                                      )}
+                                      {item.description && (
+                                        <div style={{ fontSize:12, color:'#64748b', marginBottom: item.clauseText ? 6 : 0 }}>{item.description}</div>
+                                      )}
+                                      {item.clauseText && (
+                                        <details style={{ marginTop:4 }}>
+                                          <summary style={{ fontSize:11, color:'#94a3b8', cursor:'pointer', userSelect:'none' }}>
+                                            📄 查看条款原文
+                                          </summary>
+                                          <div style={{ marginTop:6, padding:'8px 12px', background:'#f8fafc', borderRadius:7, border:'1px solid #e2e8f0', fontSize:11, color:'#475569', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+                                            {item.clauseText}
+                                          </div>
+                                        </details>
+                                      )}
+                                    </div>
+                                    {canEdit && (
+                                      <div style={{ display:'flex', gap:4, flexShrink:0 }}>
+                                        <Button size="small" icon={<EditOutlined />} onClick={() => openReminderEdit(item)} style={{ borderRadius:7 }} />
+                                        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteReminder(item)} style={{ borderRadius:7 }} />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </Spin>
+                  ),
+                },
               ]}
             />
           )}
@@ -2097,6 +2397,72 @@ export default function LandingPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── 条款提醒编辑 Modal ─────────────────────────────────────── */}
+      <Modal
+        title={
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:16 }}>📋</span>
+            <span>{reminderModal.item ? '编辑条款提醒' : '添加条款提醒'}</span>
+          </div>
+        }
+        open={reminderModal.open}
+        onCancel={() => setReminderModal({ open:false, item:null })}
+        onOk={saveReminder}
+        confirmLoading={reminderSaving}
+        okText="保存" cancelText="取消"
+        width={560}
+        styles={{ body:{ paddingTop:16 } }}
+      >
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>提醒标题 <span style={{ color:'#ef4444' }}>*</span></div>
+            <Input value={reminderForm.title || ''} onChange={e => setReminderForm(p => ({ ...p, title: e.target.value }))}
+              placeholder="如：半年财务审计表提交" maxLength={60} showCount style={{ borderRadius:8 }} />
+          </div>
+          <Row gutter={12}>
+            <Col span={12}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>条款引用</div>
+              <Input value={reminderForm.articleRef || ''} onChange={e => setReminderForm(p => ({ ...p, articleRef: e.target.value }))}
+                placeholder="如：第2.2.5条" style={{ borderRadius:8 }} />
+            </Col>
+            <Col span={12}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>优先级</div>
+              <Select value={reminderForm.priority || 'normal'} onChange={v => setReminderForm(p => ({ ...p, priority: v }))}
+                style={{ width:'100%' }} options={[{ value:'high', label:'⚠️ 紧急' }, { value:'normal', label:'📌 普通' }, { value:'low', label:'💤 低优先级' }]} />
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>时间类型</div>
+              <Select value={reminderForm.dueType || 'date'} onChange={v => setReminderForm(p => ({ ...p, dueType: v }))}
+                style={{ width:'100%' }} options={[{ value:'date', label:'具体日期' }, { value:'recurring', label:'周期重复' }, { value:'event', label:'事件触发' }]} />
+            </Col>
+            <Col span={12}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+                {reminderForm.dueType === 'recurring' ? '周期描述' : '截止日期'}
+              </div>
+              {reminderForm.dueType === 'recurring' ? (
+                <Input value={reminderForm.dueRecurring || ''} onChange={e => setReminderForm(p => ({ ...p, dueRecurring: e.target.value }))}
+                  placeholder="如：每年6月/12月前" style={{ borderRadius:8 }} />
+              ) : (
+                <Input value={reminderForm.dueDate || ''} onChange={e => setReminderForm(p => ({ ...p, dueDate: e.target.value }))}
+                  placeholder="如：2025-08-01" style={{ borderRadius:8 }} />
+              )}
+            </Col>
+          </Row>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>说明描述</div>
+            <Input.TextArea value={reminderForm.description || ''} onChange={e => setReminderForm(p => ({ ...p, description: e.target.value }))}
+              rows={2} placeholder="具体需要做什么..." maxLength={200} showCount style={{ borderRadius:8 }} />
+          </div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>条款原文（可选，支持粘贴协议原文）</div>
+            <Input.TextArea value={reminderForm.clauseText || ''} onChange={e => setReminderForm(p => ({ ...p, clauseText: e.target.value }))}
+              rows={4} placeholder="粘贴协议相关条款原文..." style={{ borderRadius:8, fontFamily:'monospace', fontSize:11 }} />
+          </div>
+        </div>
       </Modal>
 
       {/* ── 快速录入 Modal ──────────────────────────────────────────── */}
