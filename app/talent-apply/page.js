@@ -806,6 +806,7 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
 // ── 导航视图 ──────────────────────────────────
 function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }) {
   const [drawerProject, setDrawerProject] = useState(null)
+  const [hoveredId, setHoveredId] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editProject, setEditProject] = useState(null)
   const [editOpen, setEditOpen] = useState(false)
@@ -876,12 +877,14 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
                   s + (c.applicants || []).filter(a => a.paidAmount).reduce((ss, a) => ss + (a.paidAmount || 0), 0), 0)
                 const pct = totalAmt > 0 ? Math.round(approvedAmt / totalAmt * 100) : 0
 
+                const isHovered = hoveredId === p.id
                 return (
                   <div key={p.id}
-                    style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', border: `1.5px solid ${p.isFocus ? '#fedf89' : '#e4e7ec'}`, display: 'flex', alignItems: 'center', gap: 16, transition: 'box-shadow 0.15s', cursor: 'default' }}
-                    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(16,24,40,0.07)'}
-                    onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                    onMouseEnter={() => setHoveredId(p.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', border: `1.5px solid ${p.isFocus ? '#fedf89' : isHovered ? '#d0d5dd' : '#e4e7ec'}`, display: 'flex', alignItems: 'center', gap: 16, transition: 'box-shadow 0.15s, border-color 0.15s', cursor: 'default', boxShadow: isHovered ? '0 2px 12px rgba(16,24,40,0.07)' : 'none' }}
                   >
+                    {/* 左侧：名称 + 标签 */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>{p.name}</span>
@@ -892,48 +895,54 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <LevelChip v={p.level} />
                         <span style={{ fontSize: 12, color: '#667085', background: '#f2f4f7', padding: '1px 7px', borderRadius: 5 }}>{p.category}</span>
                         <span style={{ fontSize: 12, color: GREEN_DARK, background: GREEN_LIGHT, padding: '1px 7px', borderRadius: 5 }}>📍 {p.region}</span>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 28, alignItems: 'center', flexShrink: 0 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 11, color: '#98a2b3' }}>周期数</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#344054' }}>{totalCycles}</div>
+                    {/* 右侧：平时显示统计，hover 显示操作 */}
+                    <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {/* 统计数字 - 始终占位，hover 时淡出 */}
+                      <div style={{ display: 'flex', gap: 24, alignItems: 'center', opacity: isHovered ? 0 : 1, transition: 'opacity 0.15s', pointerEvents: 'none', position: isHovered ? 'absolute' : 'static', visibility: isHovered ? 'hidden' : 'visible' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: '#98a2b3' }}>⏳ {totalCycles} 期</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: '#98a2b3' }}>👤 {totalPeople} 人</div>
+                        </div>
+                        <div style={{ textAlign: 'right', minWidth: 130 }}>
+                          <div style={{ fontSize: 12, color: '#667085' }}>资金进度：{approvedAmt.toFixed(2)} / {totalAmt.toFixed(2)} 万</div>
+                          <Progress percent={pct} strokeColor={GREEN} showInfo={false} size="small" style={{ marginBottom: 0 }} />
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 11, color: '#98a2b3' }}>覆盖人数</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#344054' }}>{totalPeople}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', minWidth: 120 }}>
-                        <div style={{ fontSize: 11, color: '#98a2b3' }}>资金进度</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#344054' }}>{approvedAmt.toFixed(2)} 万 / {totalAmt.toFixed(2)} 万</div>
-                        <Progress percent={pct} strokeColor={GREEN} showInfo={false} size="small" style={{ marginBottom: 0 }} />
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: '#667085' }}>当期重点</span>
-                        <Switch size="small" checked={p.isFocus} onChange={() => handleToggleFocus(p)}
-                          style={p.isFocus ? { background: '#f79009' } : {}} />
-                      </div>
-                      <Button size="small" icon={<EditOutlined />} onClick={() => { setEditProject(parseProjectForForm(p)); setEditOpen(true) }}
-                        style={{ borderRadius: 6 }}>编辑内容</Button>
-                      {p.applyUrl && (
-                        <a href={p.applyUrl} target="_blank" rel="noreferrer">
-                          <Button size="small" style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6' }}>🌐 申报入口</Button>
-                        </a>
+                      {/* 操作按钮 - hover 时显示 */}
+                      {isHovered && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', animation: 'fadeIn 0.1s ease' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontSize: 12, color: '#667085' }}>当期重点</span>
+                            <Switch size="small" checked={p.isFocus} onChange={() => handleToggleFocus(p)}
+                              style={p.isFocus ? { background: '#f79009' } : {}} />
+                          </div>
+                          <Button size="small" icon={<EditOutlined />}
+                            onClick={() => { setEditProject(parseProjectForForm(p)); setEditOpen(true) }}
+                            style={{ borderRadius: 6 }}>编辑内容</Button>
+                          {p.applyUrl && (
+                            <a href={p.applyUrl} target="_blank" rel="noreferrer">
+                              <Button size="small" style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6' }}>🌐 申报入口</Button>
+                            </a>
+                          )}
+                          <Button size="small" type="primary" onClick={() => openDrawer(p)}
+                            style={{ borderRadius: 6, background: GREEN, border: 'none', fontWeight: 600 }}>
+                            进入申报 ›
+                          </Button>
+                          <Popconfirm title="确认删除该项目？" onConfirm={() => handleDelete(p.id)}
+                            okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
+                            <Button size="small" type="text" danger icon={<DeleteOutlined />} style={{ color: '#d0d5dd' }} />
+                          </Popconfirm>
+                        </div>
                       )}
-                      <Button size="small" type="primary" onClick={() => openDrawer(p)}
-                        style={{ borderRadius: 6, background: GREEN, border: 'none' }}>
-                        进入申报 &rsaquo;
-                      </Button>
-                      <Popconfirm title="确认删除该项目（含所有周期和人员数据）？" onConfirm={() => handleDelete(p.id)}
-                        okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-                      </Popconfirm>
                     </div>
                   </div>
                 )
