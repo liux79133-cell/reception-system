@@ -1092,72 +1092,169 @@ function StatsTable({ projects, stats }) {
   if (!projects.length) return <Empty style={{ padding: 60 }} />
 
   // 收集所有年度
-  const yearSet = new Set()
-  projects.forEach(p => (p.cycles || []).forEach(c => yearSet.add(c.year)))
-  const years = [...yearSet].sort((a, b) => a - b)
+  const allYearSet = new Set()
+  projects.forEach(p => (p.cycles || []).forEach(c => allYearSet.add(c.year)))
+  const allYears = [...allYearSet].sort((a, b) => a - b)
 
-  // 构建 projectStats map
+  // 默认选中全部年份
+  const [selectedYears, setSelectedYears] = useState(allYears)
+  const [activeTab, setActiveTab] = useState('__all__')
+
+  // 年份变化时同步（数据加载后）
+  useEffect(() => {
+    setSelectedYears(allYears)
+  }, [allYears.join(',')])
+
+  const toggleYear = (y) => {
+    setSelectedYears(prev =>
+      prev.includes(y) ? (prev.length > 1 ? prev.filter(x => x !== y) : prev) : [...prev, y].sort((a, b) => a - b)
+    )
+  }
+
+  const years = selectedYears
+
+  // 构建 projectStats map（来自 stats API）
   const psMap = {}
   ;(stats?.projectStats || []).forEach(ps => { psMap[ps.projectId] = ps.yearStats })
 
+  // 构建本地 fallback map（直接从 projects 计算）
+  const localMap = {}
+  projects.forEach(p => {
+    localMap[p.id] = {}
+    ;(p.cycles || []).forEach(c => {
+      const selectedApps = (c.applicants || []).filter(a => a.status === '已入选')
+      localMap[p.id][c.year] = {
+        count:  selectedApps.length,
+        amount: selectedApps.reduce((s, a) => s + (a.paidAmount || a.amount || 0), 0),
+      }
+    })
+  })
+
+  const getYS = (projectId, year) => {
+    const ps = psMap[projectId]?.[year]
+    if (ps) return ps
+    return localMap[projectId]?.[year] || null
+  }
+
+  // Tab 列表：全局汇总 + 每个项目
+  const tabItems = [
+    { key: '__all__', label: '全局汇总' },
+    ...projects.map(p => ({ key: String(p.id), label: p.name })),
+  ]
+
+  // 过滤展示的项目（全局 or 单项目）
+  const displayProjects = activeTab === '__all__' ? projects : projects.filter(p => String(p.id) === activeTab)
+
+  // 列定义
   const columns = [
     {
       title: '项目名称',
       dataIndex: 'name',
       key: 'name',
       fixed: 'left',
-      width: 220,
+      width: 240,
+      onCell: () => ({ style: { background: '#fff' } }),
       render: (v, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#101828', fontSize: 13 }}>{v}</div>
-          <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+          <div style={{ fontWeight: 600, color: '#101828', fontSize: 13, marginBottom: 4 }}>{v}</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <LevelChip v={r.level} />
             <span style={{ fontSize: 11, color: '#98a2b3' }}>{r.region}</span>
           </div>
         </div>
       ),
     },
-    ...years.flatMap(year => [
+    ...years.flatMap(year => ([
       {
         title: `${year}年度`,
+        key: `year_${year}`,
         children: [
           {
-            title: '入选数',
+            title: '入选人数',
             key: `${year}_count`,
-            width: 70,
+            width: 90,
+            align: 'center',
             render: (_, r) => {
-              const ys = psMap[r.id]?.[year]
-              return <span style={{ color: ys?.count ? '#101828' : '#d0d5dd' }}>{ys?.count || '—'}</span>
+              const ys = getYS(r.id, year)
+              return ys?.count
+                ? <span style={{ fontWeight: 600, color: '#101828' }}>{ys.count}</span>
+                : <span style={{ color: '#d0d5dd' }}>—</span>
             },
           },
           {
-            title: '资助金额(万)',
+            title: '拟资助金额(万)',
             key: `${year}_amount`,
-            width: 100,
+            width: 120,
+            align: 'center',
             render: (_, r) => {
-              const ys = psMap[r.id]?.[year]
-              return <span style={{ color: ys?.amount ? GREEN_DARK : '#d0d5dd', fontWeight: ys?.amount ? 600 : 400 }}>
-                {ys?.amount ? ys.amount.toFixed(2) : '—'}
-              </span>
+              const ys = getYS(r.id, year)
+              return ys?.amount
+                ? <span style={{ fontWeight: 600, color: GREEN_DARK }}>{ys.amount.toFixed(2)}</span>
+                : <span style={{ color: '#d0d5dd' }}>—</span>
             },
           },
         ],
       },
-    ]),
+    ])),
   ]
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
-      <Table
-        dataSource={projects}
-        columns={columns}
-        rowKey="id"
-        pagination={false}
-        scroll={{ x: 300 + years.length * 170 }}
-        size="middle"
-        bordered
-        style={{ fontSize: 13 }}
-      />
+    <div>
+      {/* 顶部：年份筛选 + 项目 Tab */}
+      <div style={{ background: '#fff', borderRadius: 12, padding: '14px 20px', marginBottom: 12, boxShadow: '0 1px 3px rgba(16,24,40,0.06)', border: '1px solid #f2f4f7' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>查看年份：</span>
+          {allYears.length === 0 ? (
+            <span style={{ fontSize: 12, color: '#98a2b3' }}>暂无年度数据</span>
+          ) : (
+            allYears.map(y => {
+              const on = selectedYears.includes(y)
+              return (
+                <button key={y} type="button" onClick={() => toggleYear(y)}
+                  style={{ padding: '4px 14px', borderRadius: 20, border: `1.5px solid ${on ? '#175cd3' : '#e4e7ec'}`, background: on ? '#eff8ff' : '#fff', color: on ? '#175cd3' : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: on ? 700 : 400, transition: 'all 0.12s' }}>
+                  {y} 年
+                </button>
+              )
+            })
+          )}
+          {allYears.length > 1 && (
+            <button type="button" onClick={() => setSelectedYears(allYears)}
+              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #e4e7ec', background: 'transparent', color: '#98a2b3', cursor: 'pointer', fontSize: 12 }}>
+              全选
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 项目 Tab 导航 */}
+      <div style={{ background: '#fff', borderRadius: '12px 12px 0 0', borderBottom: '1px solid #f2f4f7', overflowX: 'auto', whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(16,24,40,0.06)' }}>
+        <div style={{ display: 'inline-flex', padding: '0 16px' }}>
+          {tabItems.map(t => (
+            <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
+              style={{ padding: '12px 16px', border: 'none', borderBottom: `2px solid ${activeTab === t.key ? '#175cd3' : 'transparent'}`, background: 'transparent', color: activeTab === t.key ? '#175cd3' : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === t.key ? 700 : 400, whiteSpace: 'nowrap', transition: 'all 0.12s', flexShrink: 0 }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 表格 */}
+      <div style={{ background: '#fff', borderRadius: '0 0 12px 12px', boxShadow: '0 1px 3px rgba(16,24,40,0.06)', overflow: 'hidden' }}>
+        <Table
+          dataSource={displayProjects}
+          columns={columns}
+          rowKey="id"
+          pagination={false}
+          scroll={{ x: 240 + years.length * 210 }}
+          size="middle"
+          bordered
+          style={{ fontSize: 13 }}
+          rowClassName={(_, i) => i % 2 === 1 ? 'table-row-alt' : ''}
+        />
+      </div>
+
+      {/* 行高亮样式 */}
+      <style>{`.table-row-alt > td { background: #fafafa !important; }`}</style>
     </div>
   )
 }
@@ -1197,7 +1294,7 @@ export default function TalentApplyPage() {
   }, [])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
-  useEffect(() => { if (view === 'screen') fetchStats() }, [view, fetchStats])
+  useEffect(() => { if (view === 'screen' || view === 'table') fetchStats() }, [view, fetchStats])
 
   const [seeding, setSeeding] = useState(false)
 
