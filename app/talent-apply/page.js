@@ -1091,9 +1091,12 @@ function DataScreen({ stats, loading }) {
 function StatsTable({ projects, stats }) {
   if (!projects.length) return <Empty style={{ padding: 60 }} />
 
-  // 收集所有年度
+  // 收集所有年度（有周期即列出，数据为空时格子显示 —）
   const allYearSet = new Set()
   projects.forEach(p => (p.cycles || []).forEach(c => allYearSet.add(c.year)))
+  // 如果没有任何周期，默认给当前年和前一年作为示例列
+  const curYear = new Date().getFullYear()
+  if (allYearSet.size === 0) { allYearSet.add(curYear - 1); allYearSet.add(curYear) }
   const allYears = [...allYearSet].sort((a, b) => a - b)
 
   // 默认选中全部年份
@@ -1117,23 +1120,28 @@ function StatsTable({ projects, stats }) {
   const psMap = {}
   ;(stats?.projectStats || []).forEach(ps => { psMap[ps.projectId] = ps.yearStats })
 
-  // 构建本地 fallback map（直接从 projects 计算）
+  // 本地计算：只有真实有入选人员才返回数据，否则 null
   const localMap = {}
   projects.forEach(p => {
     localMap[p.id] = {}
     ;(p.cycles || []).forEach(c => {
       const selectedApps = (c.applicants || []).filter(a => a.status === '已入选')
-      localMap[p.id][c.year] = {
-        count:  selectedApps.length,
-        amount: selectedApps.reduce((s, a) => s + (a.paidAmount || a.amount || 0), 0),
+      if (selectedApps.length > 0) {
+        localMap[p.id][c.year] = {
+          count:  selectedApps.length,
+          amount: selectedApps.reduce((s, a) => s + (a.paidAmount || a.amount || 0), 0),
+        }
       }
     })
   })
 
+  // 只有 count > 0 才算有数据
   const getYS = (projectId, year) => {
     const ps = psMap[projectId]?.[year]
-    if (ps) return ps
-    return localMap[projectId]?.[year] || null
+    if (ps?.count > 0) return ps
+    const local = localMap[projectId]?.[year]
+    if (local?.count > 0) return local
+    return null
   }
 
   // Tab 列表：全局汇总 + 每个项目
