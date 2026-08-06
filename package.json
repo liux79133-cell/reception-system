@@ -8,7 +8,8 @@
     "start": "next start",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
-    "db:seed-agreement": "node prisma/seed-agreement.js"
+    "db:seed-agreement": "node prisma/seed-agreement.js",
+    "db:seed-talent": "node prisma/seed-talent.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
