@@ -46,8 +46,10 @@ function pickProjectFields(body, userId) {
     attachments:    body.attachments    ? JSON.stringify(body.attachments)   : null,
     cycleTemplate:  body.cycleTemplate  ? JSON.stringify(body.cycleTemplate) : null,
     cycleMonths:    body.cycleMonths    ? JSON.stringify(body.cycleMonths)   : null,
-    cycleStartDay:  body.cycleStartDay  != null ? Number(body.cycleStartDay) : null,
-    cycleEndDay:    body.cycleEndDay    != null ? Number(body.cycleEndDay)   : null,
+    cycleStartDay:    body.cycleStartDay    != null ? Number(body.cycleStartDay)    : null,
+    cycleEndDay:      body.cycleEndDay      != null ? Number(body.cycleEndDay)      : null,
+    cycleWindowStart: body.cycleWindowStart != null ? Number(body.cycleWindowStart) : null,
+    cycleWindowEnd:   body.cycleWindowEnd   != null ? Number(body.cycleWindowEnd)   : null,
     remark:         body.remark         || null,
     ...(userId != null ? { createdById: userId } : {}),
   }

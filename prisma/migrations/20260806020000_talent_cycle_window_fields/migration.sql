@@ -1,0 +1,3 @@
+ALTER TABLE "TalentProject"
+  ADD COLUMN IF NOT EXISTS "cycleWindowStart" INTEGER,
+  ADD COLUMN IF NOT EXISTS "cycleWindowEnd"   INTEGER;

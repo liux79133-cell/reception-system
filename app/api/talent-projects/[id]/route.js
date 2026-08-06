@@ -15,8 +15,10 @@ export async function PUT(request, { params }) {
     str('cycleType'); str('applyUrl'); str('contactNote'); str('remark')
     bool('isFocus')
     json('policyDesc'); json('policyLinks'); json('attachments'); json('cycleTemplate'); json('cycleMonths')
-    if (body.cycleStartDay !== undefined) data.cycleStartDay = body.cycleStartDay != null ? Number(body.cycleStartDay) : null
-    if (body.cycleEndDay   !== undefined) data.cycleEndDay   = body.cycleEndDay   != null ? Number(body.cycleEndDay)   : null
+    if (body.cycleStartDay    !== undefined) data.cycleStartDay    = body.cycleStartDay    != null ? Number(body.cycleStartDay)    : null
+    if (body.cycleEndDay      !== undefined) data.cycleEndDay      = body.cycleEndDay      != null ? Number(body.cycleEndDay)      : null
+    if (body.cycleWindowStart !== undefined) data.cycleWindowStart = body.cycleWindowStart != null ? Number(body.cycleWindowStart) : null
+    if (body.cycleWindowEnd   !== undefined) data.cycleWindowEnd   = body.cycleWindowEnd   != null ? Number(body.cycleWindowEnd)   : null
 
     const project = await prisma.talentProject.update({
       where: { id: Number(params.id) },
