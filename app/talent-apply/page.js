@@ -1091,21 +1091,21 @@ function DataScreen({ stats, loading }) {
 function StatsTable({ projects, stats }) {
   if (!projects.length) return <Empty style={{ padding: 60 }} />
 
-  // 收集所有年度（有周期即列出，数据为空时格子显示 —）
-  const allYearSet = new Set()
-  projects.forEach(p => (p.cycles || []).forEach(c => allYearSet.add(c.year)))
-  // 如果没有任何周期，默认给当前年和前一年作为示例列
+  // 收集所有年度：2018 到今年，加上已有周期的年份，合并去重
   const curYear = new Date().getFullYear()
-  if (allYearSet.size === 0) { allYearSet.add(curYear - 1); allYearSet.add(curYear) }
+  const allYearSet = new Set()
+  for (let y = 2018; y <= curYear; y++) allYearSet.add(y)
+  projects.forEach(p => (p.cycles || []).forEach(c => allYearSet.add(c.year)))
   const allYears = [...allYearSet].sort((a, b) => a - b)
 
-  // 默认选中全部年份
-  const [selectedYears, setSelectedYears] = useState(allYears)
+  // 默认选中近3年
+  const defaultYears = allYears.slice(-3)
+  const [selectedYears, setSelectedYears] = useState(defaultYears)
   const [activeTab, setActiveTab] = useState('__all__')
 
-  // 年份变化时同步（数据加载后）
+  // 数据加载后重置为近3年
   useEffect(() => {
-    setSelectedYears(allYears)
+    setSelectedYears(allYears.slice(-3))
   }, [allYears.join(',')])
 
   const toggleYear = (y) => {
