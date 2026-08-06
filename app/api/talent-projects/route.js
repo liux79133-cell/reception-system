@@ -20,7 +20,10 @@ export async function GET(request) {
       where,
       include: {
         cycles: {
-          include: { applicants: true },
+          include: {
+            applicants: true,
+            tasks: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+          },
           orderBy: { year: 'desc' },
         },
         tasks: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },

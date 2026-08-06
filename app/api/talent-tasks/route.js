@@ -26,6 +26,8 @@ export async function POST(request) {
       data: {
         projectId: Number(body.projectId),
         companyId: body.companyId ? Number(body.companyId) : null,
+        cycleId:   body.cycleId   ? Number(body.cycleId)   : null,
+        nodeLabel: body.nodeLabel || null,
         title:     body.title,
         desc:      body.desc      || null,
         assignee:  body.assignee  || null,

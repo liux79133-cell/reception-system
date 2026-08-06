@@ -311,18 +311,20 @@ model TalentCompany {
 }
 
 model TalentCycle {
-  id          Int               @id @default(autoincrement())
-  projectId   Int
-  project     TalentProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  companyId   Int?              // 关联公司（可选）
-  company     TalentCompany?    @relation(fields: [companyId], references: [id])
-  year        Int
-  deadline    String?           // 申报截止日 YYYY-MM-DD
-  status      String            @default("待申报") // 待申报|申报中|已提交|审核中|已入选|未入选
-  remark      String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  applicants  TalentApplicant[]
+  id            Int               @id @default(autoincrement())
+  projectId     Int
+  project       TalentProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId     Int?
+  company       TalentCompany?    @relation(fields: [companyId], references: [id])
+  year          Int
+  deadline      String?
+  status        String            @default("待申报") // 待申报|申报中|已提交|审核中|已入选|未入选
+  nodeStatuses  String?           // JSON: {nodeLabel: "未开始"|"进行中"|"已完成"}
+  remark        String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  applicants    TalentApplicant[]
+  tasks         TalentTask[]
 }
 
 model TalentTask {
@@ -331,11 +333,14 @@ model TalentTask {
   project     TalentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   companyId   Int?
   company     TalentCompany? @relation(fields: [companyId], references: [id])
+  cycleId     Int?           // 关联申报周期
+  cycle       TalentCycle?   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  nodeLabel   String?        // 归属节点名称（对应 cycleTemplate 中的 label）
   title       String
   desc        String?
-  assignee    String?        // 负责人
-  dueDate     String?        // YYYY-MM-DD
-  status      String         @default("pending") // pending|done
+  assignee    String?
+  dueDate     String?
+  status      String         @default("pending") // pending|doing|done
   sortOrder   Int            @default(0)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

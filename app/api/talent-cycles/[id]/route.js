@@ -5,15 +5,19 @@ export async function PUT(request, { params }) {
   try {
     requireEditor(request)
     const body = await request.json()
+    const data = {}
+    if (body.year         !== undefined) data.year         = Number(body.year)
+    if (body.deadline     !== undefined) data.deadline     = body.deadline || null
+    if (body.status       !== undefined) data.status       = body.status
+    if (body.remark       !== undefined) data.remark       = body.remark || null
+    if (body.nodeStatuses !== undefined) data.nodeStatuses = body.nodeStatuses != null ? JSON.stringify(body.nodeStatuses) : null
     const cycle = await prisma.talentCycle.update({
       where: { id: Number(params.id) },
-      data: {
-        year:     body.year     !== undefined ? Number(body.year) : undefined,
-        deadline: body.deadline !== undefined ? body.deadline     : undefined,
-        status:   body.status   !== undefined ? body.status       : undefined,
-        remark:   body.remark   !== undefined ? body.remark       : undefined,
+      data,
+      include: {
+        applicants: true,
+        tasks: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
       },
-      include: { applicants: true },
     })
     return Response.json({ cycle })
   } catch (e) { return errorResponse(e) }

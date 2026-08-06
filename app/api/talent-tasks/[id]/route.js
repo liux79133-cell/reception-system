@@ -11,6 +11,8 @@ export async function PUT(request, { params }) {
     if (body.status    !== undefined) data.status    = body.status
     if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder)
     if (body.companyId !== undefined) data.companyId = body.companyId ? Number(body.companyId) : null
+    if (body.cycleId   !== undefined) data.cycleId   = body.cycleId   ? Number(body.cycleId)   : null
+    if (body.nodeLabel !== undefined) data.nodeLabel  = body.nodeLabel || null
     const task = await prisma.talentTask.update({ where: { id: Number(params.id) }, data })
     return Response.json({ task })
   } catch (e) { return errorResponse(e) }

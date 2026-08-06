@@ -60,105 +60,94 @@ function StatusDot({ v }) {
   )
 }
 
-// ── 任务清单组件 ──────────────────────────────
-function TaskList({ projectId, companyId, tasks, onRefresh }) {
+// ── 节点状态颜色 ──────────────────────────────
+const NODE_STATUS = {
+  '未开始': { color: '#667085', bg: '#f9fafb', border: '#e4e7ec', dot: '#d0d5dd' },
+  '进行中': { color: '#b54708', bg: '#fffaeb', border: '#fedf89', dot: '#f79009' },
+  '已完成': { color: '#067647', bg: '#ecfdf3', border: '#abefc6', dot: '#17b26a' },
+}
+
+// ── 节点任务清单 ──────────────────────────────
+function NodeTaskList({ projectId, companyId, cycleId, nodeLabel, tasks, onRefresh }) {
   const [adding, setAdding] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
 
   const handleAdd = async () => {
-    const vals = await form.validateFields()
-    setSaving(true)
+    const vals = await form.validateFields(); setSaving(true)
     try {
-      await api.post('/api/talent-tasks', { projectId, companyId: companyId || null, ...vals })
-      message.success('任务已添加')
-      form.resetFields()
-      setAdding(false)
-      onRefresh()
+      await api.post('/api/talent-tasks', { projectId, companyId: companyId || null, cycleId: cycleId || null, nodeLabel: nodeLabel || null, ...vals })
+      form.resetFields(); setAdding(false); onRefresh()
     } catch { message.error('添加失败') } finally { setSaving(false) }
   }
 
-  const handleToggle = async (task) => {
-    try {
-      await api.put(`/api/talent-tasks/${task.id}`, { status: task.status === 'done' ? 'pending' : 'done' })
-      onRefresh()
-    } catch { message.error('更新失败') }
+  const statusSeq = ['pending', 'doing', 'done']
+  const cycleStatus = t => statusSeq[(statusSeq.indexOf(t.status) + 1) % statusSeq.length]
+
+  const handleCycleStatus = async (task) => {
+    try { await api.put(`/api/talent-tasks/${task.id}`, { status: cycleStatus(task) }); onRefresh() } catch { message.error('更新失败') }
   }
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/api/talent-tasks/${id}`)
-      onRefresh()
-    } catch { message.error('删除失败') }
+    try { await api.delete(`/api/talent-tasks/${id}`); onRefresh() } catch { message.error('删除失败') }
   }
 
   const handleEdit = async (task) => {
-    const vals = await form.validateFields()
-    setSaving(true)
-    try {
-      await api.put(`/api/talent-tasks/${task.id}`, vals)
-      message.success('已更新')
-      form.resetFields()
-      setEditId(null)
-      onRefresh()
-    } catch { message.error('更新失败') } finally { setSaving(false) }
+    const vals = await form.validateFields(); setSaving(true)
+    try { await api.put(`/api/talent-tasks/${task.id}`, vals); form.resetFields(); setEditId(null); onRefresh() } catch { message.error('更新失败') } finally { setSaving(false) }
   }
 
   const doneCount = tasks.filter(t => t.status === 'done').length
-  const pct = tasks.length > 0 ? Math.round(doneCount / tasks.length * 100) : 0
+  const taskStatusCfg = {
+    pending: { label: '未开始', color: '#667085', bg: '#f2f4f7' },
+    doing:   { label: '进行中', color: '#b54708', bg: '#fffaeb' },
+    done:    { label: '已完成', color: '#067647', bg: '#ecfdf3' },
+  }
 
   return (
     <div>
-      {/* 进度条 */}
       {tasks.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <Progress percent={pct} strokeColor={GREEN} size="small" style={{ flex: 1, marginBottom: 0 }} />
-          <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>{doneCount}/{tasks.length} 已完成</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>{doneCount}/{tasks.length}</span>
+          <div style={{ flex: 1, height: 4, background: '#f2f4f7', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${tasks.length > 0 ? Math.round(doneCount / tasks.length * 100) : 0}%`, background: GREEN, borderRadius: 2, transition: 'width 0.3s' }} />
+          </div>
         </div>
       )}
-
-      {/* 任务列表 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-        {tasks.length === 0 && !adding && (
-          <div style={{ textAlign: 'center', padding: '16px 0', color: '#98a2b3', fontSize: 13 }}>
-            暂无任务，点击「+ 新增任务」开始
-          </div>
-        )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {tasks.map(t => (
           <div key={t.id}>
             {editId === t.id ? (
-              <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px', border: '1px solid #e4e7ec' }}>
-                <Form form={form} layout="inline" size="small" initialValues={{ title: t.title, assignee: t.assignee, dueDate: t.dueDate, desc: t.desc }}>
-                  <Form.Item name="title" rules={[{ required: true }]}><Input placeholder="任务名称" style={{ width: 160 }} /></Form.Item>
+              <div style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px', border: '1px solid #e4e7ec' }}>
+                <Form form={form} layout="inline" size="small" initialValues={{ title: t.title, assignee: t.assignee, dueDate: t.dueDate }}>
+                  <Form.Item name="title" rules={[{ required: true }]}><Input placeholder="任务名称" style={{ width: 150 }} /></Form.Item>
                   <Form.Item name="assignee"><Input placeholder="负责人" style={{ width: 80 }} /></Form.Item>
-                  <Form.Item name="dueDate"><Input placeholder="截止 YYYY-MM-DD" style={{ width: 130 }} /></Form.Item>
+                  <Form.Item name="dueDate"><Input placeholder="YYYY-MM-DD" style={{ width: 110 }} /></Form.Item>
                 </Form>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   <Button size="small" type="primary" loading={saving} onClick={() => handleEdit(t)} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
                   <Button size="small" onClick={() => { setEditId(null); form.resetFields() }} style={{ borderRadius: 6 }}>取消</Button>
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: t.status === 'done' ? '#f9fafb' : '#fff', border: `1px solid ${t.status === 'done' ? '#f2f4f7' : '#e4e7ec'}`, cursor: 'pointer', transition: 'all 0.1s' }}
-                onClick={() => handleToggle(t)}>
-                {/* 勾选框 */}
-                <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${t.status === 'done' ? GREEN : '#d0d5dd'}`, background: t.status === 'done' ? GREEN : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                  {t.status === 'done' && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: '#fff', border: '1px solid #f2f4f7' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: t.status === 'done' ? '#98a2b3' : '#101828', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</div>
+                  <span style={{ fontSize: 13, color: t.status === 'done' ? '#98a2b3' : '#101828', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
                   {(t.assignee || t.dueDate) && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                      {t.assignee && <span style={{ fontSize: 11, color: '#667085' }}>👤 {t.assignee}</span>}
-                      {t.dueDate  && <span style={{ fontSize: 11, color: '#667085' }}>📅 {t.dueDate}</span>}
-                    </div>
+                    <span style={{ fontSize: 11, color: '#98a2b3', marginLeft: 8 }}>
+                      {t.assignee ? `👤 ${t.assignee}` : ''}{t.assignee && t.dueDate ? ' · ' : ''}{t.dueDate ? `📅 ${t.dueDate}` : ''}
+                    </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                  <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditId(t.id); form.setFieldsValue({ title: t.title, assignee: t.assignee, dueDate: t.dueDate }) }} />
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: taskStatusCfg[t.status]?.bg || '#f2f4f7', color: taskStatusCfg[t.status]?.color || '#667085', cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}
+                  onClick={() => handleCycleStatus(t)}>
+                  {taskStatusCfg[t.status]?.label}
+                </span>
+                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                  <Button type="text" size="small" icon={<EditOutlined />} style={{ color: '#d0d5dd' }} onClick={() => { setEditId(t.id); form.setFieldsValue({ title: t.title, assignee: t.assignee, dueDate: t.dueDate }) }} />
                   <Popconfirm title="删除该任务？" onConfirm={() => handleDelete(t.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-                    <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ color: '#d0d5dd' }} />
                   </Popconfirm>
                 </div>
               </div>
@@ -166,23 +155,20 @@ function TaskList({ projectId, companyId, tasks, onRefresh }) {
           </div>
         ))}
       </div>
-
-      {/* 新增表单 */}
       {adding ? (
-        <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px', border: '1px solid #e4e7ec' }}>
+        <div style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px', border: '1px solid #e4e7ec', marginTop: 6 }}>
           <Form form={form} layout="inline" size="small">
-            <Form.Item name="title" rules={[{ required: true, message: '请输入任务名称' }]}><Input placeholder="任务名称" style={{ width: 160 }} /></Form.Item>
+            <Form.Item name="title" rules={[{ required: true }]}><Input placeholder="任务名称" style={{ width: 150 }} /></Form.Item>
             <Form.Item name="assignee"><Input placeholder="负责人" style={{ width: 80 }} /></Form.Item>
-            <Form.Item name="dueDate"><Input placeholder="截止 YYYY-MM-DD" style={{ width: 130 }} /></Form.Item>
+            <Form.Item name="dueDate"><Input placeholder="YYYY-MM-DD" style={{ width: 110 }} /></Form.Item>
           </Form>
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <Button size="small" type="primary" loading={saving} onClick={handleAdd} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>添加</Button>
             <Button size="small" onClick={() => { setAdding(false); form.resetFields() }} style={{ borderRadius: 6 }}>取消</Button>
           </div>
         </div>
       ) : (
-        <Button size="small" icon={<PlusOutlined />} onClick={() => setAdding(true)}
-          style={{ borderRadius: 6, borderColor: '#d0d5dd', color: '#667085', width: '100%' }}>
+        <Button size="small" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ borderRadius: 6, borderStyle: 'dashed', color: '#98a2b3', borderColor: '#d0d5dd', width: '100%', marginTop: 6 }}>
           + 新增任务
         </Button>
       )}
@@ -190,34 +176,40 @@ function TaskList({ projectId, companyId, tasks, onRefresh }) {
   )
 }
 
-// ── 申报详情（项目内按公司切换）──────────────
+// ── 申报详情（项目内按公司切换，节点进度）────
 function ProjectDrawer({ project, onClose, onRefresh }) {
-  const [activeCompany, setActiveCompany] = useState(null) // null = 全局视图
+  const [activeCompany, setActiveCompany] = useState(null)
+  const [activeCycleId, setActiveCycleId] = useState(null) // 当前选中周期
+  const [expandedNode, setExpandedNode] = useState(null)   // 展开的节点 label
   const [addingCompany, setAddingCompany] = useState(false)
   const [editingCompany, setEditingCompany] = useState(null)
+  const [managingCompanies, setManagingCompanies] = useState(false)
   const [companyForm] = Form.useForm()
   const [cycleForm] = Form.useForm()
   const [applicantForm] = Form.useForm()
   const [addingCycle, setAddingCycle] = useState(false)
   const [addingApplicant, setAddingApplicant] = useState(null)
   const [editingApplicant, setEditingApplicant] = useState(null)
+  const [policyExpanded, setPolicyExpanded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [managingCompanies, setManagingCompanies] = useState(false)
 
   if (!project) return null
 
   const companies = project.companies || []
-  // 当前激活的公司对象（null 表示全局 / 所有公司汇总）
   const currentCompany = activeCompany ? companies.find(c => c.id === activeCompany) : null
 
-  // 根据当前公司过滤周期（null 时显示所有）
-  const cycles = currentCompany
-    ? (currentCompany.cycles || [])
-    : (project.cycles || [])
+  // 周期列表（按公司过滤）
+  const allCycles = currentCompany ? (currentCompany.cycles || []) : (project.cycles || [])
 
-  const tasks = currentCompany
-    ? (currentCompany.tasks || [])
-    : (project.tasks || [])
+  // 自动选中第一个周期
+  const activeCycle = allCycles.find(c => c.id === activeCycleId) || allCycles[0] || null
+
+  // cycleTemplate 节点
+  const tplNodes = (() => { try { return project.cycleTemplate ? JSON.parse(project.cycleTemplate) : [] } catch { return [] } })()
+  const nodeStatuses = (() => { try { return activeCycle?.nodeStatuses ? JSON.parse(activeCycle.nodeStatuses) : {} } catch { return {} } })()
+
+  // activeCycle 的任务
+  const cycleTasks = activeCycle?.tasks || []
 
   const totalApplicants = cycles.reduce((s, c) => s + (c.applicants?.length || 0), 0)
   const totalAmount = cycles.reduce((s, c) =>
@@ -295,86 +287,142 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
     try { await api.delete(`/api/talent-applicants/${id}`); onRefresh() } catch { message.error('删除失败') }
   }
 
-  // ── 政策信息解析 ──
+  // ── 统计 ──
   const safeJson = (k) => { try { return project[k] ? JSON.parse(project[k]) : [] } catch { return [] } }
   const policyLinks = safeJson('policyLinks')
   const attachments = safeJson('attachments')
   const policyDescs = safeJson('policyDesc')
 
-  return (
-    <div style={{ padding: '0 2px' }}>
+  const totalApplicants = allCycles.reduce((s, c) => s + (c.applicants?.length || 0), 0)
+  const paidAmount = allCycles.reduce((s, c) =>
+    s + (c.applicants || []).reduce((ss, a) => ss + (a.paidAmount || 0), 0), 0)
+  const totalAmount = allCycles.reduce((s, c) =>
+    s + (c.applicants || []).reduce((ss, a) => ss + (a.amount || 0), 0), 0)
+  const paidPct = totalAmount > 0 ? Math.round(paidAmount / totalAmount * 100) : 0
 
-      {/* ① 项目概览条 */}
-      <div style={{ background: GREEN_LIGHT, borderRadius: 12, padding: '14px 18px', marginBottom: 16, border: `1px solid ${GREEN}30` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+  // ── 节点操作 ──
+  const handleNodeStatus = async (nodeLabel, status) => {
+    if (!activeCycle) return
+    const updated = { ...nodeStatuses, [nodeLabel]: status }
+    try { await api.put(`/api/talent-cycles/${activeCycle.id}`, { nodeStatuses: updated }); onRefresh() } catch { message.error('更新失败') }
+  }
+
+  return (
+    <div>
+      {/* ① 顶部概览卡 */}
+      <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', marginBottom: 12, border: '1px solid #e4e7ec', boxShadow: '0 1px 4px rgba(16,24,40,0.04)' }}>
+        {/* 标签行 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           <LevelChip v={project.level} />
-          <span style={{ fontSize: 12, color: GREEN, background: `${GREEN}15`, padding: '1px 8px', borderRadius: 5, fontWeight: 500 }}>📍 {project.region}</span>
-          {project.cycleType && <span style={{ fontSize: 12, color: '#175cd3', background: '#eff8ff', padding: '1px 8px', borderRadius: 5 }}>🔄 {project.cycleType}</span>}
+          <span style={{ fontSize: 12, color: '#667085', background: '#f2f4f7', padding: '1px 8px', borderRadius: 5 }}>{project.region}</span>
+          {project.cycleType && <span style={{ fontSize: 12, color: '#175cd3', background: '#eff8ff', padding: '2px 8px', borderRadius: 5, display: 'flex', alignItems: 'center', gap: 4 }}>🗓 {project.cycleType}</span>}
           {project.isFocus && <span style={{ fontSize: 12, color: '#b54708', background: '#fffaeb', padding: '1px 8px', borderRadius: 5, fontWeight: 600, border: '1px solid #fedf89' }}>🔥 当期重点</span>}
         </div>
-        <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginBottom: (policyDescs.length || policyLinks.length || attachments.length || project.applyUrl) ? 12 : 0 }}>
-          {[
-            { label: '参与公司', value: `${companies.length} 家` },
-            { label: '申报周期', value: `${cycles.length} 个` },
-            { label: '累计获批资金', value: paidAmount > 0 ? `${paidAmount.toFixed(2)} 万` : '未录入', color: paidAmount > 0 ? GREEN_DARK : '#98a2b3' },
-            { label: '累计覆盖人数', value: totalApplicants > 0 ? `${totalApplicants} 人` : '未录入', color: totalApplicants > 0 ? '#101828' : '#98a2b3' },
-          ].map(({ label, value, color }) => (
-            <div key={label}>
-              <div style={{ fontSize: 11, color: '#98a2b3' }}>{label}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: color || '#101828' }}>{value}</div>
-            </div>
-          ))}
+
+        {/* KPI 四格 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 4 }}>参与公司</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#101828' }}>{companies.length} <span style={{ fontSize: 13, fontWeight: 400, color: '#667085' }}>家</span></div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 4 }}>申报周期</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#101828' }}>{allCycles.length} <span style={{ fontSize: 13, fontWeight: 400, color: '#667085' }}>个</span></div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 4 }}>🏆 累计获批资金</div>
+            {paidAmount > 0 ? (
+              <>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#101828' }}>{paidAmount.toFixed(0)} <span style={{ fontSize: 13, fontWeight: 400 }}>万元</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <div style={{ height: 4, flex: 1, background: '#f2f4f7', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${paidPct}%`, background: GREEN, borderRadius: 2 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: GREEN_DARK, flexShrink: 0 }}>已到账 {paidPct}%</span>
+                  <span style={{ fontSize: 11, color: '#98a2b3', flexShrink: 0 }}>{totalAmount.toFixed(0)} 万元</span>
+                </div>
+              </>
+            ) : <div style={{ fontSize: 14, color: '#98a2b3', marginTop: 6 }}>未录入</div>}
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#98a2b3', marginBottom: 4 }}>累计覆盖人数</div>
+            {totalApplicants > 0
+              ? <div style={{ fontSize: 22, fontWeight: 800, color: '#101828' }}>{totalApplicants} <span style={{ fontSize: 13, fontWeight: 400, color: '#667085' }}>人</span></div>
+              : <div style={{ fontSize: 14, color: '#98a2b3', marginTop: 6 }}>未录入</div>}
+          </div>
         </div>
-        {(policyDescs.length > 0 || policyLinks.length > 0 || attachments.length > 0 || project.applyUrl) && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {project.applyUrl && <a href={project.applyUrl} target="_blank" rel="noreferrer"><button style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${GREEN}`, background: '#fff', color: GREEN_DARK, fontSize: 11, cursor: 'pointer' }}>🌐 申报入口</button></a>}
-            {policyLinks.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer"><button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #b2ddff', background: '#eff8ff', color: '#175cd3', fontSize: 11, cursor: 'pointer' }}>📄 {l.label || '政策原文'}</button></a>)}
-            {attachments.map((a, i) => <a key={i} href={a.url} target="_blank" rel="noreferrer"><button style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #d9d6fe', background: '#f4f3ff', color: '#6941c6', fontSize: 11, cursor: 'pointer' }}>📎 {a.name || '附件'}</button></a>)}
+
+        {/* 快捷链接行 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {project.contactNote && <span style={{ fontSize: 12, color: '#667085', display: 'flex', alignItems: 'center', gap: 4 }}>👤 微信联系人：{project.contactNote}</span>}
+          {project.applyUrl && <a href={project.applyUrl} target="_blank" rel="noreferrer"><button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: '1px solid #e4e7ec', background: '#fff', color: '#344054', fontSize: 12, cursor: 'pointer' }}>↗ 前往受理系统</button></a>}
+          {policyLinks.length > 0 && (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: '1px solid #e4e7ec', background: '#fff', color: '#344054', fontSize: 12, cursor: 'pointer' }}>
+                🔗 政策原文链接 ∨
+              </button>
+            </div>
+          )}
+          {attachments.length > 0 && (
+            <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: '1px solid #e4e7ec', background: '#fff', color: '#344054', fontSize: 12, cursor: 'pointer' }}>
+              📎 相关云附件 ∨
+            </button>
+          )}
+        </div>
+
+        {/* 政策说明（可展开） */}
+        {policyDescs.length > 0 && (
+          <div style={{ marginTop: 10, borderTop: '1px solid #f2f4f7', paddingTop: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#175cd3', fontSize: 13, fontWeight: 600 }}
+              onClick={() => setPolicyExpanded(v => !v)}>
+              📖 政策解读与说明 <span style={{ fontSize: 11, fontWeight: 400 }}>{policyExpanded ? '∧' : '∨'}</span>
+            </div>
+            {policyExpanded && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {policyDescs.map((d, i) => (
+                  <div key={i} style={{ fontSize: 13, color: '#344054', background: '#f9fafb', borderRadius: 8, padding: '8px 12px' }}>{d}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* ② 公司气泡切换栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: '#98a2b3', flexShrink: 0 }}>参与公司</span>
-        {/* 全局 tab */}
-        <button onClick={() => setActiveCompany(null)}
-          style={{ padding: '4px 14px', borderRadius: 20, border: `1.5px solid ${activeCompany === null ? GREEN : '#e4e7ec'}`, background: activeCompany === null ? GREEN_LIGHT : '#fff', color: activeCompany === null ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: activeCompany === null ? 700 : 400, transition: 'all 0.12s' }}>
-          全部
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: '#98a2b3', flexShrink: 0 }}>🏢 参与公司</span>
         {companies.map(c => (
-          <button key={c.id} onClick={() => setActiveCompany(c.id)}
-            style={{ padding: '4px 14px', borderRadius: 20, border: `1.5px solid ${activeCompany === c.id ? GREEN : '#e4e7ec'}`, background: activeCompany === c.id ? GREEN_LIGHT : '#fff', color: activeCompany === c.id ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: activeCompany === c.id ? 700 : 400, transition: 'all 0.12s' }}>
+          <button key={c.id} onClick={() => { setActiveCompany(c.id); setActiveCycleId(null) }}
+            style={{ padding: '5px 16px', borderRadius: 20, border: `1.5px solid ${activeCompany === c.id ? '#175cd3' : '#e4e7ec'}`, background: activeCompany === c.id ? '#eff8ff' : '#fff', color: activeCompany === c.id ? '#175cd3' : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: activeCompany === c.id ? 700 : 400, transition: 'all 0.12s' }}>
             {c.name}
           </button>
         ))}
-        {/* 管理按钮 */}
-        <button onClick={() => setManagingCompanies(!managingCompanies)}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #e4e7ec', background: 'transparent', color: '#98a2b3', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => setManagingCompanies(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 20, border: '1px solid #e4e7ec', background: 'transparent', color: '#98a2b3', cursor: 'pointer', fontSize: 12 }}>
           ⚙ 设置/管理公司
         </button>
+        {companies.length === 0 && !managingCompanies && (
+          <button onClick={() => { setManagingCompanies(true); setAddingCompany(true) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 20, border: `1.5px dashed ${GREEN}`, background: GREEN_LIGHT, color: GREEN_DARK, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            + 添加第一个公司
+          </button>
+        )}
       </div>
 
-      {/* ③ 公司管理面板（可展开/收起） */}
+      {/* ③ 公司管理面板 */}
       {managingCompanies && (
-        <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '1px solid #e4e7ec' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#344054', marginBottom: 12 }}>公司管理</div>
-          {companies.length === 0 && !addingCompany && (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#98a2b3', fontSize: 13 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🏢</div>
-              尚未添加参与公司
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 14, border: '1px solid #e4e7ec' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#344054', marginBottom: 10 }}>管理参与公司</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
             {companies.map(c => (
               <div key={c.id}>
                 {editingCompany?.id === c.id ? (
-                  <div style={{ background: '#fff', borderRadius: 8, padding: '12px', border: '1px solid #e4e7ec' }}>
-                    <Form form={companyForm} layout="inline" size="small" initialValues={{ name: c.name, owner: c.owner, ownerFeishu: c.ownerFeishu, contact: c.contact, remark: c.remark }}>
-                      <Form.Item name="name" label="公司名" rules={[{ required: true }]}><Input style={{ width: 140 }} /></Form.Item>
+                  <div style={{ background: '#fff', borderRadius: 8, padding: '10px 12px', border: '1px solid #e4e7ec' }}>
+                    <Form form={companyForm} layout="inline" size="small">
+                      <Form.Item name="name" label="公司名" rules={[{ required: true }]}><Input style={{ width: 150 }} /></Form.Item>
                       <Form.Item name="owner" label="负责人"><Input placeholder="姓名" style={{ width: 80 }} /></Form.Item>
-                      <Form.Item name="ownerFeishu" label="飞书链接"><Input placeholder="https://..." style={{ width: 160 }} /></Form.Item>
-                      <Form.Item name="contact" label="公司联系人"><Input placeholder="姓名/电话" style={{ width: 110 }} /></Form.Item>
+                      <Form.Item name="ownerFeishu" label="飞书"><Input placeholder="https://..." style={{ width: 150 }} /></Form.Item>
+                      <Form.Item name="contact" label="联系人"><Input placeholder="姓名/电话" style={{ width: 100 }} /></Form.Item>
                     </Form>
                     <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                       <Button size="small" type="primary" loading={saving} onClick={handleSaveCompany} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
@@ -382,34 +430,28 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e4e7ec' }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: `${GREEN}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🏢</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e4e7ec' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f2f4f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>🏢</div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#101828' }}>{c.name}</div>
-                      <div style={{ fontSize: 11, color: '#98a2b3' }}>
-                        {c.owner ? `负责人：${c.owner}` : ''}
-                        {c.contact ? (c.owner ? ' · ' : '') + `联系人：${c.contact}` : ''}
-                        {!c.owner && !c.contact ? '暂无负责人' : ''}
-                      </div>
+                      <div style={{ fontSize: 11, color: '#98a2b3' }}>{c.owner ? `负责人：${c.owner}` : ''}{c.contact ? (c.owner ? ' · ' : '') + `联系：${c.contact}` : ''}{!c.owner && !c.contact ? '暂无负责人' : ''}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditingCompany(c); companyForm.setFieldsValue({ name: c.name, owner: c.owner, ownerFeishu: c.ownerFeishu, contact: c.contact, remark: c.remark }) }} />
-                      <Popconfirm title="确认删除该公司（含其任务）？" onConfirm={() => handleDeleteCompany(c.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                      </Popconfirm>
-                    </div>
+                    <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditingCompany(c); companyForm.setFieldsValue({ name: c.name, owner: c.owner, ownerFeishu: c.ownerFeishu, contact: c.contact }) }} />
+                    <Popconfirm title="确认删除该公司？" onConfirm={() => handleDeleteCompany(c.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
                   </div>
                 )}
               </div>
             ))}
           </div>
           {addingCompany ? (
-            <div style={{ background: '#fff', borderRadius: 8, padding: '12px', border: '1px solid #e4e7ec' }}>
+            <div style={{ background: '#fff', borderRadius: 8, padding: '10px 12px', border: '1px solid #e4e7ec' }}>
               <Form form={companyForm} layout="inline" size="small">
-                <Form.Item name="name" label="公司名" rules={[{ required: true, message: '必填' }]}><Input placeholder="公司全名" style={{ width: 140 }} /></Form.Item>
+                <Form.Item name="name" label="公司名" rules={[{ required: true }]}><Input placeholder="公司全名" style={{ width: 150 }} /></Form.Item>
                 <Form.Item name="owner" label="负责人"><Input placeholder="姓名" style={{ width: 80 }} /></Form.Item>
-                <Form.Item name="ownerFeishu" label="飞书"><Input placeholder="https://..." style={{ width: 160 }} /></Form.Item>
-                <Form.Item name="contact" label="公司联系人"><Input placeholder="姓名/电话" style={{ width: 110 }} /></Form.Item>
+                <Form.Item name="ownerFeishu" label="飞书"><Input placeholder="https://..." style={{ width: 150 }} /></Form.Item>
+                <Form.Item name="contact" label="联系人"><Input placeholder="姓名/电话" style={{ width: 100 }} /></Form.Item>
               </Form>
               <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                 <Button size="small" type="primary" loading={saving} onClick={handleSaveCompany} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>添加</Button>
@@ -419,174 +461,211 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
           ) : (
             <Button size="small" icon={<PlusOutlined />} onClick={() => { setAddingCompany(true); setEditingCompany(null); companyForm.resetFields() }}
               style={{ borderRadius: 6, borderColor: GREEN, color: GREEN, width: '100%' }}>
-              + 添加第一个公司
+              + 添加公司
             </Button>
           )}
         </div>
       )}
 
-      {/* ④ 当前公司内容区：负责人卡片 + 任务清单 + 申报周期 */}
-      <div style={{ display: 'grid', gridTemplateColumns: currentCompany ? '260px 1fr' : '1fr', gap: 14 }}>
-
-        {/* 左列：负责人卡片 + 任务清单（仅选中具体公司时显示） */}
-        {currentCompany && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* 负责人卡片 */}
-            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid #e4e7ec', boxShadow: '0 1px 4px rgba(16,24,40,0.04)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#667085', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>内部负责人</div>
-              {currentCompany.owner ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg,${GREEN_DARK},${GREEN})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
-                    {currentCompany.owner[0]}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>{currentCompany.owner}</div>
-                    <div style={{ fontSize: 12, color: '#98a2b3' }}>项目负责人</div>
-                  </div>
-                  {currentCompany.ownerFeishu && (
-                    <a href={currentCompany.ownerFeishu} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto' }}>
-                      <Button size="small" style={{ borderRadius: 6, borderColor: GREEN, color: GREEN, fontSize: 11 }}>飞书联系</Button>
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '10px 0', color: '#98a2b3', fontSize: 12 }}>未设置负责人</div>
-              )}
-              {currentCompany.contact && (
-                <div style={{ padding: '8px 10px', background: '#f9fafb', borderRadius: 8, fontSize: 12, color: '#667085' }}>
-                  🏢 公司联系人：<span style={{ fontWeight: 600, color: '#344054' }}>{currentCompany.contact}</span>
-                </div>
-              )}
-            </div>
-
-            {/* 任务清单卡片 */}
-            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid #e4e7ec', boxShadow: '0 1px 4px rgba(16,24,40,0.04)', flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#667085', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>任务清单</div>
-              <TaskList
-                projectId={project.id}
-                companyId={currentCompany.id}
-                tasks={currentCompany.tasks || []}
-                onRefresh={onRefresh}
-              />
-            </div>
+      {/* ④ 申报周期选择栏 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: '#98a2b3', flexShrink: 0 }}>⏳ 申报周期</span>
+        {allCycles.length === 0 ? (
+          <span style={{ fontSize: 12, color: '#d0d5dd' }}>暂无周期</span>
+        ) : (
+          <Select
+            value={activeCycle?.id ?? allCycles[0]?.id}
+            onChange={id => setActiveCycleId(id)}
+            style={{ width: 130, borderRadius: 8 }}
+            size="small"
+            options={allCycles.map(c => ({ label: `${c.year} 年度`, value: c.id }))}
+          />
+        )}
+        <Button size="small" icon={<SettingOutlined />} style={{ borderRadius: 6 }}
+          onClick={() => setAddingCycle(v => !v)} />
+        <Button size="small" icon={<PlusOutlined />} onClick={() => setAddingCycle(true)}
+          style={{ borderRadius: 6, borderColor: GREEN, color: GREEN }}>
+          新建周期
+        </Button>
+        {activeCycle && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Select value={activeCycle.status} size="small" style={{ width: 90 }}
+              onChange={v => handleUpdateCycleStatus(activeCycle.id, v)}
+              options={STATUS_LIST.map(s => ({ label: s, value: s }))} />
+            <Popconfirm title="确认删除该申报周期？" onConfirm={() => handleDeleteCycle(activeCycle.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
+              <Button size="small" danger icon={<DeleteOutlined />} style={{ borderRadius: 6 }} />
+            </Popconfirm>
           </div>
         )}
+      </div>
 
-        {/* 右列（或全宽）：申报周期 */}
-        <div>
-          {/* 新增周期 */}
-          {addingCycle ? (
-            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 14, border: '1px solid #e4e7ec' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#344054', marginBottom: 10 }}>新增申报周期</div>
-              <Form form={cycleForm} layout="inline" size="middle">
-                <Form.Item name="year" label="年度" rules={[{ required: true }]}><InputNumber placeholder="2026" min={2018} max={2035} style={{ width: 90 }} /></Form.Item>
-                <Form.Item name="deadline" label="截止日"><Input placeholder="2026-09-30" style={{ width: 130 }} /></Form.Item>
-                <Form.Item name="status" label="状态" initialValue="待申报"><Select style={{ width: 100 }} options={STATUS_LIST.map(s => ({ label: s, value: s }))} /></Form.Item>
-              </Form>
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <Button type="primary" size="small" loading={saving} onClick={handleAddCycle} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
-                <Button size="small" onClick={() => setAddingCycle(false)} style={{ borderRadius: 6 }}>取消</Button>
-              </div>
-            </div>
-          ) : (
-            <Button icon={<PlusOutlined />} size="small" onClick={() => setAddingCycle(true)}
-              style={{ marginBottom: 14, borderRadius: 6, borderColor: GREEN, color: GREEN }}>
-              新增申报周期
-            </Button>
-          )}
+      {/* 新增周期表单 */}
+      {addingCycle && (
+        <div style={{ background: '#f9fafb', borderRadius: 10, padding: '12px 16px', marginBottom: 14, border: '1px solid #e4e7ec' }}>
+          <Form form={cycleForm} layout="inline" size="small">
+            <Form.Item name="year" label="年度" rules={[{ required: true }]}><InputNumber placeholder="2026" min={2018} max={2035} style={{ width: 90 }} /></Form.Item>
+            <Form.Item name="deadline" label="截止日"><Input placeholder="2026-09-30" style={{ width: 120 }} /></Form.Item>
+            <Form.Item name="status" label="状态" initialValue="待申报"><Select style={{ width: 90 }} options={STATUS_LIST.map(s => ({ label: s, value: s }))} /></Form.Item>
+          </Form>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <Button size="small" type="primary" loading={saving} onClick={handleAddCycle} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
+            <Button size="small" onClick={() => setAddingCycle(false)} style={{ borderRadius: 6 }}>取消</Button>
+          </div>
+        </div>
+      )}
 
-          {/* 周期列表 */}
-          {cycles.length === 0 ? (
-            <Empty description="暂无申报周期" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '32px 0' }} />
-          ) : (
-            cycles.map(cycle => {
-              const totalAmt = (cycle.applicants || []).reduce((s, a) => s + (a.paidAmount || a.amount || 0), 0)
-              const selectedCount = (cycle.applicants || []).filter(a => a.status === '已入选').length
+      {/* ⑤ 申报节点进度（来自 cycleTemplate）*/}
+      {tplNodes.length > 0 && activeCycle && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', marginBottom: 14, border: '1px solid #e4e7ec' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>☰ 申报节点进度</span>
+          </div>
+          {/* 横向步骤条 */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 20, overflowX: 'auto' }}>
+            {tplNodes.map((node, i) => {
+              const ns = nodeStatuses[node.label] || '未开始'
+              const cfg = NODE_STATUS[ns]
+              const isDone = ns === '已完成'
+              const isActive = ns === '进行中'
               return (
-                <div key={cycle.id} style={{ marginBottom: 14, border: '1px solid #e4e7ec', borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ padding: '11px 14px', background: '#f9fafb', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: GREEN_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: GREEN_DARK, flexShrink: 0 }}>{cycle.year}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#101828' }}>{cycle.year} 年度</span>
-                        <Select value={cycle.status} size="small" style={{ width: 90 }} onChange={v => handleUpdateCycleStatus(cycle.id, v)} options={STATUS_LIST.map(s => ({ label: s, value: s }))} />
-                      </div>
-                      <div style={{ fontSize: 11, color: '#98a2b3' }}>
-                        {cycle.deadline ? `截止 ${cycle.deadline} · ` : ''}{cycle.applicants?.length || 0} 人 · 已入选 {selectedCount} · 资金 {totalAmt.toFixed(2)} 万
-                      </div>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', flex: i < tplNodes.length - 1 ? 1 : 'none' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 64 }}>
+                    {/* 节点圆 */}
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${isDone ? cfg.dot : isActive ? cfg.dot : '#d0d5dd'}`, background: isDone ? cfg.dot : isActive ? cfg.bg : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', boxShadow: isActive ? `0 0 0 4px ${cfg.dot}20` : 'none' }}
+                      onClick={() => {
+                        const seq = ['未开始', '进行中', '已完成']
+                        const next = seq[(seq.indexOf(ns) + 1) % seq.length]
+                        handleNodeStatus(node.label, next)
+                      }}>
+                      {isDone ? <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>✓</span>
+                        : isActive ? <span style={{ width: 10, height: 10, borderRadius: '50%', background: cfg.dot, display: 'block' }} />
+                        : <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d0d5dd', display: 'block' }} />}
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <Button size="small" icon={<PlusOutlined />} onClick={() => { setAddingApplicant(cycle.id); setEditingApplicant(null); applicantForm.resetFields() }} style={{ borderRadius: 6, borderColor: GREEN, color: GREEN }}>加人</Button>
-                      <Popconfirm title="确认删除该申报周期（含所有人员）？" onConfirm={() => handleDeleteCycle(cycle.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" danger icon={<DeleteOutlined />} style={{ borderRadius: 6 }} />
-                      </Popconfirm>
+                    <span style={{ fontSize: 11, fontWeight: isActive ? 700 : 400, color: isDone ? cfg.dot : isActive ? cfg.color : '#98a2b3', textAlign: 'center', whiteSpace: 'nowrap' }}>{node.label}</span>
+                  </div>
+                  {i < tplNodes.length - 1 && (
+                    <div style={{ flex: 1, height: 2, background: isDone ? cfg.dot : '#e4e7ec', margin: '17px 4px 0', borderRadius: 2 }} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 节点卡片列表（可展开） */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {tplNodes.map((node, i) => {
+              const ns = nodeStatuses[node.label] || '未开始'
+              const cfg = NODE_STATUS[ns]
+              const isOpen = expandedNode === node.label
+              const nodeTasks = cycleTasks.filter(t => t.nodeLabel === node.label)
+              const doneCount = nodeTasks.filter(t => t.status === 'done').length
+              return (
+                <div key={i} style={{ border: `1px solid ${isOpen ? cfg.border : '#f2f4f7'}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                  {/* 节点标题行 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: isOpen ? cfg.bg : '#fafafa', cursor: 'pointer' }}
+                    onClick={() => setExpandedNode(isOpen ? null : node.label)}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: cfg.dot + '25', border: `1.5px solid ${cfg.dot}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: cfg.dot, flexShrink: 0 }}>{i + 1}</div>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#101828', flex: 1 }}>{node.label}</span>
+                    <span style={{ fontSize: 12, color: '#98a2b3' }}>{doneCount}/{nodeTasks.length}</span>
+                    {/* 状态切换按钮组 */}
+                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      {['未开始', '进行中', '已完成'].map(s => (
+                        <button key={s} onClick={() => handleNodeStatus(node.label, s)}
+                          style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${ns === s ? NODE_STATUS[s].dot : '#e4e7ec'}`, background: ns === s ? NODE_STATUS[s].bg : '#fff', color: ns === s ? NODE_STATUS[s].color : '#98a2b3', cursor: 'pointer', fontSize: 12, fontWeight: ns === s ? 600 : 400, transition: 'all 0.1s' }}>
+                          {s}
+                        </button>
+                      ))}
                     </div>
+                    <span style={{ color: '#98a2b3', fontSize: 13, marginLeft: 4 }}>{isOpen ? '∧' : '∨'}</span>
                   </div>
 
-                  {(addingApplicant === cycle.id || editingApplicant?.cycleId === cycle.id) && (
-                    <div style={{ padding: '12px 14px', background: '#fff8f0', borderBottom: '1px solid #e4e7ec' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#344054', marginBottom: 8 }}>{editingApplicant ? '编辑人员' : '添加申请人'}</div>
-                      <Form form={applicantForm} layout="inline" size="small"
-                        initialValues={editingApplicant ? { name: editingApplicant.name, employeeId: editingApplicant.employeeId, department: editingApplicant.department, amount: editingApplicant.amount, paidAmount: editingApplicant.paidAmount, status: editingApplicant.status } : { status: '待申报' }}>
-                        <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input placeholder="姓名" style={{ width: 80 }} /></Form.Item>
-                        <Form.Item name="employeeId" label="工号"><Input placeholder="M12345" style={{ width: 90 }} /></Form.Item>
-                        <Form.Item name="department" label="部门"><Input placeholder="部门" style={{ width: 90 }} /></Form.Item>
-                        <Form.Item name="amount" label="申报金额(万)"><InputNumber placeholder="0.00" min={0} step={0.1} style={{ width: 90 }} /></Form.Item>
-                        <Form.Item name="paidAmount" label="到账(万)"><InputNumber placeholder="0.00" min={0} step={0.1} style={{ width: 90 }} /></Form.Item>
-                        <Form.Item name="status" label="状态"><Select style={{ width: 90 }} options={STATUS_LIST.map(s => ({ label: s, value: s }))} /></Form.Item>
-                      </Form>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <Button type="primary" size="small" loading={saving} onClick={handleSaveApplicant} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
-                        <Button size="small" onClick={() => { setAddingApplicant(null); setEditingApplicant(null) }} style={{ borderRadius: 6 }}>取消</Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {(cycle.applicants?.length || 0) > 0 && (
-                    <div style={{ padding: '0 14px 10px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginTop: 8 }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid #f2f4f7' }}>
-                            {['姓名', '工号', '部门', '申报金额(万)', '到账金额(万)', '状态', '操作'].map(h => (
-                              <th key={h} style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600, color: '#667085', fontSize: 11 }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cycle.applicants.map(a => (
-                            <tr key={a.id} style={{ borderBottom: '1px solid #f9fafb' }}>
-                              <td style={{ padding: '6px 8px', fontWeight: 600, color: '#101828' }}>{a.name}</td>
-                              <td style={{ padding: '6px 8px', color: '#667085' }}>{a.employeeId || '—'}</td>
-                              <td style={{ padding: '6px 8px', color: '#667085' }}>{a.department || '—'}</td>
-                              <td style={{ padding: '6px 8px', color: '#344054' }}>{a.amount != null ? a.amount.toFixed(2) : '—'}</td>
-                              <td style={{ padding: '6px 8px', fontWeight: a.paidAmount ? 600 : 400, color: a.paidAmount ? GREEN_DARK : '#98a2b3' }}>
-                                {a.paidAmount != null ? a.paidAmount.toFixed(2) : '—'}
-                              </td>
-                              <td style={{ padding: '6px 8px' }}><StatusDot v={a.status} /></td>
-                              <td style={{ padding: '6px 8px' }}>
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  <Button size="small" type="text" icon={<EditOutlined />} onClick={() => {
-                                    setEditingApplicant({ ...a, cycleId: cycle.id })
-                                    setAddingApplicant(null)
-                                    applicantForm.setFieldsValue({ name: a.name, employeeId: a.employeeId, department: a.department, amount: a.amount, paidAmount: a.paidAmount, status: a.status })
-                                  }} />
-                                  <Popconfirm title="确认删除该人员？" onConfirm={() => handleDeleteApplicant(a.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-                                    <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-                                  </Popconfirm>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {/* 展开内容：任务清单 */}
+                  {isOpen && (
+                    <div style={{ padding: '12px 16px', background: '#fff', borderTop: `1px solid ${cfg.border}` }}>
+                      <NodeTaskList
+                        projectId={project.id}
+                        companyId={currentCompany?.id || null}
+                        cycleId={activeCycle.id}
+                        nodeLabel={node.label}
+                        tasks={nodeTasks}
+                        onRefresh={onRefresh}
+                      />
                     </div>
                   )}
                 </div>
               )
-            })
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ⑥ 申请人管理 */}
+      {activeCycle && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', marginBottom: 14, border: '1px solid #e4e7ec' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>申请人员 ({activeCycle.applicants?.length || 0})</span>
+            <Button size="small" icon={<PlusOutlined />} onClick={() => { setAddingApplicant(activeCycle.id); setEditingApplicant(null); applicantForm.resetFields() }}
+              style={{ borderRadius: 6, borderColor: GREEN, color: GREEN }}>加人</Button>
+          </div>
+
+          {(addingApplicant === activeCycle.id || editingApplicant?.cycleId === activeCycle.id) && (
+            <div style={{ padding: '10px 12px', background: '#fff8f0', borderRadius: 8, marginBottom: 10, border: '1px solid #fecdd6' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#344054', marginBottom: 8 }}>{editingApplicant ? '编辑人员' : '添加申请人'}</div>
+              <Form form={applicantForm} layout="inline" size="small"
+                initialValues={editingApplicant ? { name: editingApplicant.name, employeeId: editingApplicant.employeeId, department: editingApplicant.department, amount: editingApplicant.amount, paidAmount: editingApplicant.paidAmount, status: editingApplicant.status } : { status: '待申报' }}>
+                <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input placeholder="姓名" style={{ width: 80 }} /></Form.Item>
+                <Form.Item name="employeeId" label="工号"><Input placeholder="M12345" style={{ width: 90 }} /></Form.Item>
+                <Form.Item name="department" label="部门"><Input placeholder="部门" style={{ width: 90 }} /></Form.Item>
+                <Form.Item name="amount" label="申报(万)"><InputNumber placeholder="0.00" min={0} step={0.1} style={{ width: 80 }} /></Form.Item>
+                <Form.Item name="paidAmount" label="到账(万)"><InputNumber placeholder="0.00" min={0} step={0.1} style={{ width: 80 }} /></Form.Item>
+                <Form.Item name="status" label="状态"><Select style={{ width: 90 }} options={STATUS_LIST.map(s => ({ label: s, value: s }))} /></Form.Item>
+              </Form>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <Button size="small" type="primary" loading={saving} onClick={handleSaveApplicant} style={{ background: GREEN, border: 'none', borderRadius: 6 }}>保存</Button>
+                <Button size="small" onClick={() => { setAddingApplicant(null); setEditingApplicant(null) }} style={{ borderRadius: 6 }}>取消</Button>
+              </div>
+            </div>
+          )}
+
+          {(activeCycle.applicants?.length || 0) === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#98a2b3', fontSize: 13 }}>暂无申请人员，点击「加人」添加</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #f2f4f7' }}>
+                  {['姓名', '工号', '部门', '申报金额(万)', '到账金额(万)', '状态', ''].map(h => (
+                    <th key={h} style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600, color: '#98a2b3', fontSize: 11 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {activeCycle.applicants.map(a => (
+                  <tr key={a.id} style={{ borderBottom: '1px solid #f9fafb' }}>
+                    <td style={{ padding: '7px 8px', fontWeight: 600, color: '#101828' }}>{a.name}</td>
+                    <td style={{ padding: '7px 8px', color: '#667085' }}>{a.employeeId || '—'}</td>
+                    <td style={{ padding: '7px 8px', color: '#667085' }}>{a.department || '—'}</td>
+                    <td style={{ padding: '7px 8px' }}>{a.amount != null ? a.amount.toFixed(2) : '—'}</td>
+                    <td style={{ padding: '7px 8px', fontWeight: a.paidAmount ? 600 : 400, color: a.paidAmount ? GREEN_DARK : '#98a2b3' }}>{a.paidAmount != null ? a.paidAmount.toFixed(2) : '—'}</td>
+                    <td style={{ padding: '7px 8px' }}><StatusDot v={a.status} /></td>
+                    <td style={{ padding: '7px 8px' }}>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditingApplicant({ ...a, cycleId: activeCycle.id }); setAddingApplicant(null); applicantForm.setFieldsValue({ name: a.name, employeeId: a.employeeId, department: a.department, amount: a.amount, paidAmount: a.paidAmount, status: a.status }) }} />
+                        <Popconfirm title="确认删除该人员？" onConfirm={() => handleDeleteApplicant(a.id)} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
+                          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
-      </div>
+      )}
+
+      {allCycles.length === 0 && (
+        <Empty description="暂无申报周期，点击「新建周期」开始" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
+      )}
     </div>
   )
 }
