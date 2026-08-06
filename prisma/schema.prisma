@@ -279,7 +279,10 @@ model TalentProject {
   policyDesc    String?                           // 政策说明（JSON 多维度）
   policyLinks   String?                           // 政策原文链接（JSON array）
   attachments   String?                           // 云附件（JSON array）
-  cycleTemplate String?                           // 申报节点模板（JSON array）
+  cycleTemplate String?                           // 申报节点模板（JSON array: [{label,startDay,endDay}]）
+  cycleMonths   String?                           // 包含月份（JSON int array, e.g. [1,4,7,10]）
+  cycleStartDay Int?                              // 当月开始日（如 1）
+  cycleEndDay   Int?                              // 当月结束日（如 15）
   remark        String?
   createdById   Int
   createdAt     DateTime       @default(now())

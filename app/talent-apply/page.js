@@ -376,29 +376,48 @@ function parseProjectForForm(p) {
     policyLinks:   safe('policyLinks'),
     attachments:   safe('attachments'),
     cycleTemplate: safe('cycleTemplate'),
+    cycleMonths:   safe('cycleMonths'),
+    cycleStartDay: p.cycleStartDay,
+    cycleEndDay:   p.cycleEndDay,
     remark:        p.remark,
   }
 }
 
+// 标准流程节点（一键导入）
+const STANDARD_FLOW = [
+  { label: '公司资质申报', startDay: 1, endDay: 15 },
+  { label: '个人申报',     startDay: 1, endDay: 15 },
+  { label: '单位审核',     startDay: 1, endDay: 15 },
+  { label: '主管部门审核', startDay: 1, endDay: 15 },
+  { label: '现场核验',     startDay: 1, endDay: 15 },
+  { label: '等待公示',     startDay: 1, endDay: 15 },
+  { label: '奖金发放',     startDay: 1, endDay: 15 },
+]
+
 // 节点模板默认集合（按申报频次预设）
 const CYCLE_TEMPLATES = {
   '年度申报': [
-    { label: '申报开始', offsetDays: 0 },
-    { label: '材料截止', offsetDays: 30 },
-    { label: '审核结果', offsetDays: 90 },
-    { label: '资金到账', offsetDays: 180 },
+    { label: '材料申报', startDay: 1, endDay: 31 },
+    { label: '单位审核', startDay: 1, endDay: 15 },
+    { label: '主管部门审核', startDay: 1, endDay: 15 },
+    { label: '审核结果公示', startDay: 1, endDay: 15 },
+    { label: '资金到账', startDay: 1, endDay: 15 },
   ],
   '季度申报': [
-    { label: '材料截止', offsetDays: 0 },
-    { label: '审核完成', offsetDays: 30 },
-    { label: '资金到账', offsetDays: 60 },
+    { label: '材料截止', startDay: 1, endDay: 15 },
+    { label: '单位审核', startDay: 1, endDay: 15 },
+    { label: '主管部门审核', startDay: 1, endDay: 15 },
+    { label: '资金到账', startDay: 1, endDay: 15 },
   ],
   '月度申报': [
-    { label: '材料截止', offsetDays: 0 },
-    { label: '审核完成', offsetDays: 15 },
+    { label: '材料截止', startDay: 1, endDay: 10 },
+    { label: '单位审核', startDay: 11, endDay: 20 },
+    { label: '资金到账', startDay: 21, endDay: 28 },
   ],
   '常态化': [],
 }
+
+const MONTHS_ALL = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 // ── 分区标题 ─────────────────────────────────
 function SectionTitle({ icon, title, desc }) {
@@ -417,17 +436,23 @@ function SectionTitle({ icon, title, desc }) {
 function ProjectModal({ open, initial, onCancel, onOk }) {
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
-  const [cycleType, setCycleType] = useState(null)
-  const [policyDescs, setPolicyDescs] = useState([])   // [{id, text}]
-  const [policyLinks, setPolicyLinks] = useState([])   // [{id, label, url}]
-  const [attachments, setAttachments] = useState([])   // [{id, name, url}]
-  const [tplNodes, setTplNodes]     = useState([])     // [{id, label}]
+  const [cycleType, setCycleType]       = useState(null)
+  const [cycleMonths, setCycleMonths]   = useState([])     // int[]
+  const [cycleStartDay, setCycleStartDay] = useState(null)
+  const [cycleEndDay, setCycleEndDay]   = useState(null)
+  const [policyDescs, setPolicyDescs]   = useState([])    // [{id, text}]
+  const [policyLinks, setPolicyLinks]   = useState([])    // [{id, label, url}]
+  const [attachments, setAttachments]   = useState([])    // [{id, name, url}]
+  const [tplNodes, setTplNodes]         = useState([])    // [{id, label, startDay, endDay}]
 
   useEffect(() => {
     if (!open) return
     const vals = parseProjectForForm(initial)
     form.setFieldsValue(vals)
     setCycleType(vals.cycleType || null)
+    setCycleMonths(Array.isArray(vals.cycleMonths) ? vals.cycleMonths : [])
+    setCycleStartDay(vals.cycleStartDay ?? null)
+    setCycleEndDay(vals.cycleEndDay ?? null)
     setPolicyDescs(Array.isArray(vals.policyDesc) ? vals.policyDesc.map((t, i) => ({ id: i, text: t })) : [])
     setPolicyLinks(Array.isArray(vals.policyLinks) ? vals.policyLinks.map((l, i) => ({ id: i, ...l })) : [])
     setAttachments(Array.isArray(vals.attachments) ? vals.attachments.map((a, i) => ({ id: i, ...a })) : [])
@@ -438,6 +463,15 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
     setCycleType(v)
     const tpl = CYCLE_TEMPLATES[v] || []
     setTplNodes(tpl.map((n, i) => ({ id: i, ...n })))
+    // 按频次预设默认月份
+    if (v === '季度申报') setCycleMonths([1, 4, 7, 10])
+    else if (v === '月度申报') setCycleMonths(MONTHS_ALL)
+    else if (v === '年度申报') setCycleMonths([])
+    else setCycleMonths([])
+  }
+
+  const toggleMonth = (m) => {
+    setCycleMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m].sort((a, b) => a - b))
   }
 
   const handleOk = async () => {
@@ -446,6 +480,9 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
     try {
       await onOk({
         ...vals,
+        cycleMonths:   cycleMonths,
+        cycleStartDay: cycleStartDay,
+        cycleEndDay:   cycleEndDay,
         policyDesc:    policyDescs.filter(d => d.text?.trim()).map(d => d.text),
         policyLinks:   policyLinks.filter(l => l.url?.trim()),
         attachments:   attachments.filter(a => a.url?.trim()),
@@ -507,41 +544,138 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
         {/* ② 申报周期规则 */}
         <SectionTitle icon="📅" title="申报周期规则" desc="选择频次后，节点模板将自动预填" />
         <div style={sectionBox}>
-          <div style={{ fontSize: 12, color: '#667085', marginBottom: 10 }}>申报频次</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* 申报频次 */}
+          <div style={{ fontSize: 12, color: '#667085', marginBottom: 8 }}>申报频次</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cycleType && cycleType !== '常态化' ? 16 : 0 }}>
             {CYCLE_TYPE_LIST.map(t => (
               <button key={t} type="button" onClick={() => { handleCycleTypeChange(t); form.setFieldValue('cycleType', t) }}
-                style={{ padding: '6px 16px', borderRadius: 8, border: `1.5px solid ${cycleType === t ? GREEN : '#e4e7ec'}`, background: cycleType === t ? GREEN_LIGHT : '#fff', color: cycleType === t ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: cycleType === t ? 700 : 400, transition: 'all 0.12s' }}>
+                style={{ padding: '6px 16px', borderRadius: 20, border: `1.5px solid ${cycleType === t ? GREEN : '#e4e7ec'}`, background: cycleType === t ? GREEN_LIGHT : '#fff', color: cycleType === t ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: cycleType === t ? 700 : 400, transition: 'all 0.12s' }}>
                 {t}
               </button>
             ))}
           </div>
           <Form.Item name="cycleType" hidden><Input /></Form.Item>
+
+          {/* 包含月份（月度/季度才显示） */}
+          {cycleType && cycleType !== '年度申报' && cycleType !== '常态化' && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: '#667085', marginBottom: 8 }}>
+                包含月份（多选，如 1、4、7、10 月）
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {MONTHS_ALL.map(m => {
+                  const on = cycleMonths.includes(m)
+                  return (
+                    <button key={m} type="button" onClick={() => toggleMonth(m)}
+                      style={{ width: 48, padding: '4px 0', borderRadius: 20, border: `1.5px solid ${on ? GREEN : '#e4e7ec'}`, background: on ? GREEN_LIGHT : '#fff', color: on ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 12, fontWeight: on ? 700 : 400, transition: 'all 0.12s' }}>
+                      {m} 月
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 当月开始/结束日 */}
+          {cycleType && cycleType !== '常态化' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#667085', marginBottom: 6 }}>当月开始日</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Input
+                    value={cycleStartDay ?? ''}
+                    onChange={e => setCycleStartDay(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="1"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <span style={{ fontSize: 12, color: '#98a2b3', flexShrink: 0 }}>日</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#667085', marginBottom: 6 }}>当月结束日</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Input
+                    value={cycleEndDay ?? ''}
+                    onChange={e => setCycleEndDay(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="15"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <span style={{ fontSize: 12, color: '#98a2b3', flexShrink: 0 }}>日</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ③ 申报节点模板 */}
-        <SectionTitle icon="🗓️" title="申报节点模板" desc="创建申报周期时将自动复制此模板" />
+        <SectionTitle
+          icon="🗓️"
+          title="申报节点模板"
+          desc="创建申报周期时将自动复制此模板"
+        />
         <div style={{ ...sectionBox, marginBottom: 0 }}>
+          {/* 操作按钮行 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+            <Button size="small" onClick={() => setTplNodes(STANDARD_FLOW.map((n, i) => ({ id: uid() + i, ...n })))}
+              style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6', fontSize: 12 }}>
+              ☰ 一键导入标准流程
+            </Button>
+            <Button size="small" icon={<PlusOutlined />} onClick={() => setTplNodes(p => [...p, { id: uid(), label: '', startDay: 1, endDay: 15 }])}
+              style={{ borderRadius: 6, borderColor: GREEN, color: GREEN, fontSize: 12 }}>
+              新增节点
+            </Button>
+          </div>
+
           {tplNodes.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '16px 0', color: '#98a2b3', fontSize: 13 }}>
-              {cycleType ? '暂无节点，点击「新增节点」添加' : '请先选择上方的「申报频次」，节点时间配置将自动显示'}
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#98a2b3', fontSize: 13 }}>
+              {cycleType ? '暂无节点，点击「新增节点」或「一键导入标准流程」' : '请先选择上方的「申报频次」，节点时间配置将自动显示'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {tplNodes.map((n, i) => (
-                <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: GREEN_LIGHT, border: `1.5px solid ${GREEN}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: GREEN_DARK, flexShrink: 0 }}>{i + 1}</div>
-                  <Input value={n.label} placeholder="节点名称" style={{ ...inputStyle, flex: 1 }}
-                    onChange={e => setTplNodes(prev => prev.map(x => x.id === n.id ? { ...x, label: e.target.value } : x))} />
-                  <Button type="text" danger size="small" onClick={() => setTplNodes(prev => prev.filter(x => x.id !== n.id))}>×</Button>
+                <div key={n.id} style={{ background: '#fff', border: '1px solid #e4e7ec', borderRadius: 10, padding: '12px 14px' }}>
+                  {/* 节点标题行 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#f2f4f7', border: '1.5px solid #d0d5dd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#667085', flexShrink: 0 }}>{i + 1}</div>
+                    <Input value={n.label} placeholder="节点名称，如：公司资质申报"
+                      style={{ ...inputStyle, flex: 1, fontWeight: 500 }}
+                      onChange={e => setTplNodes(prev => prev.map(x => x.id === n.id ? { ...x, label: e.target.value } : x))} />
+                    <Button type="text" size="small" onClick={() => setTplNodes(prev => prev.filter(x => x.id !== n.id))}
+                      style={{ color: '#d0d5dd', fontSize: 16, padding: '0 4px' }}>🗑</Button>
+                  </div>
+                  {/* 时间行 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 4 }}>计划开始</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>每月第</span>
+                        <Input
+                          value={n.startDay ?? ''}
+                          placeholder="1"
+                          style={{ ...inputStyle, flex: 1 }}
+                          onChange={e => setTplNodes(prev => prev.map(x => x.id === n.id ? { ...x, startDay: e.target.value === '' ? null : Number(e.target.value) } : x))}
+                        />
+                        <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>日</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#98a2b3', marginBottom: 4 }}>计划结束</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>每月第</span>
+                        <Input
+                          value={n.endDay ?? ''}
+                          placeholder="15"
+                          style={{ ...inputStyle, flex: 1 }}
+                          onChange={e => setTplNodes(prev => prev.map(x => x.id === n.id ? { ...x, endDay: e.target.value === '' ? null : Number(e.target.value) } : x))}
+                        />
+                        <span style={{ fontSize: 12, color: '#667085', flexShrink: 0 }}>日</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setTplNodes(p => [...p, { id: uid(), label: '' }])}
-            style={{ borderRadius: 6, width: '100%', borderColor: GREEN, color: GREEN, marginTop: 4 }}>
-            新增节点
-          </Button>
         </div>
 
         {/* ④ 联络与申报入口 */}

@@ -45,6 +45,9 @@ function pickProjectFields(body, userId) {
     policyLinks:    body.policyLinks    ? JSON.stringify(body.policyLinks)   : null,
     attachments:    body.attachments    ? JSON.stringify(body.attachments)   : null,
     cycleTemplate:  body.cycleTemplate  ? JSON.stringify(body.cycleTemplate) : null,
+    cycleMonths:    body.cycleMonths    ? JSON.stringify(body.cycleMonths)   : null,
+    cycleStartDay:  body.cycleStartDay  != null ? Number(body.cycleStartDay) : null,
+    cycleEndDay:    body.cycleEndDay    != null ? Number(body.cycleEndDay)   : null,
     remark:         body.remark         || null,
     ...(userId != null ? { createdById: userId } : {}),
   }
