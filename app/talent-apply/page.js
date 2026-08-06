@@ -1190,11 +1190,27 @@ export default function TalentApplyPage() {
   useEffect(() => { fetchProjects() }, [fetchProjects])
   useEffect(() => { if (view === 'screen') fetchStats() }, [view, fetchStats])
 
+  const [seeding, setSeeding] = useState(false)
+
   const handleAdd = async (vals) => {
     await api.post('/api/talent-projects', vals)
     message.success('项目已创建')
     setAddOpen(false)
     fetchProjects()
+  }
+
+  const handleSeed = async () => {
+    setSeeding(true)
+    try {
+      const res = await api.post('/api/talent-projects/seed', {})
+      const { created = [], skipped = [] } = res
+      if (created.length > 0) {
+        message.success(`成功导入 ${created.length} 个项目`)
+      } else {
+        message.info(`所有项目已存在，跳过 ${skipped.length} 个`)
+      }
+      fetchProjects()
+    } catch { message.error('导入失败') } finally { setSeeding(false) }
   }
 
   const displayProjects = projects
@@ -1208,10 +1224,18 @@ export default function TalentApplyPage() {
           <h1 style={{ fontSize: 20, fontWeight: 800, color: '#101828', margin: 0 }}>人才福利申请全流程管理</h1>
           <Button type="text" icon={<SettingOutlined />} style={{ color: '#98a2b3' }} />
         </div>
-        <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => setAddOpen(true)}
-          style={{ borderRadius: 10, background: GREEN, border: 'none', fontWeight: 600, height: 42, padding: '0 20px' }}>
-          + 新建项目
-        </Button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {projects.length === 0 && (
+            <Button loading={seeding} onClick={handleSeed}
+              style={{ borderRadius: 10, height: 42, padding: '0 18px', fontWeight: 600, borderColor: '#6941c6', color: '#6941c6' }}>
+              📥 导入初始项目
+            </Button>
+          )}
+          <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => setAddOpen(true)}
+            style={{ borderRadius: 10, background: GREEN, border: 'none', fontWeight: 600, height: 42, padding: '0 20px' }}>
+            + 新建项目
+          </Button>
+        </div>
       </div>
 
       {/* 视图切换 */}
