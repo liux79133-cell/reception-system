@@ -290,12 +290,32 @@ model TalentProject {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   cycles        TalentCycle[]
+  companies     TalentCompany[]
+  tasks         TalentTask[]
+}
+
+model TalentCompany {
+  id          Int            @id @default(autoincrement())
+  projectId   Int
+  project     TalentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  owner       String?        // 内部负责人姓名
+  ownerFeishu String?        // 负责人飞书链接
+  contact     String?        // 公司联系人
+  remark      String?
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  cycles      TalentCycle[]
+  tasks       TalentTask[]
 }
 
 model TalentCycle {
   id          Int               @id @default(autoincrement())
   projectId   Int
   project     TalentProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId   Int?              // 关联公司（可选）
+  company     TalentCompany?    @relation(fields: [companyId], references: [id])
   year        Int
   deadline    String?           // 申报截止日 YYYY-MM-DD
   status      String            @default("待申报") // 待申报|申报中|已提交|审核中|已入选|未入选
@@ -303,6 +323,22 @@ model TalentCycle {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   applicants  TalentApplicant[]
+}
+
+model TalentTask {
+  id          Int            @id @default(autoincrement())
+  projectId   Int
+  project     TalentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId   Int?
+  company     TalentCompany? @relation(fields: [companyId], references: [id])
+  title       String
+  desc        String?
+  assignee    String?        // 负责人
+  dueDate     String?        // YYYY-MM-DD
+  status      String         @default("pending") // pending|done
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 }
 
 model TalentApplicant {

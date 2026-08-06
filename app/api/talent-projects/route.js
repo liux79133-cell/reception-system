@@ -23,6 +23,14 @@ export async function GET(request) {
           include: { applicants: true },
           orderBy: { year: 'desc' },
         },
+        tasks: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+        companies: {
+          include: {
+            tasks: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+            cycles: { include: { applicants: true }, orderBy: { year: 'desc' } },
+          },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
       },
       orderBy: [{ isFocus: 'desc' }, { updatedAt: 'desc' }],
     })
