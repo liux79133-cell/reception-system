@@ -31,20 +31,31 @@ export async function GET(request) {
   } catch (e) { return errorResponse(e) }
 }
 
+function pickProjectFields(body, userId) {
+  return {
+    name:           body.name,
+    level:          body.level          || '市级',
+    region:         body.region         || '苏州市',
+    category:       body.category       || '其他',
+    isFocus:        body.isFocus        ?? false,
+    cycleType:      body.cycleType      || null,
+    applyUrl:       body.applyUrl       || null,
+    contactNote:    body.contactNote    || null,
+    policyDesc:     body.policyDesc     ? JSON.stringify(body.policyDesc)    : null,
+    policyLinks:    body.policyLinks    ? JSON.stringify(body.policyLinks)   : null,
+    attachments:    body.attachments    ? JSON.stringify(body.attachments)   : null,
+    cycleTemplate:  body.cycleTemplate  ? JSON.stringify(body.cycleTemplate) : null,
+    remark:         body.remark         || null,
+    ...(userId != null ? { createdById: userId } : {}),
+  }
+}
+
 export async function POST(request) {
   try {
     const user = requireEditor(request)
     const body = await request.json()
     const project = await prisma.talentProject.create({
-      data: {
-        name:        body.name,
-        level:       body.level       || '市级',
-        region:      body.region      || '苏州市',
-        category:    body.category    || '其他',
-        isFocus:     body.isFocus     ?? false,
-        remark:      body.remark      || null,
-        createdById: user.id,
-      },
+      data: pickProjectFields(body, user.id),
       include: { cycles: { include: { applicants: true } } },
     })
     return Response.json({ project })

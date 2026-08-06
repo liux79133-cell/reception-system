@@ -267,17 +267,24 @@ model AgreementFile {
 
 // 人才申报模块
 model TalentProject {
-  id          Int            @id @default(autoincrement())
-  name        String
-  level       String         @default("市级") // 国家级|省级|市级|区级
-  region      String         @default("苏州市") // 全国|江苏省|苏州市|上海市|深圳市|其他
-  category    String         @default("其他") // 高层次人才|产业人才|创新创业|学历补贴|其他
-  isFocus     Boolean        @default(false)  // 当期重点
-  remark      String?
-  createdById Int
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  cycles      TalentCycle[]
+  id            Int            @id @default(autoincrement())
+  name          String
+  level         String         @default("市级")   // 国家级|省级|市级|区级
+  region        String         @default("苏州市")  // 全国|江苏省|苏州市|上海市|深圳市|其他
+  category      String         @default("其他")   // 高层次人才|产业人才|创新创业|学历补贴|住房补贴|其他
+  isFocus       Boolean        @default(false)    // 当期重点
+  cycleType     String?                           // 年度申报|月度申报|季度申报|常态化
+  applyUrl      String?                           // 申报系统 URL
+  contactNote   String?                           // 微信联系方式说明
+  policyDesc    String?                           // 政策说明（JSON 多维度）
+  policyLinks   String?                           // 政策原文链接（JSON array）
+  attachments   String?                           // 云附件（JSON array）
+  cycleTemplate String?                           // 申报节点模板（JSON array）
+  remark        String?
+  createdById   Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  cycles        TalentCycle[]
 }
 
 model TalentCycle {

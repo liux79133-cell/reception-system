@@ -133,33 +133,63 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
   return (
     <div style={{ padding: '0 2px' }}>
       {/* 项目摘要 */}
-      <div style={{ background: GREEN_LIGHT, borderRadius: 10, padding: '14px 18px', marginBottom: 20, border: `1px solid ${GREEN}30` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-          <LevelChip v={project.level} />
-          <span style={{ fontSize: 12, color: GREEN, background: `${GREEN}15`, padding: '1px 8px', borderRadius: 5, fontWeight: 500 }}>
-            📍 {project.region}
-          </span>
-          {project.isFocus && (
-            <span style={{ fontSize: 12, color: '#b54708', background: '#fffaeb', padding: '1px 8px', borderRadius: 5, fontWeight: 600, border: '1px solid #fedf89' }}>
-              🔥 当期重点
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#98a2b3' }}>申报周期</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#101828' }}>{cycles.length}</div>
+      {(() => {
+        const safeJson = (k) => { try { return project[k] ? JSON.parse(project[k]) : [] } catch { return [] } }
+        const links       = safeJson('policyLinks')
+        const attaches    = safeJson('attachments')
+        const policyDescs = safeJson('policyDesc')
+        return (
+          <div style={{ background: GREEN_LIGHT, borderRadius: 12, padding: '16px 18px', marginBottom: 20, border: `1px solid ${GREEN}30` }}>
+            {/* 标签行 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <LevelChip v={project.level} />
+              <span style={{ fontSize: 12, color: GREEN, background: `${GREEN}15`, padding: '1px 8px', borderRadius: 5, fontWeight: 500 }}>📍 {project.region}</span>
+              {project.cycleType && <span style={{ fontSize: 12, color: '#175cd3', background: '#eff8ff', padding: '1px 8px', borderRadius: 5, fontWeight: 500 }}>🔄 {project.cycleType}</span>}
+              {project.isFocus && <span style={{ fontSize: 12, color: '#b54708', background: '#fffaeb', padding: '1px 8px', borderRadius: 5, fontWeight: 600, border: '1px solid #fedf89' }}>🔥 当期重点</span>}
+            </div>
+
+            {/* 统计数字 */}
+            <div style={{ display: 'flex', gap: 24, marginBottom: (links.length || attaches.length || policyDescs.length || project.applyUrl || project.contactNote) ? 14 : 0 }}>
+              <div><div style={{ fontSize: 11, color: '#98a2b3' }}>申报周期</div><div style={{ fontSize: 18, fontWeight: 700, color: '#101828' }}>{cycles.length}</div></div>
+              <div><div style={{ fontSize: 11, color: '#98a2b3' }}>覆盖人数</div><div style={{ fontSize: 18, fontWeight: 700, color: '#101828' }}>{totalApplicants}</div></div>
+              <div><div style={{ fontSize: 11, color: '#98a2b3' }}>累计资金（万）</div><div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{totalAmount.toFixed(2)}</div></div>
+            </div>
+
+            {/* 政策说明 */}
+            {policyDescs.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {policyDescs.map((d, i) => (
+                  <div key={i} style={{ fontSize: 12, color: '#344054', background: 'rgba(255,255,255,0.7)', borderRadius: 6, padding: '6px 10px', marginBottom: 4 }}>📝 {d}</div>
+                ))}
+              </div>
+            )}
+
+            {/* 联络与链接 */}
+            {(project.applyUrl || project.contactNote || links.length > 0 || attaches.length > 0) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                {project.applyUrl && (
+                  <a href={project.applyUrl} target="_blank" rel="noreferrer">
+                    <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: `1px solid ${GREEN}`, background: '#fff', color: GREEN_DARK, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>🌐 申报系统入口</button>
+                  </a>
+                )}
+                {links.map((l, i) => (
+                  <a key={i} href={l.url} target="_blank" rel="noreferrer">
+                    <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: '1px solid #b2ddff', background: '#eff8ff', color: '#175cd3', fontSize: 12, cursor: 'pointer' }}>📄 {l.label || '政策原文'}</button>
+                  </a>
+                ))}
+                {attaches.map((a, i) => (
+                  <a key={i} href={a.url} target="_blank" rel="noreferrer">
+                    <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, border: '1px solid #d9d6fe', background: '#f4f3ff', color: '#6941c6', fontSize: 12, cursor: 'pointer' }}>📎 {a.name || '附件'}</button>
+                  </a>
+                ))}
+                {project.contactNote && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 6, background: '#fffaeb', color: '#b54708', fontSize: 12 }}>💬 {project.contactNote}</span>
+                )}
+              </div>
+            )}
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#98a2b3' }}>覆盖人数</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#101828' }}>{totalApplicants}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#98a2b3' }}>累计资金（万）</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{totalAmount.toFixed(2)}</div>
-          </div>
-        </div>
-      </div>
+        )
+      })()}
 
       {/* 新增周期表单 */}
       {addingCycle ? (
@@ -327,63 +357,282 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
   )
 }
 
+const CYCLE_TYPE_LIST = ['年度申报', '月度申报', '季度申报', '常态化']
+
+// 解析项目的 JSON 字段，供编辑时回填
+function parseProjectForForm(p) {
+  if (!p) return { level: '市级', region: '苏州市', category: '其他', isFocus: false }
+  const safe = (k) => { try { return p[k] ? JSON.parse(p[k]) : undefined } catch { return undefined } }
+  return {
+    name:          p.name,
+    level:         p.level,
+    region:        p.region,
+    category:      p.category,
+    isFocus:       p.isFocus,
+    cycleType:     p.cycleType,
+    applyUrl:      p.applyUrl,
+    contactNote:   p.contactNote,
+    policyDesc:    safe('policyDesc'),
+    policyLinks:   safe('policyLinks'),
+    attachments:   safe('attachments'),
+    cycleTemplate: safe('cycleTemplate'),
+    remark:        p.remark,
+  }
+}
+
+// 节点模板默认集合（按申报频次预设）
+const CYCLE_TEMPLATES = {
+  '年度申报': [
+    { label: '申报开始', offsetDays: 0 },
+    { label: '材料截止', offsetDays: 30 },
+    { label: '审核结果', offsetDays: 90 },
+    { label: '资金到账', offsetDays: 180 },
+  ],
+  '季度申报': [
+    { label: '材料截止', offsetDays: 0 },
+    { label: '审核完成', offsetDays: 30 },
+    { label: '资金到账', offsetDays: 60 },
+  ],
+  '月度申报': [
+    { label: '材料截止', offsetDays: 0 },
+    { label: '审核完成', offsetDays: 15 },
+  ],
+  '常态化': [],
+}
+
+// ── 分区标题 ─────────────────────────────────
+function SectionTitle({ icon, title, desc }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 14px', paddingBottom: 10, borderBottom: '1px solid #f2f4f7' }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: `${GREEN}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#101828' }}>{title}</div>
+        {desc && <div style={{ fontSize: 12, color: '#98a2b3' }}>{desc}</div>}
+      </div>
+    </div>
+  )
+}
+
 // ── 新建/编辑项目弹窗 ─────────────────────────
 function ProjectModal({ open, initial, onCancel, onOk }) {
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
+  const [cycleType, setCycleType] = useState(null)
+  const [policyDescs, setPolicyDescs] = useState([])   // [{id, text}]
+  const [policyLinks, setPolicyLinks] = useState([])   // [{id, label, url}]
+  const [attachments, setAttachments] = useState([])   // [{id, name, url}]
+  const [tplNodes, setTplNodes]     = useState([])     // [{id, label}]
 
   useEffect(() => {
-    if (open) form.setFieldsValue(initial || { level: '市级', region: '苏州市', category: '其他', isFocus: false })
-  }, [open, initial, form])
+    if (!open) return
+    const vals = parseProjectForForm(initial)
+    form.setFieldsValue(vals)
+    setCycleType(vals.cycleType || null)
+    setPolicyDescs(Array.isArray(vals.policyDesc) ? vals.policyDesc.map((t, i) => ({ id: i, text: t })) : [])
+    setPolicyLinks(Array.isArray(vals.policyLinks) ? vals.policyLinks.map((l, i) => ({ id: i, ...l })) : [])
+    setAttachments(Array.isArray(vals.attachments) ? vals.attachments.map((a, i) => ({ id: i, ...a })) : [])
+    setTplNodes(Array.isArray(vals.cycleTemplate) ? vals.cycleTemplate.map((n, i) => ({ id: i, ...n })) : [])
+  }, [open, initial])
+
+  const handleCycleTypeChange = (v) => {
+    setCycleType(v)
+    const tpl = CYCLE_TEMPLATES[v] || []
+    setTplNodes(tpl.map((n, i) => ({ id: i, ...n })))
+  }
 
   const handleOk = async () => {
     const vals = await form.validateFields()
     setSaving(true)
     try {
-      await onOk(vals)
+      await onOk({
+        ...vals,
+        policyDesc:    policyDescs.filter(d => d.text?.trim()).map(d => d.text),
+        policyLinks:   policyLinks.filter(l => l.url?.trim()),
+        attachments:   attachments.filter(a => a.url?.trim()),
+        cycleTemplate: tplNodes.filter(n => n.label?.trim()),
+      })
       form.resetFields()
     } finally { setSaving(false) }
   }
 
+  const uid = () => Math.random().toString(36).slice(2)
+
+  const inputStyle = { borderRadius: 8, fontSize: 13 }
+  const sectionBox = { background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 4 }
+
   return (
     <Modal
       open={open}
-      title={initial ? '编辑项目' : '新建申报项目'}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: GREEN_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🎓</div>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>{initial ? '编辑申报项目' : '新建申报项目'}</span>
+        </div>
+      }
       onCancel={onCancel}
-      onOk={handleOk}
-      okText="保存"
-      confirmLoading={saving}
-      width={520}
-      okButtonProps={{ style: { background: GREEN, border: 'none' } }}
+      footer={
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '4px 0' }}>
+          <Button onClick={onCancel} style={{ borderRadius: 8, height: 38 }}>取消</Button>
+          <Button type="primary" loading={saving} onClick={handleOk}
+            style={{ borderRadius: 8, height: 38, background: GREEN, border: 'none', fontWeight: 600, minWidth: 100 }}>
+            保存基础信息
+          </Button>
+        </div>
+      }
+      width={680}
+      bodyStyle={{ maxHeight: '75vh', overflowY: 'auto', paddingTop: 0 }}
     >
-      <Form form={form} layout="vertical" size="large" style={{ marginTop: 16 }}>
-        <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}>
-          <Input placeholder="如：苏州市优秀人才专项奖励" style={{ borderRadius: 8 }} />
+      <Form form={form} layout="vertical" size="middle">
+
+        {/* ① 基础信息 */}
+        <SectionTitle icon="📋" title="基础信息" />
+        <Form.Item name="name" label="项目名称 *" rules={[{ required: true, message: '请输入项目名称' }]}>
+          <Input placeholder="请输入项目全称" style={inputStyle} />
         </Form.Item>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item name="level" label="级别" rules={[{ required: true }]}>
-            <Select style={{ borderRadius: 8 }}>
-              {LEVEL_LIST.map(v => <Select.Option key={v}>{v}</Select.Option>)}
-            </Select>
+          <Form.Item name="level" label="申报级别" rules={[{ required: true }]} initialValue="市级">
+            <Select style={inputStyle} options={LEVEL_LIST.map(v => ({ label: v, value: v }))} />
           </Form.Item>
-          <Form.Item name="region" label="地区" rules={[{ required: true }]}>
-            <Select style={{ borderRadius: 8 }}>
-              {REGION_LIST.map(v => <Select.Option key={v}>{v}</Select.Option>)}
-            </Select>
+          <Form.Item name="region" label="所属地区" rules={[{ required: true }]} initialValue="苏州市">
+            <Select style={inputStyle} options={REGION_LIST.map(v => ({ label: v, value: v }))} />
           </Form.Item>
-          <Form.Item name="category" label="类别">
-            <Select style={{ borderRadius: 8 }}>
-              {CATEGORY_LIST.map(v => <Select.Option key={v}>{v}</Select.Option>)}
-            </Select>
+          <Form.Item name="category" label="人才类别" initialValue="其他">
+            <Select style={inputStyle} options={CATEGORY_LIST.map(v => ({ label: v, value: v }))} />
           </Form.Item>
-          <Form.Item name="isFocus" label="当期重点" valuePropName="checked">
-            <Switch checkedChildren="🔥 重点" unCheckedChildren="普通"
-              style={{ '--switch-color': '#f79009' }} />
+          <Form.Item name="isFocus" label="当期重点" valuePropName="checked" initialValue={false}>
+            <Switch checkedChildren="🔥 当期重点" unCheckedChildren="普通项目" style={cycleType ? {} : {}} />
           </Form.Item>
         </div>
-        <Form.Item name="remark" label="备注">
-          <Input.TextArea rows={2} placeholder="选填..." style={{ borderRadius: 8 }} />
+
+        {/* ② 申报周期规则 */}
+        <SectionTitle icon="📅" title="申报周期规则" desc="选择频次后，节点模板将自动预填" />
+        <div style={sectionBox}>
+          <div style={{ fontSize: 12, color: '#667085', marginBottom: 10 }}>申报频次</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {CYCLE_TYPE_LIST.map(t => (
+              <button key={t} type="button" onClick={() => { handleCycleTypeChange(t); form.setFieldValue('cycleType', t) }}
+                style={{ padding: '6px 16px', borderRadius: 8, border: `1.5px solid ${cycleType === t ? GREEN : '#e4e7ec'}`, background: cycleType === t ? GREEN_LIGHT : '#fff', color: cycleType === t ? GREEN_DARK : '#667085', cursor: 'pointer', fontSize: 13, fontWeight: cycleType === t ? 700 : 400, transition: 'all 0.12s' }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <Form.Item name="cycleType" hidden><Input /></Form.Item>
+        </div>
+
+        {/* ③ 申报节点模板 */}
+        <SectionTitle icon="🗓️" title="申报节点模板" desc="创建申报周期时将自动复制此模板" />
+        <div style={{ ...sectionBox, marginBottom: 0 }}>
+          {tplNodes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#98a2b3', fontSize: 13 }}>
+              {cycleType ? '暂无节点，点击「新增节点」添加' : '请先选择上方的「申报频次」，节点时间配置将自动显示'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+              {tplNodes.map((n, i) => (
+                <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: GREEN_LIGHT, border: `1.5px solid ${GREEN}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: GREEN_DARK, flexShrink: 0 }}>{i + 1}</div>
+                  <Input value={n.label} placeholder="节点名称" style={{ ...inputStyle, flex: 1 }}
+                    onChange={e => setTplNodes(prev => prev.map(x => x.id === n.id ? { ...x, label: e.target.value } : x))} />
+                  <Button type="text" danger size="small" onClick={() => setTplNodes(prev => prev.filter(x => x.id !== n.id))}>×</Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setTplNodes(p => [...p, { id: uid(), label: '' }])}
+            style={{ borderRadius: 6, width: '100%', borderColor: GREEN, color: GREEN, marginTop: 4 }}>
+            新增节点
+          </Button>
+        </div>
+
+        {/* ④ 联络与申报入口 */}
+        <SectionTitle icon="🔗" title="联络与申报入口" />
+        <Form.Item name="applyUrl" label="官网 / 申报系统 URL">
+          <Input placeholder="https://..." style={inputStyle} prefix={<span style={{ color: '#98a2b3', fontSize: 12 }}>🌐</span>} />
         </Form.Item>
+        <Form.Item name="contactNote" label="微信联系方式说明">
+          <Input.TextArea rows={2} placeholder="如：添加微信 xxx，备注「申报咨询」" style={{ ...inputStyle, resize: 'none' }} />
+        </Form.Item>
+
+        {/* ⑤ 政策与附件 */}
+        <SectionTitle icon="📄" title="政策与附件" />
+
+        {/* 政策说明 */}
+        <div style={{ fontSize: 12, color: '#344054', fontWeight: 600, marginBottom: 8 }}>
+          政策说明（多维度）
+          <Button type="link" size="small" onClick={() => setPolicyDescs(p => [...p, { id: uid(), text: '' }])}
+            style={{ float: 'right', fontSize: 12, color: GREEN, padding: 0 }}>+ 新增政策维度</Button>
+        </div>
+        {policyDescs.length === 0 ? (
+          <div style={{ ...sectionBox, textAlign: 'center', color: '#98a2b3', fontSize: 12, padding: '12px' }}>
+            暂无政策维度，点击「新增政策维度」添加
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            {policyDescs.map(d => (
+              <div key={d.id} style={{ display: 'flex', gap: 8 }}>
+                <Input.TextArea rows={2} value={d.text} placeholder="输入政策说明..."
+                  style={{ ...inputStyle, resize: 'none' }}
+                  onChange={e => setPolicyDescs(prev => prev.map(x => x.id === d.id ? { ...x, text: e.target.value } : x))} />
+                <Button type="text" danger size="small" onClick={() => setPolicyDescs(prev => prev.filter(x => x.id !== d.id))}>×</Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 政策原文链接 */}
+        <div style={{ fontSize: 12, color: '#344054', fontWeight: 600, marginBottom: 8 }}>
+          政策原文链接
+          <Button type="link" size="small" onClick={() => setPolicyLinks(p => [...p, { id: uid(), label: '', url: '' }])}
+            style={{ float: 'right', fontSize: 12, color: GREEN, padding: 0 }}>+ 新增政策原文链接</Button>
+        </div>
+        {policyLinks.length === 0 ? (
+          <div style={{ ...sectionBox, textAlign: 'center', color: '#98a2b3', fontSize: 12, padding: '12px' }}>
+            暂无链接，点击「新增政策原文链接」添加
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            {policyLinks.map(l => (
+              <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <Input value={l.label} placeholder="链接名称" style={{ ...inputStyle, width: 140, flexShrink: 0 }}
+                  onChange={e => setPolicyLinks(prev => prev.map(x => x.id === l.id ? { ...x, label: e.target.value } : x))} />
+                <Input value={l.url} placeholder="https://..." style={{ ...inputStyle, flex: 1 }}
+                  onChange={e => setPolicyLinks(prev => prev.map(x => x.id === l.id ? { ...x, url: e.target.value } : x))} />
+                <Button type="text" danger size="small" onClick={() => setPolicyLinks(prev => prev.filter(x => x.id !== l.id))}>×</Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 云附件 */}
+        <div style={{ fontSize: 12, color: '#344054', fontWeight: 600, marginBottom: 8 }}>
+          云附件（如飞书文档）
+          <Button type="link" size="small" onClick={() => setAttachments(p => [...p, { id: uid(), name: '', url: '' }])}
+            style={{ float: 'right', fontSize: 12, color: GREEN, padding: 0 }}>+ 新增云附件</Button>
+        </div>
+        {attachments.length === 0 ? (
+          <div style={{ ...sectionBox, textAlign: 'center', color: '#98a2b3', fontSize: 12, padding: '12px', marginBottom: 4 }}>
+            暂无附件，点击「新增云附件」添加
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 4 }}>
+            {attachments.map(a => (
+              <div key={a.id} style={{ display: 'flex', gap: 8 }}>
+                <Input value={a.name} placeholder="附件名称" style={{ ...inputStyle, width: 140, flexShrink: 0 }}
+                  onChange={e => setAttachments(prev => prev.map(x => x.id === a.id ? { ...x, name: e.target.value } : x))} />
+                <Input value={a.url} placeholder="https://..." style={{ ...inputStyle, flex: 1 }}
+                  onChange={e => setAttachments(prev => prev.map(x => x.id === a.id ? { ...x, url: e.target.value } : x))} />
+                <Button type="text" danger size="small" onClick={() => setAttachments(prev => prev.filter(x => x.id !== a.id))}>×</Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 备注 */}
+        <SectionTitle icon="💬" title="备注" />
+        <Form.Item name="remark">
+          <Input.TextArea rows={2} placeholder="选填..." style={{ ...inputStyle, resize: 'none' }} />
+        </Form.Item>
+
       </Form>
     </Modal>
   )
@@ -505,8 +754,13 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
                         <Switch size="small" checked={p.isFocus} onChange={() => handleToggleFocus(p)}
                           style={p.isFocus ? { background: '#f79009' } : {}} />
                       </div>
-                      <Button size="small" icon={<EditOutlined />} onClick={() => { setEditProject(p); setEditOpen(true) }}
+                      <Button size="small" icon={<EditOutlined />} onClick={() => { setEditProject(parseProjectForForm(p)); setEditOpen(true) }}
                         style={{ borderRadius: 6 }}>编辑内容</Button>
+                      {p.applyUrl && (
+                        <a href={p.applyUrl} target="_blank" rel="noreferrer">
+                          <Button size="small" style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6' }}>🌐 申报入口</Button>
+                        </a>
+                      )}
                       <Button size="small" type="primary" onClick={() => openDrawer(p)}
                         style={{ borderRadius: 6, background: GREEN, border: 'none' }}>
                         进入申报 &rsaquo;
