@@ -212,10 +212,11 @@ function ProjectDrawer({ project, onClose, onRefresh }) {
   // activeCycle 的任务
   const cycleTasks = activeCycle?.tasks || []
 
-  const totalApplicants = cycles.reduce((s, c) => s + (c.applicants?.length || 0), 0)
-  const totalAmount = cycles.reduce((s, c) =>
+  const allProjectCycles = project.cycles || []
+  const totalApplicants = allProjectCycles.reduce((s, c) => s + (c.applicants?.length || 0), 0)
+  const totalAmount = allProjectCycles.reduce((s, c) =>
     s + (c.applicants || []).reduce((ss, a) => ss + (a.paidAmount || a.amount || 0), 0), 0)
-  const paidAmount = cycles.reduce((s, c) =>
+  const paidAmount = allProjectCycles.reduce((s, c) =>
     s + (c.applicants || []).reduce((ss, a) => ss + (a.paidAmount || 0), 0), 0)
 
   // ── 公司操作 ──
@@ -1119,10 +1120,20 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
 
 // ── 导航视图 ──────────────────────────────────
 function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }) {
-  const router = useRouter()
-  const [hoveredId, setHoveredId] = useState(null)
+  const [hoveredId, setHoveredId]   = useState(null)
+  const [drawerProject, setDrawerProject] = useState(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [editProject, setEditProject] = useState(null)
-  const [editOpen, setEditOpen] = useState(false)
+  const [editOpen, setEditOpen]     = useState(false)
+
+  const openDrawer = (p) => { setDrawerProject(p); setDrawerOpen(true) }
+
+  useEffect(() => {
+    if (drawerProject) {
+      const updated = projects.find(p => p.id === drawerProject.id)
+      if (updated) setDrawerProject(updated)
+    }
+  }, [projects])
 
   const handleEdit = async (vals) => {
     await api.put(`/api/talent-projects/${editProject.id}`, vals)
@@ -1233,7 +1244,7 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
                               <Button size="small" style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6' }}>🌐 申报入口</Button>
                             </a>
                           )}
-                          <Button size="small" type="primary" onClick={() => router.push(`/talent-apply/${p.id}`)}
+                          <Button size="small" type="primary" onClick={() => openDrawer(p)}
                             style={{ borderRadius: 6, background: GREEN, border: 'none', fontWeight: 600 }}>
                             进入申报 ›
                           </Button>
@@ -1251,6 +1262,29 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
           </div>
         ))
       )}
+
+      {/* 申报详情 Modal */}
+      <Modal
+        open={drawerOpen}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
+        width={900}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#101828' }}>{drawerProject?.name}</span>
+            {drawerProject && <LevelChip v={drawerProject.level} />}
+          </div>
+        }
+        styles={{ body: { maxHeight: '78vh', overflowY: 'auto', padding: '16px 24px' } }}
+      >
+        {drawerProject && (
+          <ProjectDrawer
+            project={drawerProject}
+            onClose={() => setDrawerOpen(false)}
+            onRefresh={onRefresh}
+          />
+        )}
+      </Modal>
 
       <ProjectModal
         open={editOpen}
