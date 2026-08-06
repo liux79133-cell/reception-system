@@ -265,6 +265,50 @@ model AgreementFile {
   updatedAt   DateTime @updatedAt
 }
 
+// 人才申报模块
+model TalentProject {
+  id          Int            @id @default(autoincrement())
+  name        String
+  level       String         @default("市级") // 国家级|省级|市级|区级
+  region      String         @default("苏州市") // 全国|江苏省|苏州市|上海市|深圳市|其他
+  category    String         @default("其他") // 高层次人才|产业人才|创新创业|学历补贴|其他
+  isFocus     Boolean        @default(false)  // 当期重点
+  remark      String?
+  createdById Int
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  cycles      TalentCycle[]
+}
+
+model TalentCycle {
+  id          Int               @id @default(autoincrement())
+  projectId   Int
+  project     TalentProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  year        Int
+  deadline    String?           // 申报截止日 YYYY-MM-DD
+  status      String            @default("待申报") // 待申报|申报中|已提交|审核中|已入选|未入选
+  remark      String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  applicants  TalentApplicant[]
+}
+
+model TalentApplicant {
+  id          Int         @id @default(autoincrement())
+  cycleId     Int
+  cycle       TalentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  name        String
+  employeeId  String?
+  department  String?
+  amount      Float?      // 拟资助金额（万元）
+  paidAmount  Float?      // 实际到账金额（万元）
+  paidAt      DateTime?   // 到账时间
+  status      String      @default("待申报") // 待申报|申报中|已入选|未入选
+  remark      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
 // 协议条款提醒（2.x 类条款触发节点）
 model ClauseReminder {
   id           Int      @id @default(autoincrement())
