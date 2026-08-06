@@ -13,6 +13,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
 } from 'recharts'
+import { useRouter } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
 import { api } from '@/lib/api'
 import dayjs from 'dayjs'
@@ -1118,24 +1119,10 @@ function ProjectModal({ open, initial, onCancel, onOk }) {
 
 // ── 导航视图 ──────────────────────────────────
 function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }) {
-  const [drawerProject, setDrawerProject] = useState(null)
+  const router = useRouter()
   const [hoveredId, setHoveredId] = useState(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [editProject, setEditProject] = useState(null)
   const [editOpen, setEditOpen] = useState(false)
-
-  const openDrawer = (p) => { setDrawerProject(p); setDrawerOpen(true) }
-
-  const refreshDrawer = () => {
-    onRefresh()
-  }
-
-  useEffect(() => {
-    if (drawerProject) {
-      const updated = projects.find(p => p.id === drawerProject.id)
-      if (updated) setDrawerProject(updated)
-    }
-  }, [projects])
 
   const handleEdit = async (vals) => {
     await api.put(`/api/talent-projects/${editProject.id}`, vals)
@@ -1246,7 +1233,7 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
                               <Button size="small" style={{ borderRadius: 6, borderColor: '#6941c6', color: '#6941c6' }}>🌐 申报入口</Button>
                             </a>
                           )}
-                          <Button size="small" type="primary" onClick={() => openDrawer(p)}
+                          <Button size="small" type="primary" onClick={() => router.push(`/talent-apply/${p.id}`)}
                             style={{ borderRadius: 6, background: GREEN, border: 'none', fontWeight: 600 }}>
                             进入申报 ›
                           </Button>
@@ -1264,29 +1251,6 @@ function NavView({ projects, filterLevel, filterRegion, filterFocus, onRefresh }
           </div>
         ))
       )}
-
-      {/* 申报详情 Modal */}
-      <Modal
-        open={drawerOpen}
-        onCancel={() => setDrawerOpen(false)}
-        footer={null}
-        width={820}
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#101828' }}>{drawerProject?.name}</span>
-            {drawerProject && <LevelChip v={drawerProject.level} />}
-          </div>
-        }
-        bodyStyle={{ maxHeight: '72vh', overflowY: 'auto', padding: '16px 24px' }}
-      >
-        {drawerProject && (
-          <ProjectDrawer
-            project={drawerProject}
-            onClose={() => setDrawerOpen(false)}
-            onRefresh={() => { onRefresh() }}
-          />
-        )}
-      </Modal>
 
       <ProjectModal
         open={editOpen}
